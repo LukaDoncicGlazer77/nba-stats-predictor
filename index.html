@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>NBA Stats Predictor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+
+      <!-- Sidebar Navigation -->
+      <nav class="sidebar" aria-label="Main navigation">
+        <div class="brand">
+          <span class="brand-mark">NBA</span>
+          <div>
+            <h1>StatCast</h1>
+            <p>Stats &amp; Predictions</p>
+          </div>
+        </div>
+
+        <ul class="nav-list" role="list">
+          <li><button class="nav-item active" data-section="dashboard">📊 Dashboard</button></li>
+
+          <li class="nav-heading">PLAYER INTELLIGENCE</li>
+          <li><button class="nav-item" data-section="players">🏀 Players</button></li>
+          <li><button class="nav-item" data-section="prospects">⭐ Prospects</button></li>
+          <li><button class="nav-item" data-section="comparisons">⚖️ Comparisons</button></li>
+          <li><button class="nav-item" data-section="draft">📋 Draft Class</button></li>
+          <li><button class="nav-item" data-section="watchlist">🔖 Watchlist</button></li>
+
+          <li class="nav-heading">TEAM TOOLS</li>
+          <li><button class="nav-item" data-section="team-dashboard">🏟️ Team Dashboard</button></li>
+          <li><button class="nav-item" data-section="reports">📄 Reports</button></li>
+          <li><button class="nav-item" data-section="analytics">📈 Analytics Hub</button></li>
+          <li><button class="nav-item" data-section="lineup">🔀 Lineup Simulator</button></li>
+        </ul>
+
+        <div class="sidebar-footer">
+          <div class="data-badge">
+            <span class="badge-dot"></span>
+            <span id="sidebarDbStatus">Loading...</span>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Main Content -->
+      <main class="main-content">
+
+        <!-- Top Bar -->
+        <div class="topbar">
+          <input id="globalSearch" type="search" placeholder="Search players and teams..." class="global-search" />
+          <div class="global-search-results hidden" id="globalSearchResults"></div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <section class="page" id="page-dashboard">
+          <div class="page-header">
+            <div>
+              <h2>Dashboard</h2>
+              <p class="page-subtitle" id="dashboardSeasonLabel">Latest season overview</p>
+            </div>
+            <div class="page-controls">
+              <label class="season-label" for="dashboardSeasonSelect">Season</label>
+              <select id="dashboardSeasonSelect"></select>
+            </div>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="stat-card wide">
+              <div class="stat-card-header">
+                <h3>Scoring Leaders</h3>
+                <span class="badge" id="scoringSeasonBadge"></span>
+              </div>
+              <div class="leaders-table-wrap">
+                <table class="leaders-table">
+                  <thead><tr><th>#</th><th>Player</th><th>Team</th><th>PTS</th><th>REB</th><th>AST</th><th>FG%</th></tr></thead>
+                  <tbody id="scoringLeaders"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header"><h3>Assist Leaders</h3></div>
+              <ul class="mini-leaderboard" id="assistLeaders"></ul>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header"><h3>Rebound Leaders</h3></div>
+              <ul class="mini-leaderboard" id="reboundLeaders"></ul>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header"><h3>Award Winners</h3></div>
+              <ul class="award-list" id="awardList"></ul>
+            </div>
+
+            <div class="stat-card wide">
+              <div class="stat-card-header"><h3>Eastern Conference</h3><span class="badge">East</span></div>
+              <div class="leaders-table-wrap">
+                <table class="leaders-table">
+                  <thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>W%</th><th>Net Rtg</th></tr></thead>
+                  <tbody id="eastStandings"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="stat-card wide">
+              <div class="stat-card-header"><h3>Western Conference</h3><span class="badge badge-west">West</span></div>
+              <div class="leaders-table-wrap">
+                <table class="leaders-table">
+                  <thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>W%</th><th>Net Rtg</th></tr></thead>
+                  <tbody id="westStandings"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="stat-card wide" id="bracketCard">
+              <div class="stat-card-header">
+                <h3>Playoff Bracket</h3>
+                <span class="bracket-note" id="bracketNote"></span>
+              </div>
+              <div id="playoffBracket"></div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Players Section -->
+        <!-- Players Browse List -->
+        <section class="page hidden" id="page-players">
+          <div class="page-header">
+            <div>
+              <h2>Players</h2>
+              <p class="page-subtitle">Career stats, trends &amp; projections</p>
+            </div>
+          </div>
+          <div class="player-browser-page">
+            <div class="player-browser-controls">
+              <input id="playerSearch" type="search" placeholder="Filter by name, team, position..." class="player-filter-input" />
+              <span id="matchCount" class="dataset-summary"></span>
+            </div>
+            <p id="playerCount" class="player-grid-label">Loading...</p>
+            <div id="playerGrid" class="player-grid">
+              <div class="loading-state">Loading players...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Player Profile Page -->
+        <section class="page hidden" id="page-player-profile">
+
+          <!-- Top nav bar -->
+          <div class="profile-topnav">
+            <button class="back-btn" id="backToPlayers">← Players</button>
+            <div class="profile-tab-group">
+              <button class="profile-tab active" data-pane="overview">Overview</button>
+              <button class="profile-tab" data-pane="stats">Season Stats</button>
+              <button class="profile-tab" data-pane="projections">Projections</button>
+            </div>
+            <button class="save-btn" id="profileWatchlistBtn">🔖 Save</button>
+          </div>
+
+          <!-- Dark hero header -->
+          <div class="profile-hero-dark">
+            <div class="profile-hero-main">
+              <div id="playerAvatar" class="player-avatar-hero"></div>
+              <div class="profile-hero-text">
+                <p id="playerTeam" class="profile-eyebrow"></p>
+                <h2 id="playerName" class="profile-name-h2"></h2>
+                <div id="playerTags" class="tag-row"></div>
+              </div>
+            </div>
+            <div class="profile-hero-statrow" id="heroStats"></div>
+          </div>
+
+          <!-- Overview pane -->
+          <div class="profile-pane" id="pane-overview">
+
+            <!-- Top row: Info/Notes + Radar -->
+            <div class="overview-top-row">
+              <div class="profile-col">
+                <div class="pcard">
+                  <div class="pcard-head">
+                    <h4>Player Info</h4>
+                    <span id="profileUpdated" class="pcard-sub"></span>
+                  </div>
+                  <dl id="profileFacts" class="pfact-grid"></dl>
+                  <p id="playerSummary" class="pcard-summary"></p>
+                </div>
+                <div class="pcard">
+                  <h4>Scouting Notes</h4>
+                  <ul id="scoutingNotes" class="pcard-notes"></ul>
+                </div>
+              </div>
+              <div class="pcard radar-card">
+                <h4>Skill Breakdown</h4>
+                <div class="radar-wrap">
+                  <canvas id="skillRadar" width="480" height="480"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Statistical Trend -->
+            <div class="pcard trend-card">
+              <div class="pcard-head">
+                <h4>Statistical Trend</h4>
+                <select id="metricSelect" class="pcard-select">
+                  <option value="pts">Points</option>
+                  <option value="reb">Rebounds</option>
+                  <option value="ast">Assists</option>
+                  <option value="min">Minutes</option>
+                  <option value="three">3-Pointers</option>
+                  <option value="stl">Steals</option>
+                  <option value="blk">Blocks</option>
+                  <option value="tov">Turnovers</option>
+                  <option value="net">BPM</option>
+                  <option value="ts">True Shooting</option>
+                  <option value="gp">Games Played</option>
+                </select>
+              </div>
+              <canvas id="trendChart" width="1400" height="380"></canvas>
+            </div>
+
+            <!-- Development Curve -->
+            <div class="pcard trend-card">
+              <div class="pcard-head">
+                <h4>Development Curve</h4>
+                <span class="pcard-sub">vs. typical NBA player range</span>
+              </div>
+              <canvas id="devCurveChart" width="1400" height="380"></canvas>
+            </div>
+
+          </div>
+
+          <!-- Stats pane -->
+          <div class="profile-pane hidden" id="pane-stats">
+            <div class="pcard">
+              <h4>Season by Season · per game</h4>
+              <div class="table-wrap">
+                <table class="dark-table">
+                  <thead>
+                    <tr>
+                      <th>Season</th><th>Age</th><th>GP</th><th>MIN</th>
+                      <th>PTS</th><th>REB</th><th>AST</th><th>3P</th>
+                      <th>STL</th><th>BLK</th><th>TOV</th><th>TS%</th><th>USG%</th>
+                    </tr>
+                  </thead>
+                  <tbody id="seasonRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Projections pane -->
+          <div class="profile-pane hidden" id="pane-projections">
+            <div class="profile-grid-2">
+              <div class="pcard">
+                <div class="pcard-head">
+                  <h4>Projection Builder</h4>
+                  <button id="resetControls" class="pcard-reset">Reset</button>
+                </div>
+                <div class="control-grid pcard-controls">
+                  <label>
+                    <span>Future seasons</span>
+                    <input id="seasonRange" type="range" min="1" max="5" value="3" />
+                    <strong id="seasonValue">3</strong>
+                  </label>
+                  <label>
+                    <span>Playing time Δ</span>
+                    <input id="minutesRange" type="range" min="-8" max="8" value="0" />
+                    <strong id="minutesValue">0</strong>
+                  </label>
+                  <label>
+                    <span>Usage Δ</span>
+                    <input id="usageRange" type="range" min="-6" max="6" value="0" />
+                    <strong id="usageValue">0</strong>
+                  </label>
+                  <label>
+                    <span>Durability Δ</span>
+                    <input id="durabilityRange" type="range" min="-12" max="12" value="0" />
+                    <strong id="durabilityValue">0</strong>
+                  </label>
+                </div>
+              </div>
+              <div class="pcard">
+                <h4>Projected Stats</h4>
+                <div id="projectionCards" class="proj-cards-grid"></div>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Prospects Section -->
+        <section class="page hidden" id="page-prospects">
+          <div class="page-header">
+            <div>
+              <h2>2026 Draft Prospects</h2>
+              <p class="page-subtitle">101 prospects · Rankings via ESPN Big Board</p>
+            </div>
+            <div class="page-controls">
+              <input id="prospectSearch" type="search" placeholder="Filter prospects..." class="player-filter-input" style="max-width:280px" />
+            </div>
+          </div>
+          <div class="table-panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Proj. Pick</th><th>Player</th><th>Pos</th><th>Age</th>
+                    <th>School / Club</th><th>Height</th><th>Weight</th>
+                    <th>Status</th><th>Country</th>
+                  </tr>
+                </thead>
+                <tbody id="prospectsTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Comparisons Section -->
+        <section class="page hidden" id="page-comparisons">
+          <div class="page-header">
+            <div>
+              <h2>Comparisons</h2>
+              <p class="page-subtitle">Compare two players side by side</p>
+            </div>
+          </div>
+
+          <div class="comparison-selectors">
+            <div class="compare-picker">
+              <label>Player A</label>
+              <input id="compareSearchA" type="search" placeholder="Search player..." class="compare-input" />
+              <div class="compare-dropdown" id="compareDropdownA"></div>
+            </div>
+            <div class="vs-badge">VS</div>
+            <div class="compare-picker">
+              <label>Player B</label>
+              <input id="compareSearchB" type="search" placeholder="Search player..." class="compare-input" />
+              <div class="compare-dropdown" id="compareDropdownB"></div>
+            </div>
+          </div>
+
+          <div class="comparison-content" id="comparisonContent">
+            <div class="compare-placeholder">Select two players above to compare their stats.</div>
+          </div>
+        </section>
+
+        <!-- Draft Class Section -->
+        <section class="page hidden" id="page-draft">
+          <div class="page-header">
+            <div>
+              <h2>Draft Class</h2>
+              <p class="page-subtitle">Browse historical draft picks by year</p>
+            </div>
+            <div class="page-controls">
+              <select id="draftSeasonSelect"></select>
+            </div>
+          </div>
+          <div class="table-panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pick</th><th>Rd</th><th>Player</th><th>Team</th>
+                    <th>College</th><th>Career PTS</th><th>Career REB</th>
+                    <th>Career AST</th><th>Seasons</th>
+                  </tr>
+                </thead>
+                <tbody id="draftTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Watchlist Section -->
+        <section class="page hidden" id="page-watchlist">
+          <div class="page-header">
+            <div>
+              <h2>Watchlist</h2>
+              <p class="page-subtitle">Your saved players</p>
+            </div>
+            <button class="icon-button" id="clearWatchlist">Clear all</button>
+          </div>
+
+          <div id="watchlistContent">
+            <div class="empty-state" id="watchlistEmpty">
+              <p>No players saved yet.</p>
+              <p>Go to <strong>Players</strong> and click the bookmark icon to add players here.</p>
+            </div>
+            <div class="table-panel hidden" id="watchlistTable">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Player</th><th>Latest Season</th><th>Team</th>
+                      <th>PTS</th><th>REB</th><th>AST</th><th>TS%</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="watchlistRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Team Dashboard -->
+        <section class="page hidden" id="page-team-dashboard">
+          <div class="page-header">
+            <div>
+              <h2>🏟️ Team Dashboard</h2>
+              <p class="page-subtitle">Team-level performance and standings overview</p>
+            </div>
+          </div>
+          <div class="coming-soon-page">
+            <div class="coming-soon-icon">🏟️</div>
+            <h3>Team Dashboard</h3>
+            <p>Win/loss records, offensive &amp; defensive ratings, pace, and net rating breakdowns for every team — coming soon.</p>
+            <div class="coming-soon-features">
+              <span>📊 Team ratings</span>
+              <span>📅 Game log</span>
+              <span>📉 Trend charts</span>
+              <span>🏆 Standings</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reports -->
+        <section class="page hidden" id="page-reports">
+          <div class="page-header">
+            <div>
+              <h2>📄 Reports</h2>
+              <p class="page-subtitle">Generated scouting and performance reports</p>
+            </div>
+          </div>
+          <div class="coming-soon-page">
+            <div class="coming-soon-icon">📄</div>
+            <h3>Reports</h3>
+            <p>Auto-generated player and team scouting reports with statistical context and trend analysis — coming soon.</p>
+            <div class="coming-soon-features">
+              <span>🔍 Player scouting</span>
+              <span>📋 Season summaries</span>
+              <span>📤 Export to PDF</span>
+              <span>🗓️ Weekly digests</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Analytics Hub -->
+        <section class="page hidden" id="page-analytics">
+          <div class="page-header">
+            <div>
+              <h2>📈 Analytics Hub</h2>
+              <p class="page-subtitle">Advanced metrics and custom stat breakdowns</p>
+            </div>
+          </div>
+          <div class="coming-soon-page">
+            <div class="coming-soon-icon">📈</div>
+            <h3>Analytics Hub</h3>
+            <p>Deep dives into advanced metrics — PER, BPM, VORP, True Shooting, usage trends, and custom filters across any season — coming soon.</p>
+            <div class="coming-soon-features">
+              <span>📐 Custom queries</span>
+              <span>🧮 Advanced metrics</span>
+              <span>📊 Shot charts</span>
+              <span>🔬 Regression tools</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Lineup Simulator -->
+        <section class="page hidden" id="page-lineup">
+          <div class="page-header">
+            <div>
+              <h2>🔀 Lineup Simulator</h2>
+              <p class="page-subtitle">Build and evaluate lineup combinations</p>
+            </div>
+          </div>
+          <div class="coming-soon-page">
+            <div class="coming-soon-icon">🔀</div>
+            <h3>Lineup Simulator</h3>
+            <p>Drag-and-drop lineup builder with projected net rating, spacing grade, and pace impact for any five-man unit — coming soon.</p>
+            <div class="coming-soon-features">
+              <span>🏀 5-man units</span>
+              <span>⚡ Net rating projection</span>
+              <span>📐 Spacing grade</span>
+              <span>🔄 Rotation builder</span>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <script src="app.js?v=20260616-fix21"></script>
+  </body>
+</html>

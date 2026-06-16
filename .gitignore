@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+nba.db-shm
+nba.db-wal
+*.bak
+*.bak3

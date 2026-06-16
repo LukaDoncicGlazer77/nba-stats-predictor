@@ -1,0 +1,1269 @@
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const $ = (sel) => document.querySelector(sel);
+
+function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function seasonStart(season) {
+  return Number(String(season).slice(0, 4));
+}
+
+function titleCase(value) {
+  return String(value || "").toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
+
+function initials(name) {
+  return name.split(" ").map((p) => p[0]).join("");
+}
+
+function playerPhotoUrl(playerId) {
+  if (!playerId) return null;
+  return `/api/player-photo/${playerId}`;
+}
+
+function playerAvatar(playerId, name, colors, size = 48) {
+  const url = playerPhotoUrl(playerId);
+  const bg = colors ? `linear-gradient(135deg,${colors[0]},${colors[1]})` : "#1a2540";
+  const ini = initials(name || "?");
+  if (url) {
+    return `<span class="p-avatar" style="width:${size}px;height:${size}px;background:${bg}">
+      <img src="${url}" alt="${name}" width="${size}" height="${size}"
+           onerror="this.style.display='none';this.parentElement.classList.add('p-avatar-fallback')" />
+      <span class="p-avatar-ini">${ini}</span>
+    </span>`;
+  }
+  return `<span class="p-avatar p-avatar-fallback" style="width:${size}px;height:${size}px;background:${bg}">
+    <span class="p-avatar-ini">${ini}</span>
+  </span>`;
+}
+
+function fmt(value, key) {
+  if (!Number.isFinite(value)) return "0.0";
+  if (key === "gp") return Math.round(value);
+  return value.toFixed(1);
+}
+
+function stableColor(seed, offset = 0) {
+  const palette = ["#1e6f5c", "#235b8f", "#bd3340", "#d79d28", "#5f4b8b", "#246a73", "#8a4f2a", "#31572c"];
+  let hash = offset;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) % palette.length;
+  return palette[Math.abs(hash) % palette.length];
+}
+
+function latestSeason(player) {
+  return player.seasons[player.seasons.length - 1];
+}
+
+// ── Routing ──────────────────────────────────────────────────────────────────
+
+let currentSection = "dashboard";
+
+function navigate(section) {
+  document.querySelectorAll(".page").forEach((p) => p.classList.add("hidden"));
+  document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
+  const page = $(`#page-${section}`);
+  if (page) page.classList.remove("hidden");
+  // player-profile is a sub-page of players — keep Players nav highlighted
+  const navSection = section === "player-profile" ? "players" : section;
+  if (section !== "player-profile") currentSection = section;
+  const btn = document.querySelector(`.nav-item[data-section="${navSection}"]`);
+  if (btn) btn.classList.add("active");
+
+  if (section === "dashboard" && !dashboardLoaded) loadDashboard();
+  if (section === "players") {
+    if (!playersLoaded) initPlayers();
+    else renderPlayerGrid();
+  }
+  if (section === "player-profile") renderPlayerProfile();
+  if (section === "prospects" && !prospectsLoaded) loadProspects();
+  if (section === "draft" && !draftLoaded) loadDraft();
+  if (section === "watchlist") renderWatchlist();
+  if (section === "comparisons" && !playersLoaded) initPlayers();
+}
+
+document.querySelectorAll(".nav-item").forEach((btn) => {
+  btn.addEventListener("click", () => navigate(btn.dataset.section));
+});
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+
+let dashboardLoaded = false;
+
+async function loadDashboard(season) {
+  dashboardLoaded = true;
+  try {
+    const url = season ? `/api/dashboard?season=${season}` : "/api/dashboard";
+    const data = await fetch(url).then((r) => r.json());
+    const s = data.season;
+    $("#dashboardSeasonLabel").textContent = `${s}–${String(Number(s) + 1).slice(-2)} season overview`;
+    $("#scoringSeasonBadge").textContent = s;
+
+    // Populate season selector (only once)
+    const sel = $("#dashboardSeasonSelect");
+    if (sel && data.seasons_available && sel.options.length === 0) {
+      data.seasons_available.forEach((yr) => {
+        const opt = document.createElement("option");
+        opt.value = yr;
+        opt.textContent = `${yr}–${String(Number(yr) + 1).slice(-2)}`;
+        if (String(yr) === String(s)) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    } else if (sel) {
+      sel.value = String(s);
+    }
+
+    $("#scoringLeaders").innerHTML = data.top_scorers.map((p, i) => `
+      <tr>
+        <td class="rank">${i + 1}</td>
+        <td class="highlight">${p.player}</td>
+        <td>${p.team || "—"}</td>
+        <td class="highlight">${(p.pts || 0).toFixed(1)}</td>
+        <td>${(p.reb || 0).toFixed(1)}</td>
+        <td>${(p.ast || 0).toFixed(1)}</td>
+        <td>${p.fg_pct ? (p.fg_pct).toFixed(1) + "%" : "—"}</td>
+      </tr>
+    `).join("");
+
+    $("#assistLeaders").innerHTML = data.top_assisters.map((p, i) => `
+      <li>
+        <span class="mini-rank">${i + 1}</span>
+        <span class="player-col"><strong>${p.player}</strong><span>${p.team || "—"}</span></span>
+        <span class="stat-val">${(p.ast || 0).toFixed(1)}</span>
+      </li>
+    `).join("");
+
+    $("#reboundLeaders").innerHTML = data.top_rebounders.map((p, i) => `
+      <li>
+        <span class="mini-rank">${i + 1}</span>
+        <span class="player-col"><strong>${p.player}</strong><span>${p.team || "—"}</span></span>
+        <span class="stat-val">${(p.reb || 0).toFixed(1)}</span>
+      </li>
+    `).join("");
+
+    const awardNames = {
+      "nba mvp":          "MVP",
+      "nba dpoy":         "Defensive Player of the Year",
+      "nba roty":         "Rookie of the Year",
+      "nba smoy":         "Sixth Man of the Year",
+      "nba mip":          "Most Improved Player",
+      "nba allstar_mvp":  "All-Star Game MVP",
+      "nba finals_mvp":   "NBA Finals MVP",
+      "nba clutch_poy":   "Clutch Player of the Year",
+    };
+    const awardOrder = ["nba mvp","nba dpoy","nba roty","nba smoy","nba mip","nba allstar_mvp","nba finals_mvp","nba clutch_poy"];
+    const sortedAwards = [...data.awards].sort((a, b) => {
+      const ai = awardOrder.indexOf(a.award), bi = awardOrder.indexOf(b.award);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+    $("#awardList").innerHTML = sortedAwards.map((a) => `
+      <li>
+        <span class="award-name">${awardNames[a.award] || a.award}</span>
+        <span class="award-player">${a.player}</span>
+      </li>
+    `).join("") || "<li style='color:var(--muted)'>No award data for this season.</li>";
+
+    const EAST = new Set(["ATL","BOS","BRK","CHO","CHA","CHI","CLE","DET","IND","MIL","MIA","NYK","ORL","PHI","TOR","WAS"]);
+    const WEST = new Set(["DAL","DEN","GSW","HOU","LAC","LAL","MEM","MIN","NOP","OKC","PHO","POR","SAC","SAS","UTA"]);
+    const standingRow = (t, i) => {
+      const madePlayoffs = String(t.playoffs).toUpperCase() === "TRUE";
+      const playoff = madePlayoffs ? `<span class="playoff-dot" title="Made Playoffs">🏆</span>` : "";
+      return `
+      <tr class="${madePlayoffs ? "playoff-team" : ""}">
+        <td class="rank">${i + 1}</td>
+        <td class="highlight">${t.team} ${playoff}</td>
+        <td>${t.w}</td>
+        <td>${t.l}</td>
+        <td>${t.win_pct ? (t.win_pct * 100).toFixed(1) + "%" : "—"}</td>
+        <td style="color:${t.net_rtg > 0 ? "var(--green)" : "var(--red)"}">${t.net_rtg > 0 ? "+" : ""}${(t.net_rtg || 0).toFixed(1)}</td>
+      </tr>`;
+    };
+    const east = data.team_standings.filter((t) => EAST.has(t.abbreviation)).sort((a,b) => b.w - a.w);
+    const west = data.team_standings.filter((t) => WEST.has(t.abbreviation)).sort((a,b) => b.w - a.w);
+    $("#eastStandings").innerHTML = east.map(standingRow).join("");
+    $("#westStandings").innerHTML = west.map(standingRow).join("");
+
+    $("#sidebarDbStatus").textContent = `${s} data loaded`;
+    renderPlayoffBracket(data.team_standings, s);
+  } catch (e) {
+    console.warn("Dashboard load failed", e);
+    $("#sidebarDbStatus").textContent = "DB error";
+  }
+}
+
+$("#dashboardSeasonSelect").addEventListener("change", (e) => {
+  dashboardLoaded = false;
+  loadDashboard(e.target.value);
+});
+
+// ── Playoff Bracket ───────────────────────────────────────────────────────────
+
+const EAST_ABBREVS = new Set(["ATL","BOS","BRK","CHO","CHA","CHI","CLE","DET","IND","MIL","MIA","NYK","ORL","PHI","TOR","WAS"]);
+
+function renderPlayoffBracket(allTeams, season) {
+  const bracket = $("#playoffBracket");
+  const note = $("#bracketNote");
+  if (!bracket) return;
+
+  const playoffTeams = allTeams.filter((t) => String(t.playoffs).toUpperCase() === "TRUE");
+  const enoughData = playoffTeams.length >= 14;
+
+  let eastSeeds, westSeeds;
+  if (enoughData) {
+    eastSeeds = playoffTeams.filter((t) => EAST_ABBREVS.has(t.abbreviation)).sort((a, b) => b.w - a.w).slice(0, 8);
+    westSeeds = playoffTeams.filter((t) => !EAST_ABBREVS.has(t.abbreviation)).sort((a, b) => b.w - a.w).slice(0, 8);
+    if (note) note.textContent = "First-round matchups by regular-season seeding";
+  } else {
+    // Infer from wins for incomplete/in-progress seasons
+    eastSeeds = allTeams.filter((t) => EAST_ABBREVS.has(t.abbreviation)).sort((a, b) => b.w - a.w).slice(0, 8);
+    westSeeds = allTeams.filter((t) => !EAST_ABBREVS.has(t.abbreviation)).sort((a, b) => b.w - a.w).slice(0, 8);
+    if (note) note.textContent = "Projected — based on current standings";
+  }
+
+  const teamSlot = (seeds, seedNum, isWinner = false) => {
+    const t = seeds[seedNum - 1];
+    if (!t) return `<div class="b-slot b-tbd"><span class="b-seed-num">${seedNum}</span><span class="b-team-name">TBD</span></div>`;
+    return `<div class="b-slot${isWinner ? " b-winner" : ""}">
+      <span class="b-seed-num">${seedNum}</span>
+      <span class="b-team-name">${t.team}</span>
+      <span class="b-team-rec">${t.w}–${t.l}</span>
+    </div>`;
+  };
+
+  const matchup = (seeds, hi, lo) => `
+    <div class="b-matchup">
+      ${teamSlot(seeds, hi)}
+      <div class="b-vs">vs</div>
+      ${teamSlot(seeds, lo)}
+    </div>`;
+
+  const tbd2 = () => `<div class="b-matchup b-matchup-tbd"><div class="b-slot b-tbd"><span class="b-team-name">TBD</span></div><div class="b-vs">vs</div><div class="b-slot b-tbd"><span class="b-team-name">TBD</span></div></div>`;
+
+  const confBracket = (seeds, label, west = false) => {
+    const r1 = `<div class="b-round">
+        <div class="b-round-label">First Round</div>
+        ${matchup(seeds, 1, 8)}
+        ${matchup(seeds, 4, 5)}
+        ${matchup(seeds, 2, 7)}
+        ${matchup(seeds, 3, 6)}
+      </div>`;
+    const r2 = `<div class="b-round">
+        <div class="b-round-label">Semifinals</div>
+        ${tbd2()}
+        ${tbd2()}
+      </div>`;
+    const cf = `<div class="b-round">
+        <div class="b-round-label">Conf Finals</div>
+        ${tbd2()}
+      </div>`;
+    const rounds = west ? [cf, r2, r1].join("") : [r1, r2, cf].join("");
+    return `<div class="b-conf">
+      <div class="b-conf-label">${label}</div>
+      <div class="b-rounds">${rounds}</div>
+    </div>`;
+  };
+
+  bracket.innerHTML = `
+    <div class="b-wrap">
+      ${confBracket(eastSeeds, "Eastern Conference", false)}
+      <div class="b-finals">
+        <div class="b-finals-label">🏆 NBA Finals</div>
+        <div class="b-finals-box">
+          <div class="b-slot b-tbd"><span class="b-team-name">East Champion</span></div>
+          <div class="b-vs">vs</div>
+          <div class="b-slot b-tbd"><span class="b-team-name">West Champion</span></div>
+        </div>
+      </div>
+      ${confBracket(westSeeds, "Western Conference", true)}
+    </div>`;
+}
+
+// ── Players ──────────────────────────────────────────────────────────────────
+
+const fallbackPlayers = [];
+let players = fallbackPlayers;
+let dataSource = "loading";
+let playersLoaded = false;
+
+const playerState = {
+  player: null,
+  metric: "pts",
+  seasonsAhead: 3,
+  minutesChange: 0,
+  usageChange: 0,
+  durabilityChange: 0,
+};
+
+const metricLabels = { pts:"PTS", reb:"REB", ast:"AST", min:"MIN", three:"3P", stl:"STL", blk:"BLK", tov:"TOV", net:"BPM", ts:"TS%", gp:"GP" };
+
+function estimateMinutes(row) {
+  const pts = toNumber(row.pts), reb = toNumber(row.reb), ast = toNumber(row.ast), usg = toNumber(row.usg_pct) * 100;
+  return Math.max(8, Math.min(38, 12 + pts * 0.48 + reb * 0.42 + ast * 0.55 + usg * 0.12));
+}
+
+function classifyPosition(latest) {
+  if (latest.pos) return latest.pos;
+  const h = toNumber(latest.player_height) / 2.54;
+  if (h >= 82) return "C";
+  if (h >= 80) return "F/C";
+  if (h >= 77) return "F";
+  if (h >= 75) return "G/F";
+  return "G";
+}
+
+function playerSummary(player) {
+  const l = latestSeason(player);
+  return `${player.name} last appeared for ${player.team} in ${l.season}, averaging ${fmt(l.pts,"pts")} pts, ${fmt(l.reb,"reb")} reb, ${fmt(l.ast,"ast")} ast per game.`;
+}
+
+function playerNotes(player) {
+  const l = latestSeason(player);
+  const notes = [
+    `${l.gp} games played in the latest available season.`,
+    `${fmt(l.usg,"usg")}% usage rate with ${fmt(l.ts,"ts")}% true shooting.`,
+    `${fmt(l.net,"net")} box plus/minus in the latest season sample.`,
+    `${fmt(l.stl,"stl")} steals, ${fmt(l.blk,"blk")} blocks, and ${fmt(l.tov,"tov")} turnovers per game.`,
+  ];
+  if (player.country && player.country !== "USA") notes.push(`International profile: ${player.country}.`);
+  return notes;
+}
+
+function buildPlayersFromRows(rows) {
+  const grouped = rows.reduce((map, row) => {
+    const name = row.player_name && row.player_name.trim();
+    if (!name) return map;
+    if (!map.has(name)) map.set(name, []);
+    map.get(name).push(row);
+    return map;
+  }, new Map());
+
+  return [...grouped.entries()].map(([name, rowsForPlayer]) => {
+    // For seasons with multiple team entries (trades), keep only TOT row or the highest-games row
+    // but also collect the individual teams played for that season
+    const seasonMap = {};
+    const seasonTeams = {};
+    for (const row of rowsForPlayer) {
+      const key = row.season;
+      const team = row.team_abbreviation || row.team || "";
+      if (!seasonMap[key]) {
+        seasonMap[key] = row;
+        seasonTeams[key] = [];
+      }
+      if (team !== "TOT") seasonTeams[key].push(team);
+      if (team === "TOT") { seasonMap[key] = row; continue; }
+      const existing = seasonMap[key];
+      const existingTeam = existing.team_abbreviation || existing.team || "";
+      if (existingTeam !== "TOT" && toNumber(row.gp) > toNumber(existing.gp)) seasonMap[key] = row;
+    }
+    const deduped = Object.values(seasonMap);
+
+    const seasons = deduped
+      .sort((a, b) => seasonStart(a.season) - seasonStart(b.season))
+      .map((row) => ({
+        teamsThisSeason: (seasonTeams[row.season] || []).filter((t, i, arr) => arr.indexOf(t) === i),
+        season: row.season,
+        age: toNumber(row.age),
+        gp: toNumber(row.gp),
+        min: row.min === undefined ? estimateMinutes(row) : toNumber(row.min),
+        pts: toNumber(row.pts),
+        reb: toNumber(row.reb),
+        ast: toNumber(row.ast),
+        three: toNumber(row.three),
+        stl: toNumber(row.stl),
+        blk: toNumber(row.blk),
+        tov: toNumber(row.tov),
+        fg: toNumber(row.fg),
+        threePct: toNumber(row.three_pct),
+        ftPct: toNumber(row.ft_pct),
+        net: toNumber(row.net_rating),
+        ts: toNumber(row.ts_pct) * 100,
+        usg: toNumber(row.usg_pct) * 100,
+        team: row.team_abbreviation,
+        pos: row.pos,
+        playerId: row.player_id,
+        country: row.country,
+        college: row.college,
+        heightCm: toNumber(row.player_height),
+        weightKg: toNumber(row.player_weight),
+      }))
+      .filter((s) => s.season);
+    const latest = seasons[seasons.length - 1];
+    return {
+      id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+      name,
+      playerId: latest.playerId || null,
+      team: latest.team,
+      position: classifyPosition(latest),
+      height: latest.heightCm ? `${Math.round(latest.heightCm)} cm` : "N/A",
+      weight: latest.weightKg ? `${Math.round(latest.weightKg)} kg` : "N/A",
+      age: latest.age,
+      country: latest.country,
+      college: latest.college,
+      experience: `${seasons.length} seasons`,
+      archetype: `${latest.pos || titleCase(latest.country) || "NBA"} player profile`,
+      colors: [stableColor(name), stableColor(name, 3)],
+      seasons,
+    };
+  })
+  .sort((a, b) => {
+    const lastName = (n) => n.trim().split(" ").slice(-1)[0].toLowerCase();
+    return lastName(a.name).localeCompare(lastName(b.name)) || a.name.localeCompare(b.name);
+  })
+  .map((p) => ({ ...p, summary: playerSummary(p), notes: playerNotes(p) }));
+}
+
+async function initPlayers() {
+  if (playersLoaded) return;
+  playersLoaded = true;
+  renderPlayerGrid();
+  try {
+    const rows = await fetch("/api/seasons").then((r) => r.json());
+    dataSource = "SQLite archive API";
+    players = buildPlayersFromRows(rows);
+  } catch (e) {
+    console.warn("Players API failed", e);
+    dataSource = "no data";
+  }
+  renderPlayerGrid();
+}
+
+function weightedAverage(values) {
+  const weights = [0.12, 0.16, 0.2, 0.23, 0.29].slice(-values.length);
+  const total = weights.reduce((s, w) => s + w, 0);
+  return values.reduce((s, v, i) => s + v * weights[i], 0) / total;
+}
+
+function slope(seasons, key) {
+  const pts = seasons.map((s, i) => ({ x: i + 1, y: s[key] }));
+  const xAvg = weightedAverage(pts.map((p) => p.x));
+  const yAvg = weightedAverage(pts.map((p) => p.y));
+  const num = pts.reduce((s, p) => s + (p.x - xAvg) * (p.y - yAvg), 0);
+  const den = pts.reduce((s, p) => s + (p.x - xAvg) ** 2, 0);
+  return den ? num / den : 0;
+}
+
+function ageCurve(age, key) {
+  if (key === "ts") return age > 34 ? -0.6 : age > 31 ? -0.25 : age < 27 ? 0.15 : 0;
+  if (key === "net") return age > 34 ? -0.035 : age < 27 ? 0.02 : 0;
+  if (age < 25) return 0.045;
+  if (age < 29) return 0.018;
+  if (age < 32) return -0.008;
+  if (age < 35) return -0.028;
+  return -0.055;
+}
+
+function projectPlayer(player) {
+  const seasons = player.seasons;
+  const last = latestSeason(player);
+  const projections = [];
+  const keys = ["pts","reb","ast","three","stl","blk","tov","net","ts","min","gp","usg"];
+  const firstYear = Number(last.season.slice(0, 4)) + 1;
+
+  for (let year = 1; year <= playerState.seasonsAhead; year++) {
+    const age = last.age + year;
+    const sy = firstYear + year - 1;
+    const proj = { season: `${sy}-${String((sy + 1) % 100).padStart(2, "0")}`, age };
+    keys.forEach((key) => {
+      const recent = seasons.slice(-5).map((s) => s[key]);
+      proj[key] = weightedAverage(recent) + slope(seasons.slice(-5), key) * 0.42 * year + weightedAverage(recent) * ageCurve(age, key) * year;
+    });
+    proj.min += playerState.minutesChange;
+    proj.usg += playerState.usageChange;
+    proj.gp += playerState.durabilityChange;
+    const mf = proj.min / (last.min || 1), uf = proj.usg / (last.usg || 1);
+    proj.pts *= 0.58 * mf + 0.42 * uf;
+    proj.ast *= 0.7 * mf + 0.3 * uf;
+    proj.reb *= 0.86 * mf + 0.14 * uf;
+    proj.three *= 0.7 * mf + 0.3 * uf;
+    proj.stl *= 0.85 * mf + 0.15 * uf;
+    proj.blk *= 0.9 * mf + 0.1 * uf;
+    proj.tov *= 0.62 * mf + 0.38 * uf;
+    proj.net *= 0.74 * mf + 0.26 * uf;
+    proj.gp = Math.max(38, Math.min(82, proj.gp));
+    proj.min = Math.max(22, Math.min(39, proj.min));
+    proj.usg = Math.max(18, Math.min(39, proj.usg));
+    proj.ts = Math.max(39, Math.min(72, proj.ts));
+    projections.push(proj);
+  }
+  return projections;
+}
+
+function renderPlayerGrid() {
+  const grid = $("#playerGrid");
+  if (!grid) return;
+  if (!playersLoaded || players.length === 0) {
+    grid.innerHTML = `<div class="loading-state">Loading players...</div>`;
+    if ($("#playerCount")) $("#playerCount").textContent = "Loading...";
+    if ($("#matchCount")) $("#matchCount").textContent = "";
+    return;
+  }
+  const FEATURED = ["LeBron James", "Victor Wembanyama", "Luka Dončić", "Michael Jordan", "Stephen Curry", "Kobe Bryant", "Kevin Durant"];
+  const query = ($("#playerSearch") ? $("#playerSearch").value : "").toLowerCase().trim();
+  const matches = query
+    ? players.filter((p) => [p.name, p.team || "", p.position || ""].join(" ").toLowerCase().includes(query))
+    : FEATURED.map((name) => players.find((p) => p.name === name)).filter(Boolean);
+  if ($("#playerCount")) $("#playerCount").textContent = query ? `${matches.length.toLocaleString()} results` : "Most Popular Searches";
+  if ($("#matchCount")) $("#matchCount").textContent = query ? "" : "Search above to find any player";
+  grid.innerHTML = "";
+  matches.forEach((player) => {
+    const l = latestSeason(player);
+    const card = document.createElement("div");
+    card.className = "player-card";
+    card.innerHTML = `
+      <div class="player-card-avatar" style="background:linear-gradient(135deg,${player.colors[0]},${player.colors[1]})">
+        <span class="player-card-ini">${initials(player.name)}</span>
+      </div>
+      <div class="player-card-name">${player.name}</div>
+      <div class="player-card-meta">${l.team || "—"} · ${player.position || "—"} · ${l.season}</div>
+      <div class="player-card-stats">
+        <div class="player-card-stat"><strong>${fmt(l.pts,"pts")}</strong><span>PTS</span></div>
+        <div class="player-card-stat"><strong>${fmt(l.reb,"reb")}</strong><span>REB</span></div>
+        <div class="player-card-stat"><strong>${fmt(l.ast,"ast")}</strong><span>AST</span></div>
+      </div>`;
+    if (player.playerId) {
+      const avatarDiv = card.querySelector(".player-card-avatar");
+      const img = new Image();
+      img.onload = () => { avatarDiv.innerHTML = ""; avatarDiv.appendChild(img); };
+      img.src = playerPhotoUrl(player.playerId);
+      img.alt = player.name;
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:10px;";
+    }
+    card.addEventListener("click", () => openPlayerProfile(player));
+    grid.appendChild(card);
+  });
+}
+
+function openPlayerProfile(player) {
+  playerState.player = player;
+  navigate("player-profile");
+}
+
+function renderPlayerProfile() {
+  if (!playerState.player) return;
+  const player = playerState.player;
+  const projections = projectPlayer(player);
+  renderProfile(player);
+  renderProjection(player, projections);
+  renderSeasonTable(player);
+  syncControls();
+  drawRadar(player);
+  drawChart(player, projections, true);
+  drawDevCurve(player, true);
+  // Reset to overview tab
+  document.querySelectorAll(".profile-tab").forEach((t) =>
+    t.classList.toggle("active", t.dataset.pane === "overview")
+  );
+  document.querySelectorAll(".profile-pane").forEach((p) =>
+    p.classList.toggle("hidden", p.id !== "pane-overview")
+  );
+  // Update watchlist button
+  const ids = getWatchlist();
+  const btn = $("#profileWatchlistBtn");
+  if (btn) {
+    const saved = ids.includes(player.id);
+    btn.textContent = saved ? "✓ Saved" : "🔖 Save";
+    btn.classList.toggle("saved", saved);
+  }
+}
+
+function drawRadar(player) {
+  const canvas = $("#skillRadar");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const l = latestSeason(player);
+  const w = canvas.width, h = canvas.height;
+  const cx = w / 2, cy = h / 2;
+  const r = Math.min(w, h) / 2 - 50;
+  const skills = [
+    { label: "Scoring",    value: Math.min(l.pts / 32, 1) },
+    { label: "Playmaking", value: Math.min(l.ast / 11, 1) },
+    { label: "Rebounding", value: Math.min(l.reb / 14, 1) },
+    { label: "Defense",    value: Math.min((l.stl * 2 + l.blk) / 5, 1) },
+    { label: "Efficiency", value: Math.min(l.ts > 0 ? l.ts / 70 : 0.5, 1) },
+    { label: "Durability", value: Math.min(l.gp / 75, 1) },
+  ];
+  const n = skills.length;
+  const step = (Math.PI * 2) / n;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#182030";
+  ctx.fillRect(0, 0, w, h);
+  // Grid rings
+  [0.25, 0.5, 0.75, 1].forEach((pct) => {
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + step * i;
+      const x = cx + r * pct * Math.cos(a), y = cy + r * pct * Math.sin(a);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+  // Spokes
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + step * i;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  // Filled polygon
+  ctx.beginPath();
+  skills.forEach((s, i) => {
+    const a = -Math.PI / 2 + step * i;
+    const x = cx + r * s.value * Math.cos(a), y = cy + r * s.value * Math.sin(a);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = player.colors[0] + "44";
+  ctx.fill();
+  ctx.strokeStyle = player.colors[0];
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  // Vertex dots
+  skills.forEach((s, i) => {
+    const a = -Math.PI / 2 + step * i;
+    const x = cx + r * s.value * Math.cos(a), y = cy + r * s.value * Math.sin(a);
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = player.colors[0];
+    ctx.fill();
+  });
+  // Labels
+  skills.forEach((s, i) => {
+    const a = -Math.PI / 2 + step * i;
+    const lr = r + 32;
+    const x = cx + lr * Math.cos(a), y = cy + lr * Math.sin(a);
+    ctx.textAlign = "center";
+    ctx.font = "bold 11px system-ui";
+    ctx.fillStyle = "rgba(220,232,255,0.75)";
+    ctx.fillText(s.label, x, y + 4);
+    ctx.font = "10px system-ui";
+    ctx.fillStyle = "rgba(220,232,255,0.35)";
+    ctx.fillText(`${Math.round(s.value * 100)}`, x, y + 17);
+  });
+}
+
+function renderProfile(player) {
+  const l = latestSeason(player);
+  $("#playerTeam").textContent = `${player.team} · ${player.position}`;
+  $("#playerName").textContent = player.name;
+  $("#profileUpdated").textContent = dataSource;
+  const avatarEl = $("#playerAvatar");
+  avatarEl.style.background = `linear-gradient(135deg, ${player.colors[0]}, ${player.colors[1]})`;
+  avatarEl.classList.remove("avatar-fallback");
+  if (player.playerId) {
+    const ini = initials(player.name);
+    avatarEl.innerHTML = `<span class="avatar-ini">${ini}</span>`;
+    const img = new Image();
+    img.onload = () => { avatarEl.innerHTML = ""; avatarEl.appendChild(img); };
+    img.onerror = () => {};
+    img.src = playerPhotoUrl(player.playerId);
+    img.alt = player.name;
+    img.style.cssText = "width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:12px;";
+  } else {
+    avatarEl.innerHTML = `<span class="avatar-ini">${initials(player.name)}</span>`;
+  }
+  $("#playerSummary").textContent = player.summary;
+  $("#playerTags").innerHTML = [player.archetype, player.experience, `${fmt(l.pts,"pts")} PPG`, `${fmt(l.ast,"ast")} APG`]
+    .map((t) => `<span class="tag">${t}</span>`).join("");
+  $("#heroStats").innerHTML = [["PTS",l.pts],["REB",l.reb],["AST",l.ast],["3P",l.three],["TS%",l.ts]]
+    .map(([label, val]) => `<div class="hero-stat"><strong>${fmt(val,"pts")}</strong><span>${label} last season</span></div>`).join("");
+  const facts = [["Age",player.age],["Position",player.position],["Experience",player.experience],
+    ["Minutes",fmt(l.min,"min")],["Usage",`${fmt(l.usg,"usg")}%`],["Games",l.gp],
+    ["College",player.college||"—"],["Season",l.season],["Team",l.team||"—"]];
+  $("#profileFacts").innerHTML = facts.map(([label,val]) => `<div><dt>${label}</dt><dd>${val}</dd></div>`).join("");
+  $("#scoutingNotes").innerHTML = player.notes.map((n) => `<li>${n}</li>`).join("");
+}
+
+function drawCourt(player) {
+  const canvas = $("#courtCanvas");
+  const ctx = canvas.getContext("2d");
+  const [primary, secondary] = player.colors;
+  const w = canvas.width, h = canvas.height;
+  const grad = ctx.createLinearGradient(0, 0, w, h);
+  grad.addColorStop(0, primary); grad.addColorStop(1, "#171717");
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = secondary; ctx.globalAlpha = 0.5; ctx.lineWidth = 4;
+  ctx.strokeRect(60, 30, w - 120, h - 60);
+  ctx.beginPath(); ctx.arc(w/2, h/2, 60, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(w/2, h/2, 14, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeRect(60, h/2 - 70, 140, 140);
+  ctx.strokeRect(w - 200, h/2 - 70, 140, 140);
+  ctx.globalAlpha = 0.15;
+  for (let i = 0; i < 50; i++) {
+    ctx.fillStyle = i % 3 === 0 ? secondary : "#fff";
+    ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function computeTypicalRangeByAge(metric) {
+  const byAge = {};
+  for (const p of players) {
+    for (const s of p.seasons) {
+      const age = Math.round(s.age);
+      if (!age || age < 18 || age > 42) continue;
+      const val = s[metric];
+      if (!Number.isFinite(val) || val <= 0) continue;
+      if (!byAge[age]) byAge[age] = [];
+      byAge[age].push(val);
+    }
+  }
+  const result = {};
+  for (let age = 18; age <= 42; age++) {
+    const vals = byAge[age] || [];
+    if (vals.length < 10) continue;
+    const sorted = [...vals].sort((a, b) => a - b);
+    const n = sorted.length;
+    result[age] = {
+      p25:    sorted[Math.floor(n * 0.25)],
+      median: sorted[Math.floor(n * 0.50)],
+      p75:    sorted[Math.floor(n * 0.75)],
+    };
+  }
+  return result;
+}
+
+function drawChart(player, projections = [], dark = false) {
+  const canvas = $("#trendChart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  const pad = { top: 28, right: 28, bottom: 58, left: 52 };
+  const actual = player.seasons.map((s) => ({ label: s.season, value: s[playerState.metric], type: "actual" }));
+  const proj = projections.map((s) => ({ label: s.season, value: s[playerState.metric], type: "projected" }));
+  const all = actual.concat(proj);
+  const vals = all.map((p) => p.value);
+  const minV = playerState.metric === "net" ? Math.min(...vals) - 3 : Math.max(0, Math.min(...vals) - 3);
+  const maxV = Math.max(...vals) + 3;
+  const pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
+  const gridColor = dark ? "rgba(255,255,255,0.07)" : "#e3e6e1";
+  const labelColor = dark ? "rgba(220,232,255,0.38)" : "#626262";
+  const titleColor = dark ? "rgba(220,232,255,0.8)" : "#151515";
+  const bgColor = dark ? "#182030" : "#fff";
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = bgColor; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  ctx.fillStyle = labelColor; ctx.font = "12px system-ui";
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (ph / 4) * i;
+    const val = maxV - ((maxV - minV) / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+    ctx.fillText(val.toFixed(1), 8, y + 4);
+  }
+  const ptFor = (pt, idx) => ({
+    x: pad.left + (pw / Math.max(all.length - 1, 1)) * idx,
+    y: pad.top + ph - ((pt.value - minV) / (maxV - minV)) * ph,
+  });
+  ctx.lineWidth = 3; ctx.strokeStyle = player.colors[0];
+  ctx.beginPath();
+  actual.forEach((pt, i) => { const p = ptFor(pt, i); i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); });
+  ctx.stroke();
+  if (proj.length) {
+    ctx.setLineDash([8, 6]); ctx.strokeStyle = "#bd3340";
+    ctx.beginPath();
+    const bridge = ptFor(actual[actual.length - 1], actual.length - 1);
+    ctx.moveTo(bridge.x, bridge.y);
+    proj.forEach((pt, i) => { const p = ptFor(pt, actual.length + i); ctx.lineTo(p.x, p.y); });
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  all.forEach((pt, i) => {
+    const p = ptFor(pt, i);
+    ctx.fillStyle = pt.type === "actual" ? player.colors[0] : "#bd3340";
+    ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(p.x, h - 18); ctx.rotate(-0.5);
+    ctx.fillStyle = labelColor; ctx.font = "11px system-ui";
+    ctx.fillText(pt.label, 0, 0); ctx.restore();
+  });
+  ctx.fillStyle = titleColor; ctx.font = "700 14px system-ui";
+  ctx.fillText(`${metricLabels[playerState.metric]} trend`, pad.left, 20);
+}
+
+function drawDevCurve(player, dark = false) {
+  const canvas = $("#devCurveChart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  const pad = { top: 36, right: 110, bottom: 42, left: 52 };
+  const metric = playerState.metric;
+
+  // Player seasons by age
+  const playerByAge = {};
+  for (const s of player.seasons) {
+    const age = Math.round(s.age);
+    if (age && Number.isFinite(s[metric])) playerByAge[age] = s[metric];
+  }
+  const playerAges = Object.keys(playerByAge).map(Number).sort((a, b) => a - b);
+  if (playerAges.length === 0) return;
+
+  // Typical range by age across all NBA players
+  const typical = players.length > 1 ? computeTypicalRangeByAge(metric) : {};
+
+  // X-axis spans the player's full age range, anchored to ages with data
+  const ageMin = Math.min(...playerAges, ...Object.keys(typical).map(Number));
+  const ageMax = Math.max(...playerAges, ...Object.keys(typical).map(Number));
+  const ageSpan = ageMax - ageMin;
+
+  // Y-axis scale
+  const playerVals = playerAges.map((a) => playerByAge[a]);
+  const bandVals   = Object.values(typical).flatMap((t) => [t.p25, t.p75]);
+  const allVals    = [...playerVals, ...bandVals].filter(Number.isFinite);
+  const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
+  const vPad = (rawMax - rawMin) * 0.15 || 2;
+  const minV = metric === "net" ? rawMin - vPad : Math.max(0, rawMin - vPad);
+  const maxV = rawMax + vPad;
+
+  const pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
+  const xFor = (age) => pad.left + (pw / Math.max(ageSpan, 1)) * (age - ageMin);
+  const yFor = (v)   => pad.top  + ph - ((v - minV) / (maxV - minV)) * ph;
+
+  const gridColor  = dark ? "rgba(255,255,255,0.07)" : "#e3e6e1";
+  const labelColor = dark ? "rgba(220,232,255,0.38)" : "#626262";
+  const titleColor = dark ? "rgba(220,232,255,0.85)" : "#151515";
+  const bgColor    = dark ? "#182030" : "#fff";
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = bgColor; ctx.fillRect(0, 0, w, h);
+
+  // Grid lines + Y labels
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  ctx.fillStyle = labelColor; ctx.font = "12px system-ui";
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (ph / 4) * i;
+    const val = maxV - ((maxV - minV) / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+    ctx.fillText(val.toFixed(1), 6, y + 4);
+  }
+
+  // Age labels on X axis
+  ctx.fillStyle = labelColor; ctx.font = "11px system-ui";
+  for (let age = Math.ceil(ageMin / 2) * 2; age <= ageMax; age += 2) {
+    ctx.fillText(`${age}`, xFor(age) - 6, h - 10);
+  }
+  // "Age" axis label
+  ctx.fillStyle = dark ? "rgba(220,232,255,0.25)" : "rgba(80,80,80,0.5)";
+  ctx.font = "10px system-ui";
+  ctx.fillText("Age", pad.left + pw / 2 - 10, h - 0);
+
+  // ── Typical range band (gray) ──────────────────────────────────────────────
+  const typicalAges = Object.keys(typical).map(Number).sort((a, b) => a - b)
+    .filter((a) => a >= ageMin && a <= ageMax);
+
+  if (typicalAges.length > 1) {
+    // Shaded band
+    ctx.beginPath();
+    typicalAges.forEach((age, i) => {
+      const x = xFor(age), y = yFor(typical[age].p75);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    [...typicalAges].reverse().forEach((age) => {
+      ctx.lineTo(xFor(age), yFor(typical[age].p25));
+    });
+    ctx.closePath();
+    ctx.fillStyle = dark ? "rgba(170,185,210,0.14)" : "rgba(130,145,175,0.16)";
+    ctx.fill();
+
+    // Median dashed line
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = dark ? "rgba(180,190,210,0.45)" : "rgba(100,115,145,0.6)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    typicalAges.forEach((age, i) => {
+      const x = xFor(age), y = yFor(typical[age].median);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Right-edge percentile labels
+    const lastAge = typicalAges[typicalAges.length - 1];
+    const lastT   = typical[lastAge];
+    const lx = xFor(lastAge) + 6;
+    ctx.fillStyle = dark ? "rgba(170,185,210,0.55)" : "rgba(80,95,125,0.7)";
+    ctx.font = "10px system-ui";
+    ctx.fillText("75th %ile", lx, yFor(lastT.p75) + 4);
+    ctx.fillText("Median",    lx, yFor(lastT.median) + 4);
+    ctx.fillText("25th %ile", lx, yFor(lastT.p25) + 4);
+  }
+
+  // ── Player curve by age ────────────────────────────────────────────────────
+  ctx.lineWidth = 2.5; ctx.strokeStyle = player.colors[0];
+  ctx.beginPath();
+  playerAges.forEach((age, i) => {
+    const x = xFor(age), y = yFor(playerByAge[age]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Dots
+  ctx.fillStyle = player.colors[0];
+  playerAges.forEach((age) => {
+    ctx.beginPath();
+    ctx.arc(xFor(age), yFor(playerByAge[age]), 4, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Title
+  ctx.fillStyle = titleColor; ctx.font = "700 13px system-ui";
+  ctx.fillText(`${metricLabels[metric]} by Age — vs. Typical NBA Career Arc`, pad.left, 22);
+
+  // Legend
+  const lx2 = w - pad.right + 8;
+  ctx.fillStyle = player.colors[0]; ctx.fillRect(lx2, pad.top + 4, 16, 3);
+  ctx.fillStyle = labelColor; ctx.font = "10px system-ui";
+  ctx.fillText(player.name.split(" ").pop(), lx2 + 20, pad.top + 8);
+  ctx.fillStyle = dark ? "rgba(170,185,210,0.3)" : "rgba(130,145,175,0.35)";
+  ctx.fillRect(lx2, pad.top + 20, 16, 10);
+  ctx.fillStyle = labelColor;
+  ctx.fillText("NBA avg", lx2 + 20, pad.top + 27);
+}
+
+function renderProjection(player, projections) {
+  const final = projections[projections.length - 1];
+  $("#projectionCards").innerHTML = [
+    ["Projected PTS", final.pts, "pts"], ["Projected REB", final.reb, "reb"],
+    ["Projected AST", final.ast, "ast"], ["Projected 3P", final.three, "three"],
+    ["Projected MIN", final.min, "min"], ["Projected GP", final.gp, "gp"],
+  ].map(([label, val, key]) => `<div class="projection-card"><span>${label}</span><strong>${fmt(val, key)}</strong></div>`).join("");
+}
+
+function renderSeasonTable(player) {
+  const projections = projectPlayer(player);
+  const rows = player.seasons.map((s) => ({ ...s, projected: false }))
+    .concat(projections.map((s) => ({ ...s, projected: true })));
+  $("#seasonRows").innerHTML = rows.map((s) => {
+    const teamLabel = s.projected
+      ? " (proj.)"
+      : s.teamsThisSeason && s.teamsThisSeason.length > 1
+        ? ` (${s.teamsThisSeason.join(", ")})`
+        : s.team ? ` (${s.team})` : "";
+    return `
+    <tr${s.projected ? ' style="color:var(--red);opacity:0.85"' : ""}>
+      <td>${s.season}${teamLabel}</td>
+      <td>${s.age}</td><td>${fmt(s.gp,"gp")}</td><td>${fmt(s.min,"min")}</td>
+      <td>${fmt(s.pts,"pts")}</td><td>${fmt(s.reb,"reb")}</td><td>${fmt(s.ast,"ast")}</td>
+      <td>${fmt(s.three,"three")}</td><td>${fmt(s.stl,"stl")}</td><td>${fmt(s.blk,"blk")}</td>
+      <td>${fmt(s.tov,"tov")}</td><td>${fmt(s.ts,"ts")}</td><td>${fmt(s.usg,"usg")}</td>
+    </tr>`;
+  }).join("");
+}
+
+function syncControls() {
+  $("#seasonValue").textContent = playerState.seasonsAhead;
+  const sign = (v) => v > 0 ? `+${v}` : v;
+  $("#minutesValue").textContent = sign(playerState.minutesChange);
+  $("#usageValue").textContent = sign(playerState.usageChange);
+  $("#durabilityValue").textContent = sign(playerState.durabilityChange);
+}
+
+// ── Player grid + profile event wiring ─────────────────────────────────────
+
+$("#playerSearch").addEventListener("input", renderPlayerGrid);
+
+$("#metricSelect").addEventListener("change", (e) => {
+  playerState.metric = e.target.value;
+  if (playerState.player) {
+    drawChart(playerState.player, projectPlayer(playerState.player), true);
+    drawDevCurve(playerState.player, true);
+  }
+});
+
+[["seasonRange","seasonsAhead"],["minutesRange","minutesChange"],["usageRange","usageChange"],["durabilityRange","durabilityChange"]].forEach(([id, key]) => {
+  $(`#${id}`).addEventListener("input", (e) => {
+    playerState[key] = Number(e.target.value);
+    syncControls();
+    if (playerState.player) {
+      const proj = projectPlayer(playerState.player);
+      renderProjection(playerState.player, proj);
+      renderSeasonTable(playerState.player);
+      drawChart(playerState.player, proj, true);
+      drawDevCurve(playerState.player, true);
+    }
+  });
+});
+
+$("#resetControls").addEventListener("click", () => {
+  playerState.seasonsAhead = 3; playerState.minutesChange = 0;
+  playerState.usageChange = 0; playerState.durabilityChange = 0;
+  $("#seasonRange").value = 3; $("#minutesRange").value = 0;
+  $("#usageRange").value = 0; $("#durabilityRange").value = 0;
+  syncControls();
+  if (playerState.player) {
+    const proj = projectPlayer(playerState.player);
+    renderProjection(playerState.player, proj);
+    renderSeasonTable(playerState.player);
+    drawChart(playerState.player, proj, true);
+    drawDevCurve(playerState.player, true);
+  }
+});
+
+$("#backToPlayers").addEventListener("click", () => navigate("players"));
+
+$("#profileWatchlistBtn").addEventListener("click", () => {
+  if (!playerState.player) return;
+  const ids = getWatchlist();
+  const id = playerState.player.id;
+  const updated = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
+  saveWatchlist(updated);
+  const saved = updated.includes(id);
+  const btn = $("#profileWatchlistBtn");
+  btn.textContent = saved ? "✓ Saved" : "🔖 Save";
+  btn.classList.toggle("saved", saved);
+});
+
+// Profile tab switching
+document.querySelectorAll(".profile-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".profile-tab").forEach((t) => t.classList.remove("active"));
+    document.querySelectorAll(".profile-pane").forEach((p) => p.classList.add("hidden"));
+    tab.classList.add("active");
+    const pane = $(`#pane-${tab.dataset.pane}`);
+    if (pane) pane.classList.remove("hidden");
+    // Re-draw canvases when switching back to overview
+    if (tab.dataset.pane === "overview" && playerState.player) {
+      drawRadar(playerState.player);
+      drawChart(playerState.player, projectPlayer(playerState.player), true);
+      drawDevCurve(playerState.player, true);
+    }
+  });
+});
+
+// ── Prospects ────────────────────────────────────────────────────────────────
+
+let prospectsLoaded = false;
+
+let allProspects = [];
+
+const STATUS_COLORS = {
+  "Freshman":    "rgba(91,141,238,0.18)",
+  "Sophomore":   "rgba(91,141,238,0.12)",
+  "Junior":      "rgba(62,207,142,0.14)",
+  "Senior":      "rgba(62,207,142,0.2)",
+  "International": "rgba(215,157,40,0.18)",
+  "G League":    "rgba(189,51,64,0.16)",
+};
+
+function renderProspectsTable(filter = "") {
+  const q = filter.toLowerCase().trim();
+  const rows = q
+    ? allProspects.filter((p) => [p.name, p.school, p.pos, p.country, p.status].join(" ").toLowerCase().includes(q))
+    : allProspects;
+  $("#prospectsTable").innerHTML = rows.map((p) => {
+    const color = STATUS_COLORS[p.status] || "rgba(255,255,255,0.05)";
+    const pickDisplay = p.rank <= 100
+      ? `<strong style="color:var(--blue)">#${p.rank}</strong>`
+      : `<span style="color:var(--muted)">NR</span>`;
+    const rowClass = p.rank <= 30 ? ' class="top-prospect"' : "";
+    return `<tr${rowClass}>
+      <td class="rank">${pickDisplay}</td>
+      <td><strong>${p.name}</strong></td>
+      <td>${p.pos}</td>
+      <td>${p.age}</td>
+      <td>${p.school}</td>
+      <td>${p.height}</td>
+      <td>${p.weight}</td>
+      <td><span class="status-badge" style="background:${color}">${p.status}</span></td>
+      <td>${p.country}</td>
+    </tr>`;
+  }).join("");
+}
+
+async function loadProspects() {
+  prospectsLoaded = true;
+  try {
+    allProspects = await fetch("/api/prospects").then((r) => r.json());
+    renderProspectsTable();
+  } catch (e) {
+    console.warn("Prospects load failed", e);
+  }
+}
+
+$("#prospectSearch").addEventListener("input", (e) => renderProspectsTable(e.target.value));
+
+// ── Draft Class ──────────────────────────────────────────────────────────────
+
+let draftLoaded = false;
+
+async function loadDraft(season) {
+  draftLoaded = true;
+  const url = season ? `/api/draft?season=${season}` : "/api/draft";
+  try {
+    const data = await fetch(url).then((r) => r.json());
+    const select = $("#draftSeasonSelect");
+    if (!select.options.length) {
+      data.seasons.forEach((s) => {
+        const opt = document.createElement("option");
+        opt.value = s; opt.textContent = s;
+        if (s === data.season) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+    $("#draftTable").innerHTML = data.picks.map((p) => `
+      <tr>
+        <td><strong>#${p.overall_pick}</strong></td>
+        <td>${p.round}</td>
+        <td>${p.player}</td>
+        <td>${p.team || "—"}</td>
+        <td>${p.college || "—"}</td>
+        <td>${p.career_pts || "—"}</td>
+        <td>${p.career_reb || "—"}</td>
+        <td>${p.career_ast || "—"}</td>
+        <td>${p.seasons_played || 0}</td>
+      </tr>`).join("");
+  } catch (e) {
+    console.warn("Draft load failed", e);
+  }
+}
+
+$("#draftSeasonSelect").addEventListener("change", (e) => loadDraft(e.target.value));
+
+// ── Comparisons ──────────────────────────────────────────────────────────────
+
+let compareA = null, compareB = null;
+
+function setupCompareSearch(inputId, dropdownId, onSelect) {
+  const input = $(`#${inputId}`);
+  const dropdown = $(`#${dropdownId}`);
+
+  input.addEventListener("input", () => {
+    const q = input.value.toLowerCase().trim();
+    if (!q || players.length === 0) { dropdown.classList.remove("open"); return; }
+    const matches = players.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 8);
+    dropdown.innerHTML = matches.map((p) => `<div class="compare-option" data-name="${p.name}">${p.name} · ${p.team}</div>`).join("");
+    dropdown.classList.toggle("open", matches.length > 0);
+    dropdown.querySelectorAll(".compare-option").forEach((opt) => {
+      opt.addEventListener("click", () => {
+        const player = players.find((p) => p.name === opt.dataset.name);
+        onSelect(player);
+        input.value = player.name;
+        dropdown.classList.remove("open");
+        renderComparison();
+      });
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!input.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove("open");
+  });
+}
+
+function renderComparison() {
+  const container = $("#comparisonContent");
+  if (!compareA || !compareB) {
+    container.innerHTML = `<div class="compare-placeholder">Select two players above to compare their stats.</div>`;
+    return;
+  }
+  const la = latestSeason(compareA), lb = latestSeason(compareB);
+  const stats = [
+    ["PTS", "pts"], ["REB", "reb"], ["AST", "ast"], ["3P", "three"],
+    ["STL", "stl"], ["BLK", "blk"], ["TOV", "tov"], ["TS%", "ts"], ["USG%", "usg"],
+  ];
+  const cardHtml = (player, latest, other) => `
+    <div class="compare-card">
+      <h3>${player.name}</h3>
+      <p class="compare-team">${latest.team || "—"} · ${player.position} · ${latest.season}</p>
+      ${stats.map(([label, key]) => {
+        const val = latest[key], oval = other[key];
+        const better = (key === "tov") ? val < oval : val > oval;
+        return `<div class="compare-stat-row">
+          <span class="compare-stat-label">${label}</span>
+          <span class="compare-stat-val ${better ? "better" : ""}">${fmt(val, key)}</span>
+        </div>`;
+      }).join("")}
+    </div>`;
+  container.innerHTML = `<div class="compare-cards">${cardHtml(compareA, la, lb)}${cardHtml(compareB, lb, la)}</div>`;
+}
+
+setupCompareSearch("compareSearchA", "compareDropdownA", (p) => { compareA = p; });
+setupCompareSearch("compareSearchB", "compareDropdownB", (p) => { compareB = p; });
+
+// ── Watchlist ────────────────────────────────────────────────────────────────
+
+function getWatchlist() {
+  try { return JSON.parse(localStorage.getItem("nba_watchlist") || "[]"); } catch { return []; }
+}
+
+function saveWatchlist(list) {
+  localStorage.setItem("nba_watchlist", JSON.stringify(list));
+}
+
+function renderWatchlist() {
+  const ids = getWatchlist();
+  const watched = players.filter((p) => ids.includes(p.id));
+  const empty = $("#watchlistEmpty"), table = $("#watchlistTable");
+  if (!watched.length) {
+    empty.classList.remove("hidden"); table.classList.add("hidden"); return;
+  }
+  empty.classList.add("hidden"); table.classList.remove("hidden");
+  $("#watchlistRows").innerHTML = watched.map((p) => {
+    const l = latestSeason(p);
+    return `<tr>
+      <td><strong>${p.name}</strong></td>
+      <td>${l.season}</td>
+      <td>${l.team || "—"}</td>
+      <td>${fmt(l.pts,"pts")}</td>
+      <td>${fmt(l.reb,"reb")}</td>
+      <td>${fmt(l.ast,"ast")}</td>
+      <td>${fmt(l.ts,"ts")}%</td>
+      <td><button class="watchlist-remove" data-id="${p.id}">Remove</button></td>
+    </tr>`;
+  }).join("");
+  $("#watchlistRows").querySelectorAll(".watchlist-remove").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      saveWatchlist(getWatchlist().filter((id) => id !== btn.dataset.id));
+      renderWatchlist();
+    });
+  });
+}
+
+$("#clearWatchlist").addEventListener("click", () => { saveWatchlist([]); renderWatchlist(); });
+
+// ── Global Search ─────────────────────────────────────────────────────────────
+
+const globalSearch = $("#globalSearch");
+const globalResults = $("#globalSearchResults");
+
+globalSearch.addEventListener("input", () => {
+  const q = globalSearch.value.toLowerCase().trim();
+  if (!q || players.length === 0) { globalResults.classList.add("hidden"); return; }
+  const matches = players.filter((p) =>
+    p.name.toLowerCase().includes(q) || (p.team || "").toLowerCase().includes(q)
+  ).slice(0, 8);
+  if (!matches.length) { globalResults.classList.add("hidden"); return; }
+  globalResults.innerHTML = matches.map((p) => {
+    const l = latestSeason(p);
+    return `<div class="search-result-item" data-id="${p.id}">
+      <span class="search-result-avatar" style="background:${p.colors[0]}">${initials(p.name)}</span>
+      <span><strong>${p.name}</strong><span>${l.team || "—"} · ${p.position} · ${fmt(l.pts,"pts")} PPG</span></span>
+    </div>`;
+  }).join("");
+  globalResults.classList.remove("hidden");
+  globalResults.querySelectorAll(".search-result-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      const player = players.find((p) => p.id === item.dataset.id);
+      if (player) {
+        globalSearch.value = "";
+        globalResults.classList.add("hidden");
+        openPlayerProfile(player);
+      }
+    });
+  });
+});
+
+document.addEventListener("click", (e) => {
+  if (!globalSearch.contains(e.target) && !globalResults.contains(e.target)) {
+    globalResults.classList.add("hidden");
+  }
+});
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+
+loadDashboard();
+navigate("dashboard");
