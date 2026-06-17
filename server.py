@@ -1,25 +1,38 @@
 #!/usr/bin/env python3
 import json
+import os
 import re
-import sqlite3
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import psycopg2
+import psycopg2.extras
 
 ROOT = Path(__file__).resolve().parent
-DB_PATH = ROOT / "nba.db"
+DATABASE_URL = os.environ.get("DATABASE_URL") or \
+    "postgresql://postgres:LukaDoncic77@db.ovgnihzycxdjzouurpfz.supabase.co:5432/postgres"
 
 
 def connect():
-    connection = sqlite3.connect(DB_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
+    return psycopg2.connect(DATABASE_URL)
 
 
-def rows_to_json(rows):
-    return json.dumps([dict(row) for row in rows]).encode("utf-8")
+def q(conn, sql, params=()):
+    """Execute a query and return all rows as dicts."""
+    pg_sql = sql.replace("?", "%s")
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(pg_sql, params)
+    return cur.fetchall()
+
+
+def q1(conn, sql, params=()):
+    """Execute a query and return the first row."""
+    pg_sql = sql.replace("?", "%s")
+    cur = conn.cursor()
+    cur.execute(pg_sql, params)
+    return cur.fetchone()
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -35,7 +48,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def send_json_rows(self, rows):
-        body = rows_to_json(rows)
+        body = json.dumps([dict(r) for r in rows]).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -47,12 +60,11 @@ class Handler(SimpleHTTPRequestHandler):
         params = parse_qs(parsed.query)
 
         if parsed.path == "/api/health":
-            return self.send_json({"ok": True, "database": DB_PATH.name})
+            return self.send_json({"ok": True, "database": "supabase"})
 
         if parsed.path == "/api/seasons":
             with connect() as db:
-                rows = db.execute(
-                    """
+                rows = q(db, """
                     SELECT
                       player AS player_name,
                       player_id,
@@ -78,8 +90,7 @@ class Handler(SimpleHTTPRequestHandler):
                       CAST(season AS INTEGER) AS season_start
                     FROM archive_player_dashboard
                     ORDER BY player, CAST(season AS INTEGER)
-                    """
-                ).fetchall()
+                """)
             return self.send_json_rows(rows)
 
         if parsed.path == "/api/players":
@@ -91,35 +102,33 @@ class Handler(SimpleHTTPRequestHandler):
                   COUNT(*) AS seasons,
                   MIN(CAST(season AS INTEGER)) AS first_season_start,
                   MAX(CAST(season AS INTEGER)) AS latest_season_start,
-                  ROUND(AVG(CAST(pts_per_game AS REAL)), 1) AS career_pts,
-                  ROUND(AVG(CAST(trb_per_game AS REAL)), 1) AS career_reb,
-                  ROUND(AVG(CAST(ast_per_game AS REAL)), 1) AS career_ast,
-                  ROUND(AVG(CAST(ts_percent AS REAL)) * 100, 1) AS career_ts_pct
+                  ROUND(AVG(CAST(pts_per_game AS REAL))::numeric, 1) AS career_pts,
+                  ROUND(AVG(CAST(trb_per_game AS REAL))::numeric, 1) AS career_reb,
+                  ROUND(AVG(CAST(ast_per_game AS REAL))::numeric, 1) AS career_ast,
+                  ROUND((AVG(CAST(ts_percent AS REAL)) * 100)::numeric, 1) AS career_ts_pct
                 FROM archive_player_dashboard
             """
             args = []
             if search:
-                sql += " WHERE player LIKE ?"
+                sql += " WHERE player ILIKE ?"
                 args.append(f"%{search}%")
             sql += " GROUP BY player_id, player ORDER BY seasons DESC, career_pts DESC, player LIMIT 200"
             with connect() as db:
-                rows = db.execute(sql, args).fetchall()
+                rows = q(db, sql, args)
             return self.send_json_rows(rows)
 
         if parsed.path == "/api/dashboard":
             with connect() as db:
-                latest_season = db.execute(
+                latest_season = q1(db,
                     "SELECT MAX(CAST(season AS INTEGER)) FROM archive_player_per_game"
-                ).fetchone()[0]
+                )[0]
                 season = int(params.get("season", [latest_season])[0] or latest_season)
 
-                seasons_available = [
-                    r[0] for r in db.execute(
-                        "SELECT DISTINCT season FROM archive_team_summaries ORDER BY CAST(season AS INTEGER) DESC"
-                    ).fetchall()
-                ]
+                seasons_available = [r[0] for r in q(db,
+                    "SELECT DISTINCT season FROM archive_team_summaries ORDER BY CAST(season AS INTEGER) DESC"
+                )]
 
-                top_scorers = db.execute("""
+                top_scorers = q(db, """
                     SELECT player, player_id, team, CAST(pts_per_game AS REAL) AS pts,
                            CAST(trb_per_game AS REAL) AS reb,
                            CAST(ast_per_game AS REAL) AS ast,
@@ -127,40 +136,40 @@ class Handler(SimpleHTTPRequestHandler):
                     FROM archive_player_per_game
                     WHERE season = ? AND pts_per_game != '' AND CAST(g AS INTEGER) >= 20
                     ORDER BY CAST(pts_per_game AS REAL) DESC LIMIT 10
-                """, (str(season),)).fetchall()
+                """, (str(season),))
 
-                top_assisters = db.execute("""
+                top_assisters = q(db, """
                     SELECT player, player_id, team, CAST(ast_per_game AS REAL) AS ast,
                            CAST(pts_per_game AS REAL) AS pts
                     FROM archive_player_per_game
                     WHERE season = ? AND ast_per_game != '' AND CAST(g AS INTEGER) >= 20
                     ORDER BY CAST(ast_per_game AS REAL) DESC LIMIT 5
-                """, (str(season),)).fetchall()
+                """, (str(season),))
 
-                top_rebounders = db.execute("""
+                top_rebounders = q(db, """
                     SELECT player, player_id, team, CAST(trb_per_game AS REAL) AS reb,
                            CAST(pts_per_game AS REAL) AS pts
                     FROM archive_player_per_game
                     WHERE season = ? AND trb_per_game != '' AND CAST(g AS INTEGER) >= 20
                     ORDER BY CAST(trb_per_game AS REAL) DESC LIMIT 5
-                """, (str(season),)).fetchall()
+                """, (str(season),))
 
-                awards = db.execute("""
+                awards = q(db, """
                     SELECT a.award, a.player, a.player_id, a.winner, a.share
                     FROM archive_player_award_shares a
                     WHERE a.season = ? AND UPPER(a.winner) = 'TRUE'
                     ORDER BY a.award
-                """, (str(season),)).fetchall()
+                """, (str(season),))
 
-                team_standings = db.execute("""
+                team_standings = q(db, """
                     SELECT team, abbreviation, w, l,
-                           ROUND(CAST(w AS REAL)/(CAST(w AS REAL)+CAST(l AS REAL)),3) AS win_pct,
+                           ROUND((CAST(w AS REAL)/(CAST(w AS REAL)+CAST(l AS REAL)))::numeric,3) AS win_pct,
                            CAST(n_rtg AS REAL) AS net_rtg,
                            playoffs
                     FROM archive_team_summaries
                     WHERE season = ? AND abbreviation != 'NA'
                     ORDER BY CAST(w AS REAL) DESC
-                """, (str(season),)).fetchall()
+                """, (str(season),))
 
             return self.send_json({
                 "season": season,
@@ -175,49 +184,49 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/draft":
             season = (params.get("season", ["2025"])[0] or "2025").strip()
             with connect() as db:
-                rows = db.execute("""
+                rows = q(db, """
                     SELECT d.season, d.overall_pick, d.round, d.tm AS team,
                            d.player, d.player_id, d.college,
-                           ROUND(AVG(CAST(p.pts_per_game AS REAL)), 1) AS career_pts,
-                           ROUND(AVG(CAST(p.trb_per_game AS REAL)), 1) AS career_reb,
-                           ROUND(AVG(CAST(p.ast_per_game AS REAL)), 1) AS career_ast,
+                           ROUND(AVG(CAST(p.pts_per_game AS REAL))::numeric, 1) AS career_pts,
+                           ROUND(AVG(CAST(p.trb_per_game AS REAL))::numeric, 1) AS career_reb,
+                           ROUND(AVG(CAST(p.ast_per_game AS REAL))::numeric, 1) AS career_ast,
                            COUNT(p.season) AS seasons_played
                     FROM archive_draft_pick_history d
                     LEFT JOIN archive_player_per_game p ON p.player_id = d.player_id
                     WHERE d.season = ?
-                    GROUP BY d.player_id, d.overall_pick
+                    GROUP BY d.player_id, d.overall_pick, d.season, d.round, d.tm, d.player, d.college
                     ORDER BY CAST(d.overall_pick AS INTEGER)
-                """, (season,)).fetchall()
-                seasons_available = db.execute("""
+                """, (season,))
+                seasons_available = q(db, """
                     SELECT DISTINCT season FROM archive_draft_pick_history
                     ORDER BY CAST(season AS INTEGER) DESC
-                """).fetchall()
+                """)
             return self.send_json({
                 "season": season,
                 "picks": [dict(r) for r in rows],
-                "seasons": [r[0] for r in seasons_available],
+                "seasons": [r["season"] for r in seasons_available],
             })
 
         if parsed.path == "/api/prospects":
             with connect() as db:
-                rows = db.execute("""
+                rows = q(db, """
                     SELECT rank, name, pos, age, school, height, weight, status, country
                     FROM archive_draft_prospects_2026
-                    ORDER BY rank
-                """).fetchall()
+                    ORDER BY CAST(rank AS INTEGER)
+                """)
             return self.send_json_rows(rows)
 
         if parsed.path == "/api/allstars":
             with connect() as db:
-                rows = db.execute("""
+                rows = q(db, """
                     SELECT player, player_id, team, season, lg, replaced
                     FROM archive_all_star_selections
                     ORDER BY CAST(season AS INTEGER) DESC, player
                     LIMIT 100
-                """).fetchall()
+                """)
             return self.send_json_rows(rows)
 
-        # Photo proxy — fetches Basketball-Reference headshot server-side to avoid hotlink blocking
+        # Photo proxy — fetches Basketball-Reference headshot server-side
         m = re.match(r"^/api/player-photo/([a-z0-9]+)$", parsed.path)
         if m:
             player_id = m.group(1)
@@ -250,12 +259,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
-    if not DB_PATH.exists():
-        raise SystemExit(f"Missing database: {DB_PATH}")
-
-    server = ThreadingHTTPServer(("localhost", 8000), Handler)
-    print("Serving NBA predictor at http://localhost:8000")
-    print("API health check: http://localhost:8000/api/health")
+    port = int(os.environ.get("PORT", 8000))
+    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    print(f"Serving NBA predictor at http://0.0.0.0:{port}")
     server.serve_forever()
 
 
