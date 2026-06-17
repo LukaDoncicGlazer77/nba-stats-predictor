@@ -158,12 +158,16 @@ class Handler(SimpleHTTPRequestHandler):
                            safe_float(trb_per_game) AS reb,
                            safe_float(ast_per_game) AS ast,
                            safe_float(fg_percent)*100 AS fg_pct
-                    FROM archive_player_per_game
+                    FROM archive_player_per_game p
                     WHERE season = ?
                       AND pts_per_game != '' AND g != ''
                       AND safe_int(g) >= 20
+                      AND NOT (team NOT IN ('TOT','2TM','3TM') AND player IN (
+                          SELECT player FROM archive_player_per_game
+                          WHERE season = ? GROUP BY player HAVING COUNT(*) > 1
+                      ))
                     ORDER BY safe_float(pts_per_game) DESC NULLS LAST LIMIT 10
-                """, (str(season),))
+                """, (str(season), str(season)))
 
                 top_assisters = q(conn, """
                     SELECT player, player_id, team,
@@ -173,8 +177,12 @@ class Handler(SimpleHTTPRequestHandler):
                     WHERE season = ?
                       AND ast_per_game != '' AND g != ''
                       AND safe_int(g) >= 20
+                      AND NOT (team NOT IN ('TOT','2TM','3TM') AND player IN (
+                          SELECT player FROM archive_player_per_game
+                          WHERE season = ? GROUP BY player HAVING COUNT(*) > 1
+                      ))
                     ORDER BY safe_float(ast_per_game) DESC NULLS LAST LIMIT 5
-                """, (str(season),))
+                """, (str(season), str(season)))
 
                 top_rebounders = q(conn, """
                     SELECT player, player_id, team,
@@ -184,8 +192,12 @@ class Handler(SimpleHTTPRequestHandler):
                     WHERE season = ?
                       AND trb_per_game != '' AND g != ''
                       AND safe_int(g) >= 20
+                      AND NOT (team NOT IN ('TOT','2TM','3TM') AND player IN (
+                          SELECT player FROM archive_player_per_game
+                          WHERE season = ? GROUP BY player HAVING COUNT(*) > 1
+                      ))
                     ORDER BY safe_float(trb_per_game) DESC NULLS LAST LIMIT 5
-                """, (str(season),))
+                """, (str(season), str(season)))
 
                 awards = q(conn, """
                     SELECT a.award, a.player, a.player_id, a.winner, a.share
