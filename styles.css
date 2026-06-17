@@ -48,38 +48,49 @@ button, input, select { font: inherit; }
 }
 
 .brand {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding: 24px 20px 20px;
+  padding: 20px 20px 16px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: var(--gold);
-  color: #111;
-  font-weight: 900;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  flex-shrink: 0;
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.brand h1 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 800;
+.brand-logo svg {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(249,115,22,0.5));
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-name {
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.brand-stat {
   color: #fff;
 }
 
-.brand p {
-  margin: 2px 0 0;
-  font-size: 0.72rem;
+.brand-fuel {
+  background: linear-gradient(135deg, #f97316, #facc15);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.brand-text p {
+  margin: 3px 0 0;
+  font-size: 0.68rem;
   color: var(--sidebar-muted);
+  white-space: nowrap;
 }
 
 /* Nav */

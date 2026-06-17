@@ -18,10 +18,39 @@
       <!-- Sidebar Navigation -->
       <nav class="sidebar" aria-label="Main navigation">
         <div class="brand">
-          <span class="brand-mark">NBA</span>
-          <div>
-            <h1>StatFuel</h1>
-            <p>Stats &amp; Predictions</p>
+          <div class="brand-logo">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 64" width="42" height="48" aria-hidden="true">
+              <defs>
+                <radialGradient id="ballGrad" cx="50%" cy="60%" r="50%">
+                  <stop offset="0%" stop-color="#ff8c00"/>
+                  <stop offset="100%" stop-color="#c94a00"/>
+                </radialGradient>
+                <linearGradient id="flameGrad" x1="50%" y1="100%" x2="50%" y2="0%">
+                  <stop offset="0%" stop-color="#f97316"/>
+                  <stop offset="60%" stop-color="#facc15"/>
+                  <stop offset="100%" stop-color="#fff7a0"/>
+                </linearGradient>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="1.5" result="blur"/>
+                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <!-- Flame left -->
+              <path d="M20 38 C16 30 18 20 22 14 C20 20 24 24 23 30 C26 22 28 14 26 6 C32 14 30 22 33 28 C33 20 36 16 34 10 C40 18 38 28 36 38Z" fill="url(#flameGrad)" filter="url(#glow)"/>
+              <!-- Basketball body -->
+              <circle cx="28" cy="46" r="16" fill="url(#ballGrad)"/>
+              <!-- Basketball lines -->
+              <path d="M12 46 Q20 40 28 46 Q36 52 44 46" fill="none" stroke="#7a2800" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M28 30 Q22 38 28 46 Q34 54 28 62" fill="none" stroke="#7a2800" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M14 38 Q18 46 14 54" fill="none" stroke="#7a2800" stroke-width="1.1" stroke-linecap="round"/>
+              <path d="M42 38 Q38 46 42 54" fill="none" stroke="#7a2800" stroke-width="1.1" stroke-linecap="round"/>
+              <!-- Shine -->
+              <ellipse cx="22" cy="40" rx="3" ry="5" fill="white" opacity="0.18" transform="rotate(-20 22 40)"/>
+            </svg>
+            <div class="brand-text">
+              <div class="brand-name"><span class="brand-stat">Stat</span><span class="brand-fuel">Fuel</span></div>
+              <p>Stats &amp; Predictions</p>
+            </div>
           </div>
         </div>
 
