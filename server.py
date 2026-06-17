@@ -89,7 +89,7 @@ class Handler(SimpleHTTPRequestHandler):
                       season,
                       CAST(season AS INTEGER) AS season_start
                     FROM archive_player_dashboard
-                    ORDER BY player, CAST(season AS INTEGER)
+                    ORDER BY player, season
                 """)
             return self.send_json_rows(rows)
 
@@ -125,7 +125,7 @@ class Handler(SimpleHTTPRequestHandler):
                 season = int(params.get("season", [latest_season])[0] or latest_season)
 
                 seasons_available = [r["season"] for r in q(db,
-                    "SELECT DISTINCT season FROM archive_team_summaries ORDER BY CAST(season AS INTEGER) DESC"
+                    "SELECT season FROM (SELECT DISTINCT season FROM archive_team_summaries) t ORDER BY CAST(season AS INTEGER) DESC"
                 )]
 
                 top_scorers = q(db, """
@@ -198,7 +198,7 @@ class Handler(SimpleHTTPRequestHandler):
                     ORDER BY CAST(d.overall_pick AS INTEGER)
                 """, (season,))
                 seasons_available = q(db, """
-                    SELECT DISTINCT season FROM archive_draft_pick_history
+                    SELECT season FROM (SELECT DISTINCT season FROM archive_draft_pick_history) t
                     ORDER BY CAST(season AS INTEGER) DESC
                 """)
             return self.send_json({
