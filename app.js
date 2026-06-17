@@ -758,7 +758,7 @@ function computeTypicalRangeByAge(metric) {
 
 // ── Predictions & Value ──────────────────────────────────────────────────────
 
-function renderPredictions(player, projections = []) {
+async function renderPredictions(player, projections = []) {
   const el = $("#predGrid");
   if (!el) return;
 
@@ -768,19 +768,18 @@ function renderPredictions(player, projections = []) {
   const last = seasons[seasons.length - 1];
   const age = parseFloat(last.age) || 26;
 
-  // Use same projection values as the chart
   const nextSeason = projections[0] || null;
   const projPts = nextSeason ? (nextSeason.pts || 0).toFixed(1) : "—";
   const projReb = nextSeason ? (nextSeason.reb || 0).toFixed(1) : "—";
   const projAst = nextSeason ? (nextSeason.ast || 0).toFixed(1) : "—";
   const projMin = nextSeason ? (nextSeason.min || 0).toFixed(1) : "—";
-  const recentCount = Math.min(3, seasons.length);
 
   // Efficiency score (0-100)
-  const per    = parseFloat(last.ts_pct) || 0;  // ts_percent in decimal
+  const per    = parseFloat(last.ts_pct) || 0;
   const bpm    = parseFloat(last.net_rating) || 0;
   const vorp   = parseFloat(last.vorp) || 0;
   const perVal = parseFloat(last.per) || 15;
+  const ws     = parseFloat(last.ws) || 0;
 
   const perScore  = Math.min(100, Math.max(0, ((perVal - 5) / 30) * 100));
   const bpmScore  = Math.min(100, Math.max(0, ((bpm + 5) / 20) * 100));
@@ -788,21 +787,42 @@ function renderPredictions(player, projections = []) {
   const vorpScore = Math.min(100, Math.max(0, ((vorp + 1) / 9) * 100));
   const effScore  = Math.round(perScore * 0.3 + bpmScore * 0.25 + tsScore * 0.2 + vorpScore * 0.25);
 
-  // Efficiency tier
   const effTier = effScore >= 80 ? ["MVP Caliber","var(--gold)"] :
                   effScore >= 65 ? ["All-Star","#5b8af0"] :
                   effScore >= 50 ? ["Starter","var(--green)"] :
                   effScore >= 35 ? ["Rotation","var(--muted)"] :
                                    ["Developmental","rgba(255,255,255,0.3)"];
 
-  // Market value estimate based on VORP + Win Shares
-  const ws = parseFloat(last.ws) || 0;
-  const rawValue = Math.max(0, (vorp * 6.5) + (ws * 1.8));
-  const marketValue = Math.min(62, Math.max(1.2, rawValue));
-  const valueTier = marketValue >= 40 ? "Max Contract" :
-                    marketValue >= 25 ? "Near-Max" :
-                    marketValue >= 15 ? "Starter" :
-                    marketValue >= 7  ? "Role Player" : "Minimum";
+  // ML salary prediction
+  let mlSalaryM = null;
+  let mlSalaryPct = null;
+  let mlTier = "";
+  try {
+    const res = await fetch(`/api/salary-predict?player_id=${encodeURIComponent(player.player_id)}`);
+    if (res.ok) {
+      const d = await res.json();
+      mlSalaryM = d.predicted_salary_m;
+      mlSalaryPct = d.salary_pct;
+    }
+  } catch (_) {}
+
+  if (mlSalaryM !== null) {
+    mlTier = mlSalaryM >= 40 ? "Max Contract" :
+             mlSalaryM >= 25 ? "Near-Max" :
+             mlSalaryM >= 15 ? "Starter" :
+             mlSalaryM >= 7  ? "Role Player" : "Minimum";
+  } else {
+    // formula fallback
+    const rawValue = Math.max(0, (vorp * 6.5) + (ws * 1.8));
+    mlSalaryM = Math.min(62, Math.max(1.2, rawValue));
+    mlSalaryPct = (mlSalaryM / 155) * 100;
+    mlTier = mlSalaryM >= 40 ? "Max Contract" :
+             mlSalaryM >= 25 ? "Near-Max" :
+             mlSalaryM >= 15 ? "Starter" :
+             mlSalaryM >= 7  ? "Role Player" : "Minimum";
+  }
+
+  const salaryBarPct = Math.min(100, (mlSalaryM / 62) * 100).toFixed(0);
 
   el.innerHTML = `
     <div class="pred-section">
@@ -823,15 +843,16 @@ function renderPredictions(player, projections = []) {
     </div>
 
     <div class="pred-section">
-      <div class="pred-label">Estimated Market Value</div>
+      <div class="pred-label">ML Salary Prediction <span style="font-size:0.65rem;color:var(--muted);font-weight:400">· Random Forest</span></div>
       <div class="pred-score-wrap">
-        <div class="pred-score pred-money">$${marketValue.toFixed(1)}M</div>
-        <div class="pred-tier">${valueTier}</div>
+        <div class="pred-score pred-money">$${mlSalaryM.toFixed(1)}M</div>
+        <div class="pred-tier">${mlTier}</div>
       </div>
       <div class="pred-bar-track">
-        <div class="pred-bar-fill pred-bar-gold" style="width:${Math.min(100,(marketValue/62)*100).toFixed(0)}%"></div>
+        <div class="pred-bar-fill pred-bar-gold" style="width:${salaryBarPct}%"></div>
       </div>
       <div class="pred-breakdown">
+        <span>${mlSalaryPct !== null ? mlSalaryPct.toFixed(1) : "—"}% of cap</span>
         <span>Win Shares: ${ws.toFixed(1)}</span>
         <span>VORP: ${vorp.toFixed(1)}</span>
         <span>Age: ${Math.round(age)}</span>

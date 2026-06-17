@@ -13,6 +13,29 @@ import psycopg2
 import psycopg2.extras
 
 ROOT = Path(__file__).resolve().parent
+
+# ── Salary model (loaded once at startup) ──────────────────────────────────
+_salary_model = None
+def _load_salary_model():
+    global _salary_model
+    if _salary_model is not None:
+        return _salary_model
+    model_path = ROOT / "salary_model.pkl"
+    if not model_path.exists():
+        return None
+    try:
+        import joblib
+        _salary_model = joblib.load(model_path)
+        print("Salary model loaded.")
+    except Exception as e:
+        print(f"Could not load salary model: {e}")
+    return _salary_model
+
+SALARY_CAPS_M = {
+    2015: 70.00, 2016: 94.143, 2017: 99.093, 2018: 101.869, 2019: 109.14,
+    2020: 109.14, 2021: 112.414, 2022: 123.655, 2023: 136.021, 2024: 140.588,
+    2025: 155.00, 2026: 170.00,
+}
 DATABASE_URL = os.environ.get("DATABASE_URL") or \
     "postgresql://postgres:LukaDoncic77@db.ovgnihzycxdjzouurpfz.supabase.co:5432/postgres"
 
@@ -301,6 +324,96 @@ class Handler(SimpleHTTPRequestHandler):
             finally:
                 conn.close()
             return self.send_json_rows(rows)
+
+        if parsed.path == "/api/salary-predict":
+            player_id = (params.get("player_id", [""])[0] or "").strip()
+            if not player_id:
+                return self.send_json({"error": "player_id required"}, status=400)
+            bundle = _load_salary_model()
+            if bundle is None:
+                return self.send_json({"error": "Model not available"}, status=503)
+            conn = connect()
+            try:
+                # Grab the player's most recent season stats
+                row = q(conn, """
+                    SELECT
+                        safe_float(p.age) AS age, safe_float(p.g) AS g,
+                        safe_float(p.gs) AS gs, safe_float(p.mp_per_game) AS mp_per_game,
+                        safe_float(p.fg_per_game) AS fg_per_game,
+                        safe_float(p.fga_per_game) AS fga_per_game,
+                        safe_float(p.fg_percent) AS fg_percent,
+                        safe_float(p.x3p_per_game) AS x3p_per_game,
+                        safe_float(p.x3pa_per_game) AS x3pa_per_game,
+                        safe_float(p.x3p_percent) AS x3p_percent,
+                        safe_float(p.ft_per_game) AS ft_per_game,
+                        safe_float(p.fta_per_game) AS fta_per_game,
+                        safe_float(p.ft_percent) AS ft_percent,
+                        safe_float(p.orb_per_game) AS orb_per_game,
+                        safe_float(p.drb_per_game) AS drb_per_game,
+                        safe_float(p.trb_per_game) AS trb_per_game,
+                        safe_float(p.ast_per_game) AS ast_per_game,
+                        safe_float(p.stl_per_game) AS stl_per_game,
+                        safe_float(p.blk_per_game) AS blk_per_game,
+                        safe_float(p.tov_per_game) AS tov_per_game,
+                        safe_float(p.pts_per_game) AS pts_per_game,
+                        safe_float(a.per) AS per,
+                        safe_float(a.ts_percent) AS ts_percent,
+                        safe_float(a.usg_percent) AS usg_percent,
+                        safe_float(a.ows) AS ows, safe_float(a.dws) AS dws,
+                        safe_float(a.ws) AS ws, safe_float(a.ws_48) AS ws_48,
+                        safe_float(a.obpm) AS obpm, safe_float(a.dbpm) AS dbpm,
+                        safe_float(a.bpm) AS bpm, safe_float(a.vorp) AS vorp,
+                        p.pos, safe_int(p.season) AS season
+                    FROM archive_player_per_game p
+                    JOIN archive_advanced a
+                      ON a.player_id = p.player_id AND a.season = p.season
+                    WHERE p.player_id = ?
+                    ORDER BY safe_int(p.season) DESC
+                    LIMIT 1
+                """, (player_id,))
+            finally:
+                conn.close()
+
+            if not row:
+                return self.send_json({"error": "Player not found"}, status=404)
+
+            r = dict(row[0])
+            model = bundle["model"]
+            features = bundle["features"]
+            positions = bundle["positions"]
+            POSITIONS = ["C", "PF", "PG", "SF", "SG"]
+
+            pos_primary = (r.get("pos") or "SF").split("-")[0].strip()
+            if pos_primary not in POSITIONS:
+                pos_primary = "SF"
+
+            feat_vals = {}
+            for f in features:
+                if f.startswith("Pos_"):
+                    pos = f.split("_", 1)[1]
+                    feat_vals[f] = 1.0 if pos_primary == pos else 0.0
+                else:
+                    v = r.get(f)
+                    feat_vals[f] = float(v) if v is not None else 0.0
+
+            import numpy as np
+            X = np.array([[feat_vals[f] for f in features]])
+            salary_pct = float(model.predict(X)[0])
+            salary_pct = max(0.005, min(salary_pct, 0.40))
+
+            # Use next-season cap for valuation
+            current_season = int(r.get("season") or 2026)
+            next_season_start = current_season  # DB season = end year; next contract starts this summer
+            cap_m = SALARY_CAPS_M.get(next_season_start, 155.0)
+            predicted_m = round(salary_pct * cap_m, 2)
+
+            return self.send_json({
+                "player_id": player_id,
+                "season": current_season,
+                "salary_pct": round(salary_pct * 100, 1),
+                "predicted_salary_m": predicted_m,
+                "cap_m": cap_m,
+            })
 
         # Photo proxy
         m = re.match(r"^/api/player-photo/([a-z0-9]+)$", parsed.path)
