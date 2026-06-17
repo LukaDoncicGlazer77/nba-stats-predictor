@@ -572,6 +572,7 @@ function renderPlayerProfile() {
   renderProfile(player);
   renderProjection(player, projections);
   renderSeasonTable(player);
+  renderPredictions(player);
   syncControls();
   drawRadar(player);
   drawChart(player, projections, true);
@@ -753,6 +754,106 @@ function computeTypicalRangeByAge(metric) {
     };
   }
   return result;
+}
+
+// ── Predictions & Value ──────────────────────────────────────────────────────
+
+function renderPredictions(player) {
+  const el = $("#predGrid");
+  if (!el) return;
+
+  const seasons = (player.seasons || []).filter(s => s.pts != null);
+  if (!seasons.length) { el.innerHTML = "<p style='color:var(--muted)'>Not enough data</p>"; return; }
+
+  // Use last season as baseline, weighted avg of last 3 for projections
+  const recent = seasons.slice(-3);
+  const weights = recent.length === 3 ? [0.2, 0.3, 0.5] : recent.length === 2 ? [0.35, 0.65] : [1];
+  const wavg = (key) => recent.reduce((sum, s, i) => sum + (parseFloat(s[key]) || 0) * weights[i], 0);
+
+  const last = seasons[seasons.length - 1];
+  const age = parseFloat(last.age) || 26;
+
+  // Age curve adjustment (-1% per year after 30, +1% per year before 26)
+  const ageFactor = age < 26 ? 1 + (26 - age) * 0.01 : age > 30 ? 1 - (age - 30) * 0.012 : 1;
+
+  const projPts  = (wavg("pts")  * ageFactor).toFixed(1);
+  const projReb  = (wavg("reb")  * ageFactor).toFixed(1);
+  const projAst  = (wavg("ast")  * ageFactor).toFixed(1);
+  const projMin  = (wavg("min")  * ageFactor).toFixed(1);
+
+  // Efficiency score (0-100)
+  const per    = parseFloat(last.ts_pct) || 0;  // ts_percent in decimal
+  const bpm    = parseFloat(last.net_rating) || 0;
+  const vorp   = parseFloat(last.vorp) || 0;
+  const perVal = parseFloat(last.per) || 15;
+
+  const perScore  = Math.min(100, Math.max(0, ((perVal - 5) / 30) * 100));
+  const bpmScore  = Math.min(100, Math.max(0, ((bpm + 5) / 20) * 100));
+  const tsScore   = Math.min(100, Math.max(0, ((per - 0.40) / 0.35) * 100));
+  const vorpScore = Math.min(100, Math.max(0, ((vorp + 1) / 9) * 100));
+  const effScore  = Math.round(perScore * 0.3 + bpmScore * 0.25 + tsScore * 0.2 + vorpScore * 0.25);
+
+  // Efficiency tier
+  const effTier = effScore >= 80 ? ["MVP Caliber","var(--gold)"] :
+                  effScore >= 65 ? ["All-Star","#5b8af0"] :
+                  effScore >= 50 ? ["Starter","var(--green)"] :
+                  effScore >= 35 ? ["Rotation","var(--muted)"] :
+                                   ["Developmental","rgba(255,255,255,0.3)"];
+
+  // Market value estimate based on VORP + Win Shares
+  const ws = parseFloat(last.ws) || 0;
+  const rawValue = Math.max(0, (vorp * 6.5) + (ws * 1.8));
+  const marketValue = Math.min(62, Math.max(1.2, rawValue));
+  const valueTier = marketValue >= 40 ? "Max Contract" :
+                    marketValue >= 25 ? "Near-Max" :
+                    marketValue >= 15 ? "Starter" :
+                    marketValue >= 7  ? "Role Player" : "Minimum";
+
+  el.innerHTML = `
+    <div class="pred-section">
+      <div class="pred-label">Efficiency Score</div>
+      <div class="pred-score-wrap">
+        <div class="pred-score" style="color:${effTier[1]}">${effScore}</div>
+        <div class="pred-tier" style="color:${effTier[1]}">${effTier[0]}</div>
+      </div>
+      <div class="pred-bar-track">
+        <div class="pred-bar-fill" style="width:${effScore}%;background:${effTier[1]}"></div>
+      </div>
+      <div class="pred-breakdown">
+        <span>PER: ${perVal.toFixed(1)}</span>
+        <span>BPM: ${bpm >= 0 ? "+" : ""}${bpm.toFixed(1)}</span>
+        <span>TS%: ${(per * 100).toFixed(1)}%</span>
+        <span>VORP: ${vorp.toFixed(1)}</span>
+      </div>
+    </div>
+
+    <div class="pred-section">
+      <div class="pred-label">Estimated Market Value</div>
+      <div class="pred-score-wrap">
+        <div class="pred-score pred-money">$${marketValue.toFixed(1)}M</div>
+        <div class="pred-tier">${valueTier}</div>
+      </div>
+      <div class="pred-bar-track">
+        <div class="pred-bar-fill pred-bar-gold" style="width:${Math.min(100,(marketValue/62)*100).toFixed(0)}%"></div>
+      </div>
+      <div class="pred-breakdown">
+        <span>Win Shares: ${ws.toFixed(1)}</span>
+        <span>VORP: ${vorp.toFixed(1)}</span>
+        <span>Age: ${Math.round(age)}</span>
+      </div>
+    </div>
+
+    <div class="pred-section">
+      <div class="pred-label">Next Season Projection</div>
+      <div class="pred-stats-row">
+        <div class="pred-stat"><strong>${projPts}</strong><span>PTS</span></div>
+        <div class="pred-stat"><strong>${projReb}</strong><span>REB</span></div>
+        <div class="pred-stat"><strong>${projAst}</strong><span>AST</span></div>
+        <div class="pred-stat"><strong>${projMin}</strong><span>MIN</span></div>
+      </div>
+      <div class="pred-breakdown">Weighted avg of last ${recent.length} season${recent.length > 1 ? "s" : ""} · age-adjusted</div>
+    </div>
+  `;
 }
 
 function drawChart(player, projections = [], dark = false) {
