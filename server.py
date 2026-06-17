@@ -124,7 +124,7 @@ class Handler(SimpleHTTPRequestHandler):
                 )[0]
                 season = int(params.get("season", [latest_season])[0] or latest_season)
 
-                seasons_available = [r[0] for r in q(db,
+                seasons_available = [r["season"] for r in q(db,
                     "SELECT DISTINCT season FROM archive_team_summaries ORDER BY CAST(season AS INTEGER) DESC"
                 )]
 
