@@ -223,13 +223,16 @@ async function renderPlayoffBracket(allTeams, season) {
       const abbrev = which === 1 ? s.team1_abbrev : s.team2_abbrev;
       const name = which === 1 ? s.team1 : s.team2;
       const seed = which === 1 ? s.team1_seed : s.team2_seed;
-      const wins = which === 1 ? s.team1_wins : s.team2_wins;
+      const myWins = which === 1 ? s.team1_wins : s.team2_wins;
+      const oppWins = which === 1 ? s.team2_wins : s.team1_wins;
       const isWinner = abbrev === s.winner_abbrev;
-      const shortName = name.split(" ").slice(-1)[0];
+      const words = name.split(" ");
+      const shortName = words.length > 1 ? words.slice(-1)[0] : name;
+      const score = `${myWins}-${oppWins}`;
       return `<div class="b-slot${isWinner ? " b-winner" : ""}">
         <span class="b-seed-num">${seed}</span>
         <span class="b-team-name">${shortName}</span>
-        <span class="b-team-rec">${wins}</span>
+        <span class="b-team-rec">${score}</span>
       </div>`;
     };
 
