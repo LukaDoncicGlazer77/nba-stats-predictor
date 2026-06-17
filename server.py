@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import decimal
 import json
 import os
 import re
@@ -34,10 +35,11 @@ def q1(conn, sql, params=()):
     return cur.fetchone()
 
 
-# Safe cast helpers for text columns that may contain empty strings
-def _n(col):
-    """Wrap a column name in NULLIF(col, '') so empty strings cast safely."""
-    return f"NULLIF({col}, '')"
+def to_json(obj):
+    """JSON serializer that handles Decimal and other PostgreSQL types."""
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -45,7 +47,7 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=ROOT, **kwargs)
 
     def send_json(self, payload, status=200):
-        body = json.dumps(payload).encode("utf-8")
+        body = json.dumps(payload, default=to_json).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -53,7 +55,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def send_json_rows(self, rows):
-        body = json.dumps([dict(r) for r in rows]).encode("utf-8")
+        body = json.dumps([dict(r) for r in rows], default=to_json).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -86,24 +88,24 @@ class Handler(SimpleHTTPRequestHandler):
                       player_id,
                       team AS team_abbreviation,
                       pos,
-                      CAST(NULLIF(age, '') AS REAL) AS age,
-                      CAST(NULLIF(g, '') AS INTEGER) AS gp,
-                      CAST(NULLIF(mp_per_game, '') AS REAL) AS min,
-                      CAST(NULLIF(pts_per_game, '') AS REAL) AS pts,
-                      CAST(NULLIF(trb_per_game, '') AS REAL) AS reb,
-                      CAST(NULLIF(ast_per_game, '') AS REAL) AS ast,
-                      CAST(NULLIF(x3p_per_game, '') AS REAL) AS three,
-                      CAST(NULLIF(stl_per_game, '') AS REAL) AS stl,
-                      CAST(NULLIF(blk_per_game, '') AS REAL) AS blk,
-                      CAST(NULLIF(tov_per_game, '') AS REAL) AS tov,
-                      CAST(NULLIF(fg_percent, '') AS REAL) * 100 AS fg,
-                      CAST(NULLIF(x3p_percent, '') AS REAL) * 100 AS three_pct,
-                      CAST(NULLIF(ft_percent, '') AS REAL) * 100 AS ft_pct,
-                      CAST(NULLIF(bpm, '') AS REAL) AS net_rating,
-                      CAST(NULLIF(usg_percent, '') AS REAL) / 100 AS usg_pct,
-                      CAST(NULLIF(ts_percent, '') AS REAL) AS ts_pct,
+                      safe_float(age) AS age,
+                      safe_int(g) AS gp,
+                      safe_float(mp_per_game) AS min,
+                      safe_float(pts_per_game) AS pts,
+                      safe_float(trb_per_game) AS reb,
+                      safe_float(ast_per_game) AS ast,
+                      safe_float(x3p_per_game) AS three,
+                      safe_float(stl_per_game) AS stl,
+                      safe_float(blk_per_game) AS blk,
+                      safe_float(tov_per_game) AS tov,
+                      safe_float(fg_percent) * 100 AS fg,
+                      safe_float(x3p_percent) * 100 AS three_pct,
+                      safe_float(ft_percent) * 100 AS ft_pct,
+                      safe_float(bpm) AS net_rating,
+                      safe_float(usg_percent) / 100 AS usg_pct,
+                      safe_float(ts_percent) AS ts_pct,
                       season,
-                      CAST(NULLIF(season, '') AS INTEGER) AS season_start
+                      safe_int(season) AS season_start
                     FROM archive_player_dashboard
                     ORDER BY player, season
                 """)
@@ -118,12 +120,12 @@ class Handler(SimpleHTTPRequestHandler):
                   player AS player_name,
                   player_id,
                   COUNT(*) AS seasons,
-                  MIN(CAST(NULLIF(season, '') AS INTEGER)) AS first_season_start,
-                  MAX(CAST(NULLIF(season, '') AS INTEGER)) AS latest_season_start,
-                  ROUND(AVG(CAST(NULLIF(pts_per_game, '') AS REAL))::numeric, 1) AS career_pts,
-                  ROUND(AVG(CAST(NULLIF(trb_per_game, '') AS REAL))::numeric, 1) AS career_reb,
-                  ROUND(AVG(CAST(NULLIF(ast_per_game, '') AS REAL))::numeric, 1) AS career_ast,
-                  ROUND((AVG(CAST(NULLIF(ts_percent, '') AS REAL)) * 100)::numeric, 1) AS career_ts_pct
+                  MIN(safe_int(season)) AS first_season_start,
+                  MAX(safe_int(season)) AS latest_season_start,
+                  ROUND(AVG(safe_float(pts_per_game))::numeric, 1) AS career_pts,
+                  ROUND(AVG(safe_float(trb_per_game))::numeric, 1) AS career_reb,
+                  ROUND(AVG(safe_float(ast_per_game))::numeric, 1) AS career_ast,
+                  ROUND((AVG(safe_float(ts_percent)) * 100)::numeric, 1) AS career_ts_pct
                 FROM archive_player_dashboard
             """
             args = []
@@ -142,47 +144,47 @@ class Handler(SimpleHTTPRequestHandler):
             conn = connect()
             try:
                 latest_season = q1(conn,
-                    "SELECT MAX(CAST(NULLIF(season, '') AS INTEGER)) FROM archive_player_per_game"
+                    "SELECT MAX(safe_int(season)) FROM archive_player_per_game"
                 )[0]
                 season = int(params.get("season", [latest_season])[0] or latest_season)
 
                 seasons_available = [r["season"] for r in q(conn,
-                    "SELECT season FROM (SELECT DISTINCT season FROM archive_team_summaries) t ORDER BY CAST(NULLIF(season, '') AS INTEGER) DESC"
+                    "SELECT season FROM (SELECT DISTINCT season FROM archive_team_summaries) t ORDER BY safe_int(season) DESC"
                 )]
 
                 top_scorers = q(conn, """
                     SELECT player, player_id, team,
-                           CAST(NULLIF(pts_per_game, '') AS REAL) AS pts,
-                           CAST(NULLIF(trb_per_game, '') AS REAL) AS reb,
-                           CAST(NULLIF(ast_per_game, '') AS REAL) AS ast,
-                           CAST(NULLIF(fg_percent, '') AS REAL)*100 AS fg_pct
+                           safe_float(pts_per_game) AS pts,
+                           safe_float(trb_per_game) AS reb,
+                           safe_float(ast_per_game) AS ast,
+                           safe_float(fg_percent)*100 AS fg_pct
                     FROM archive_player_per_game
                     WHERE season = ?
                       AND pts_per_game != '' AND g != ''
-                      AND CAST(NULLIF(g, '') AS INTEGER) >= 20
-                    ORDER BY CAST(NULLIF(pts_per_game, '') AS REAL) DESC LIMIT 10
+                      AND safe_int(g) >= 20
+                    ORDER BY safe_float(pts_per_game) DESC NULLS LAST LIMIT 10
                 """, (str(season),))
 
                 top_assisters = q(conn, """
                     SELECT player, player_id, team,
-                           CAST(NULLIF(ast_per_game, '') AS REAL) AS ast,
-                           CAST(NULLIF(pts_per_game, '') AS REAL) AS pts
+                           safe_float(ast_per_game) AS ast,
+                           safe_float(pts_per_game) AS pts
                     FROM archive_player_per_game
                     WHERE season = ?
                       AND ast_per_game != '' AND g != ''
-                      AND CAST(NULLIF(g, '') AS INTEGER) >= 20
-                    ORDER BY CAST(NULLIF(ast_per_game, '') AS REAL) DESC LIMIT 5
+                      AND safe_int(g) >= 20
+                    ORDER BY safe_float(ast_per_game) DESC NULLS LAST LIMIT 5
                 """, (str(season),))
 
                 top_rebounders = q(conn, """
                     SELECT player, player_id, team,
-                           CAST(NULLIF(trb_per_game, '') AS REAL) AS reb,
-                           CAST(NULLIF(pts_per_game, '') AS REAL) AS pts
+                           safe_float(trb_per_game) AS reb,
+                           safe_float(pts_per_game) AS pts
                     FROM archive_player_per_game
                     WHERE season = ?
                       AND trb_per_game != '' AND g != ''
-                      AND CAST(NULLIF(g, '') AS INTEGER) >= 20
-                    ORDER BY CAST(NULLIF(trb_per_game, '') AS REAL) DESC LIMIT 5
+                      AND safe_int(g) >= 20
+                    ORDER BY safe_float(trb_per_game) DESC NULLS LAST LIMIT 5
                 """, (str(season),))
 
                 awards = q(conn, """
@@ -194,14 +196,15 @@ class Handler(SimpleHTTPRequestHandler):
 
                 team_standings = q(conn, """
                     SELECT team, abbreviation, w, l,
-                           CASE WHEN NULLIF(w, '') IS NOT NULL AND NULLIF(l, '') IS NOT NULL
-                                THEN ROUND((CAST(NULLIF(w,'') AS REAL)/(CAST(NULLIF(w,'') AS REAL)+CAST(NULLIF(l,'') AS REAL)))::numeric,3)
+                           CASE WHEN safe_float(w) IS NOT NULL AND safe_float(l) IS NOT NULL
+                                AND (safe_float(w) + safe_float(l)) > 0
+                                THEN ROUND((safe_float(w)/(safe_float(w)+safe_float(l)))::numeric, 3)
                                 ELSE NULL END AS win_pct,
-                           CAST(NULLIF(n_rtg, '') AS REAL) AS net_rtg,
+                           safe_float(n_rtg) AS net_rtg,
                            playoffs
                     FROM archive_team_summaries
                     WHERE season = ? AND abbreviation != 'NA'
-                    ORDER BY CAST(NULLIF(w, '') AS REAL) DESC NULLS LAST
+                    ORDER BY safe_float(w) DESC NULLS LAST
                 """, (str(season),))
             finally:
                 conn.close()
@@ -223,19 +226,19 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, """
                     SELECT d.season, d.overall_pick, d.round, d.tm AS team,
                            d.player, d.player_id, d.college,
-                           ROUND(AVG(CAST(NULLIF(p.pts_per_game, '') AS REAL))::numeric, 1) AS career_pts,
-                           ROUND(AVG(CAST(NULLIF(p.trb_per_game, '') AS REAL))::numeric, 1) AS career_reb,
-                           ROUND(AVG(CAST(NULLIF(p.ast_per_game, '') AS REAL))::numeric, 1) AS career_ast,
+                           ROUND(AVG(safe_float(p.pts_per_game))::numeric, 1) AS career_pts,
+                           ROUND(AVG(safe_float(p.trb_per_game))::numeric, 1) AS career_reb,
+                           ROUND(AVG(safe_float(p.ast_per_game))::numeric, 1) AS career_ast,
                            COUNT(p.season) AS seasons_played
                     FROM archive_draft_pick_history d
                     LEFT JOIN archive_player_per_game p ON p.player_id = d.player_id
                     WHERE d.season = ?
                     GROUP BY d.player_id, d.overall_pick, d.season, d.round, d.tm, d.player, d.college
-                    ORDER BY CAST(NULLIF(d.overall_pick, '') AS INTEGER)
+                    ORDER BY safe_int(d.overall_pick)
                 """, (season,))
                 seasons_available = q(conn, """
                     SELECT season FROM (SELECT DISTINCT season FROM archive_draft_pick_history) t
-                    ORDER BY CAST(NULLIF(season, '') AS INTEGER) DESC
+                    ORDER BY safe_int(season) DESC
                 """)
             finally:
                 conn.close()
@@ -251,7 +254,7 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, """
                     SELECT rank, name, pos, age, school, height, weight, status, country
                     FROM archive_draft_prospects_2026
-                    ORDER BY CAST(NULLIF(rank, '') AS INTEGER)
+                    ORDER BY safe_int(rank)
                 """)
             finally:
                 conn.close()
@@ -263,7 +266,7 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, """
                     SELECT player, player_id, team, season, lg, replaced
                     FROM archive_all_star_selections
-                    ORDER BY CAST(NULLIF(season, '') AS INTEGER) DESC, player
+                    ORDER BY safe_int(season) DESC, player
                     LIMIT 100
                 """)
             finally:
