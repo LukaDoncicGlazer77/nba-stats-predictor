@@ -572,7 +572,7 @@ function renderPlayerProfile() {
   renderProfile(player);
   renderProjection(player, projections);
   renderSeasonTable(player);
-  renderPredictions(player);
+  renderPredictions(player, projections);
   syncControls();
   drawRadar(player);
   drawChart(player, projections, true);
@@ -758,28 +758,23 @@ function computeTypicalRangeByAge(metric) {
 
 // ── Predictions & Value ──────────────────────────────────────────────────────
 
-function renderPredictions(player) {
+function renderPredictions(player, projections = []) {
   const el = $("#predGrid");
   if (!el) return;
 
   const seasons = (player.seasons || []).filter(s => s.pts != null);
   if (!seasons.length) { el.innerHTML = "<p style='color:var(--muted)'>Not enough data</p>"; return; }
 
-  // Use last season as baseline, weighted avg of last 3 for projections
-  const recent = seasons.slice(-3);
-  const weights = recent.length === 3 ? [0.2, 0.3, 0.5] : recent.length === 2 ? [0.35, 0.65] : [1];
-  const wavg = (key) => recent.reduce((sum, s, i) => sum + (parseFloat(s[key]) || 0) * weights[i], 0);
-
   const last = seasons[seasons.length - 1];
   const age = parseFloat(last.age) || 26;
 
-  // Age curve adjustment (-1% per year after 30, +1% per year before 26)
-  const ageFactor = age < 26 ? 1 + (26 - age) * 0.01 : age > 30 ? 1 - (age - 30) * 0.012 : 1;
-
-  const projPts  = (wavg("pts")  * ageFactor).toFixed(1);
-  const projReb  = (wavg("reb")  * ageFactor).toFixed(1);
-  const projAst  = (wavg("ast")  * ageFactor).toFixed(1);
-  const projMin  = (wavg("min")  * ageFactor).toFixed(1);
+  // Use same projection values as the chart
+  const nextSeason = projections[0] || null;
+  const projPts = nextSeason ? (nextSeason.pts || 0).toFixed(1) : "—";
+  const projReb = nextSeason ? (nextSeason.reb || 0).toFixed(1) : "—";
+  const projAst = nextSeason ? (nextSeason.ast || 0).toFixed(1) : "—";
+  const projMin = nextSeason ? (nextSeason.min || 0).toFixed(1) : "—";
+  const recentCount = Math.min(3, seasons.length);
 
   // Efficiency score (0-100)
   const per    = parseFloat(last.ts_pct) || 0;  // ts_percent in decimal
@@ -851,7 +846,7 @@ function renderPredictions(player) {
         <div class="pred-stat"><strong>${projAst}</strong><span>AST</span></div>
         <div class="pred-stat"><strong>${projMin}</strong><span>MIN</span></div>
       </div>
-      <div class="pred-breakdown">Weighted avg of last ${recent.length} season${recent.length > 1 ? "s" : ""} · age-adjusted</div>
+      <div class="pred-breakdown">Matches dashed line in Statistical Trend · age-adjusted</div>
     </div>
   `;
 }
