@@ -405,6 +405,11 @@ function buildPlayersFromRows(rows) {
         net: toNumber(row.net_rating),
         ts: toNumber(row.ts_pct) * 100,
         usg: toNumber(row.usg_pct) * 100,
+        per: toNumber(row.per),
+        vorp: toNumber(row.vorp),
+        ws: toNumber(row.ws),
+        ows: toNumber(row.ows),
+        dws: toNumber(row.dws),
         team: row.team_abbreviation,
         pos: row.pos,
         playerId: row.player_id,
@@ -774,8 +779,8 @@ async function renderPredictions(player, projections = []) {
   const projAst = nextSeason ? (nextSeason.ast || 0).toFixed(1) : "—";
   const projMin = nextSeason ? (nextSeason.min || 0).toFixed(1) : "—";
 
-  const tsPct  = parseFloat(last.ts_pct) || 0;
-  const bpm    = parseFloat(last.net_rating) || 0;
+  const tsPct  = (parseFloat(last.ts) || 0) / 100;   // ts stored as 0-100
+  const bpm    = parseFloat(last.net) || 0;           // net_rating stored as net
   const vorp   = parseFloat(last.vorp) || 0;
   const perVal = parseFloat(last.per) || 15;
   const ws     = parseFloat(last.ws) || 0;
@@ -801,7 +806,7 @@ async function renderPredictions(player, projections = []) {
   // ML salary
   let mlSalaryM = null, mlSalaryPct = null;
   try {
-    const res = await fetch(`/api/salary-predict?player_id=${encodeURIComponent(player.player_id)}`);
+    const res = await fetch(`/api/salary-predict?player_id=${encodeURIComponent(player.playerId)}`);
     if (res.ok) { const d = await res.json(); mlSalaryM = d.predicted_salary_m; mlSalaryPct = d.salary_pct; }
   } catch (_) {}
 
