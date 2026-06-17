@@ -1003,7 +1003,7 @@ function drawDevCurve(player, dark = false) {
   const yFor = (v)   => pad.top  + ph - ((v - minV) / (maxV - minV)) * ph;
 
   const gridColor  = dark ? "rgba(255,255,255,0.07)" : "#e3e6e1";
-  const labelColor = dark ? "rgba(220,232,255,0.38)" : "#626262";
+  const labelColor = dark ? "rgba(220,232,255,0.75)" : "#626262";
   const titleColor = dark ? "rgba(220,232,255,0.85)" : "#151515";
   const bgColor    = dark ? "#182030" : "#fff";
 
@@ -1012,22 +1012,22 @@ function drawDevCurve(player, dark = false) {
 
   // Grid lines + Y labels
   ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
-  ctx.fillStyle = labelColor; ctx.font = "12px system-ui";
+  ctx.fillStyle = labelColor; ctx.font = "bold 15px system-ui";
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + (ph / 4) * i;
     const val = maxV - ((maxV - minV) / 4) * i;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
-    ctx.fillText(val.toFixed(1), 6, y + 4);
+    ctx.fillText(val.toFixed(1), 4, y + 5);
   }
 
   // Age labels on X axis
-  ctx.fillStyle = labelColor; ctx.font = "11px system-ui";
+  ctx.fillStyle = labelColor; ctx.font = "bold 14px system-ui";
   for (let age = Math.ceil(ageMin / 2) * 2; age <= ageMax; age += 2) {
-    ctx.fillText(`${age}`, xFor(age) - 6, h - 10);
+    ctx.fillText(`${age}`, xFor(age) - 8, h - 10);
   }
   // "Age" axis label
-  ctx.fillStyle = dark ? "rgba(220,232,255,0.25)" : "rgba(80,80,80,0.5)";
-  ctx.font = "10px system-ui";
+  ctx.fillStyle = dark ? "rgba(220,232,255,0.55)" : "rgba(80,80,80,0.5)";
+  ctx.font = "13px system-ui";
   ctx.fillText("Age", pad.left + pw / 2 - 10, h - 0);
 
   // ── Typical range band (gray) ──────────────────────────────────────────────
@@ -1064,8 +1064,8 @@ function drawDevCurve(player, dark = false) {
     const lastAge = typicalAges[typicalAges.length - 1];
     const lastT   = typical[lastAge];
     const lx = xFor(lastAge) + 6;
-    ctx.fillStyle = dark ? "rgba(170,185,210,0.55)" : "rgba(80,95,125,0.7)";
-    ctx.font = "10px system-ui";
+    ctx.fillStyle = dark ? "rgba(190,205,230,0.85)" : "rgba(80,95,125,0.7)";
+    ctx.font = "bold 13px system-ui";
     ctx.fillText("75th %ile", lx, yFor(lastT.p75) + 4);
     ctx.fillText("Median",    lx, yFor(lastT.median) + 4);
     ctx.fillText("25th %ile", lx, yFor(lastT.p25) + 4);
