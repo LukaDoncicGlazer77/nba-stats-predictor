@@ -98,7 +98,7 @@ async function loadDashboard(season) {
     const url = season ? `/api/dashboard?season=${season}` : "/api/dashboard";
     const data = await fetch(url).then((r) => r.json());
     const s = data.season;
-    $("#dashboardSeasonLabel").textContent = `${s}–${String(Number(s) + 1).slice(-2)} season overview`;
+    $("#dashboardSeasonLabel").textContent = `${Number(s) - 1}–${String(Number(s)).slice(-2)} season overview`;
     $("#scoringSeasonBadge").textContent = s;
 
     // Populate season selector (only once)
@@ -107,7 +107,7 @@ async function loadDashboard(season) {
       data.seasons_available.forEach((yr) => {
         const opt = document.createElement("option");
         opt.value = yr;
-        opt.textContent = `${yr}–${String(Number(yr) + 1).slice(-2)}`;
+        opt.textContent = `${Number(yr) - 1}–${String(Number(yr)).slice(-2)}`;
         if (String(yr) === String(s)) opt.selected = true;
         sel.appendChild(opt);
       });
