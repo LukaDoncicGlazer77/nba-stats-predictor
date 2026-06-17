@@ -766,7 +766,7 @@ async function renderPredictions(player, projections = []) {
   if (!seasons.length) { el.innerHTML = "<p style='color:var(--muted)'>Not enough data</p>"; return; }
 
   const last = seasons[seasons.length - 1];
-  const age = parseFloat(last.age) || 26;
+  const age  = parseFloat(last.age) || 26;
 
   const nextSeason = projections[0] || null;
   const projPts = nextSeason ? (nextSeason.pts || 0).toFixed(1) : "—";
@@ -774,8 +774,7 @@ async function renderPredictions(player, projections = []) {
   const projAst = nextSeason ? (nextSeason.ast || 0).toFixed(1) : "—";
   const projMin = nextSeason ? (nextSeason.min || 0).toFixed(1) : "—";
 
-  // Efficiency score (0-100)
-  const per    = parseFloat(last.ts_pct) || 0;
+  const tsPct  = parseFloat(last.ts_pct) || 0;
   const bpm    = parseFloat(last.net_rating) || 0;
   const vorp   = parseFloat(last.vorp) || 0;
   const perVal = parseFloat(last.per) || 15;
@@ -783,91 +782,123 @@ async function renderPredictions(player, projections = []) {
 
   const perScore  = Math.min(100, Math.max(0, ((perVal - 5) / 30) * 100));
   const bpmScore  = Math.min(100, Math.max(0, ((bpm + 5) / 20) * 100));
-  const tsScore   = Math.min(100, Math.max(0, ((per - 0.40) / 0.35) * 100));
+  const tsScore   = Math.min(100, Math.max(0, ((tsPct - 0.40) / 0.35) * 100));
   const vorpScore = Math.min(100, Math.max(0, ((vorp + 1) / 9) * 100));
   const effScore  = Math.round(perScore * 0.3 + bpmScore * 0.25 + tsScore * 0.2 + vorpScore * 0.25);
 
-  const effTier = effScore >= 80 ? ["MVP Caliber","var(--gold)"] :
-                  effScore >= 65 ? ["All-Star","#5b8af0"] :
-                  effScore >= 50 ? ["Starter","var(--green)"] :
-                  effScore >= 35 ? ["Rotation","var(--muted)"] :
-                                   ["Developmental","rgba(255,255,255,0.3)"];
+  const [tierLabel, tierColor] =
+    effScore >= 80 ? ["MVP Caliber", "#f0c040"] :
+    effScore >= 65 ? ["All-Star",    "#5b8af0"] :
+    effScore >= 50 ? ["Starter",     "#3ecf8e"] :
+    effScore >= 35 ? ["Rotation",    "#7a8fb0"] :
+                     ["Developmental","rgba(255,255,255,0.3)"];
 
-  // ML salary prediction
-  let mlSalaryM = null;
-  let mlSalaryPct = null;
-  let mlTier = "";
+  // Arc gauge math — semicircle r=50, center 65,68
+  const arcR = 50, arcCx = 65, arcCy = 68;
+  const arcLen = Math.PI * arcR; // ≈ 157.08
+  const arcOffset = arcLen * (1 - effScore / 100);
+
+  // ML salary
+  let mlSalaryM = null, mlSalaryPct = null;
   try {
     const res = await fetch(`/api/salary-predict?player_id=${encodeURIComponent(player.player_id)}`);
-    if (res.ok) {
-      const d = await res.json();
-      mlSalaryM = d.predicted_salary_m;
-      mlSalaryPct = d.salary_pct;
-    }
+    if (res.ok) { const d = await res.json(); mlSalaryM = d.predicted_salary_m; mlSalaryPct = d.salary_pct; }
   } catch (_) {}
 
-  if (mlSalaryM !== null) {
-    mlTier = mlSalaryM >= 40 ? "Max Contract" :
-             mlSalaryM >= 25 ? "Near-Max" :
-             mlSalaryM >= 15 ? "Starter" :
-             mlSalaryM >= 7  ? "Role Player" : "Minimum";
-  } else {
-    // formula fallback
-    const rawValue = Math.max(0, (vorp * 6.5) + (ws * 1.8));
-    mlSalaryM = Math.min(62, Math.max(1.2, rawValue));
+  if (mlSalaryM === null) {
+    const raw = Math.max(0, (vorp * 6.5) + (ws * 1.8));
+    mlSalaryM   = Math.min(62, Math.max(1.2, raw));
     mlSalaryPct = (mlSalaryM / 155) * 100;
-    mlTier = mlSalaryM >= 40 ? "Max Contract" :
-             mlSalaryM >= 25 ? "Near-Max" :
-             mlSalaryM >= 15 ? "Starter" :
-             mlSalaryM >= 7  ? "Role Player" : "Minimum";
   }
+  const mlTier = mlSalaryM >= 40 ? "Max Contract" :
+                 mlSalaryM >= 25 ? "Near-Max"     :
+                 mlSalaryM >= 15 ? "Starter"       :
+                 mlSalaryM >= 7  ? "Role Player"   : "Minimum";
 
-  const salaryBarPct = Math.min(100, (mlSalaryM / 62) * 100).toFixed(0);
+  // Circular ring math — r=42, circumference≈263.9
+  const ringR = 42, ringC = 2 * Math.PI * ringR;
+  const ringOffset = ringC * (1 - Math.min(mlSalaryM, 62) / 62);
 
   el.innerHTML = `
-    <div class="pred-section">
-      <div class="pred-label">Efficiency Score</div>
-      <div class="pred-score-wrap">
-        <div class="pred-score" style="color:${effTier[1]}">${effScore}</div>
-        <div class="pred-tier" style="color:${effTier[1]}">${effTier[0]}</div>
+    <!-- Efficiency gauge panel -->
+    <div class="pred-panel">
+      <div class="pred-panel-label">Efficiency Score</div>
+      <div class="pred-gauge-wrap">
+        <svg class="pred-gauge-svg" viewBox="0 0 130 76" fill="none">
+          <path class="pred-arc-bg"
+            d="M 15,72 A ${arcR},${arcR} 0 0,1 115,72"
+            stroke-width="9"/>
+          <path class="pred-arc-fill"
+            d="M 15,72 A ${arcR},${arcR} 0 0,1 115,72"
+            stroke="${tierColor}" stroke-width="9"
+            stroke-dasharray="${arcLen.toFixed(2)}"
+            stroke-dashoffset="${arcOffset.toFixed(2)}"/>
+          <filter id="arcGlow">
+            <feGaussianBlur stdDeviation="2" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </svg>
+        <div class="pred-gauge-center">
+          <div class="pred-gauge-num" style="color:${tierColor}">${effScore}</div>
+          <div class="pred-gauge-tier" style="color:${tierColor}">${tierLabel}</div>
+        </div>
       </div>
-      <div class="pred-bar-track">
-        <div class="pred-bar-fill" style="width:${effScore}%;background:${effTier[1]}"></div>
-      </div>
-      <div class="pred-breakdown">
-        <span>PER: ${perVal.toFixed(1)}</span>
-        <span>BPM: ${bpm >= 0 ? "+" : ""}${bpm.toFixed(1)}</span>
-        <span>TS%: ${(per * 100).toFixed(1)}%</span>
-        <span>VORP: ${vorp.toFixed(1)}</span>
-      </div>
-    </div>
-
-    <div class="pred-section">
-      <div class="pred-label">ML Salary Prediction <span style="font-size:0.65rem;color:var(--muted);font-weight:400">· Random Forest</span></div>
-      <div class="pred-score-wrap">
-        <div class="pred-score pred-money">$${mlSalaryM.toFixed(1)}M</div>
-        <div class="pred-tier">${mlTier}</div>
-      </div>
-      <div class="pred-bar-track">
-        <div class="pred-bar-fill pred-bar-gold" style="width:${salaryBarPct}%"></div>
-      </div>
-      <div class="pred-breakdown">
-        <span>${mlSalaryPct !== null ? mlSalaryPct.toFixed(1) : "—"}% of cap</span>
-        <span>Win Shares: ${ws.toFixed(1)}</span>
-        <span>VORP: ${vorp.toFixed(1)}</span>
-        <span>Age: ${Math.round(age)}</span>
+      <div class="pred-gauge-stats">
+        <span class="pred-gs">PER <b>${perVal.toFixed(1)}</b></span>
+        <span class="pred-gs">BPM <b>${bpm >= 0 ? "+" : ""}${bpm.toFixed(1)}</b></span>
+        <span class="pred-gs">TS% <b>${(tsPct * 100).toFixed(1)}%</b></span>
+        <span class="pred-gs">VORP <b>${vorp.toFixed(1)}</b></span>
       </div>
     </div>
 
-    <div class="pred-section">
-      <div class="pred-label">Next Season Projection</div>
-      <div class="pred-stats-row">
-        <div class="pred-stat"><strong>${projPts}</strong><span>PTS</span></div>
-        <div class="pred-stat"><strong>${projReb}</strong><span>REB</span></div>
-        <div class="pred-stat"><strong>${projAst}</strong><span>AST</span></div>
-        <div class="pred-stat"><strong>${projMin}</strong><span>MIN</span></div>
+    <!-- Salary ring panel -->
+    <div class="pred-panel pred-salary-panel">
+      <div class="pred-panel-label">ML Salary Prediction · RF</div>
+      <div class="pred-ring-wrap">
+        <svg class="pred-ring-svg" viewBox="0 0 110 110">
+          <circle class="pred-ring-bg" cx="55" cy="55" r="${ringR}" stroke-width="8"/>
+          <circle class="pred-ring-fill"
+            cx="55" cy="55" r="${ringR}"
+            stroke="url(#salGrad)" stroke-width="8"
+            stroke-dasharray="${ringC.toFixed(2)}"
+            stroke-dashoffset="${ringOffset.toFixed(2)}"/>
+          <defs>
+            <linearGradient id="salGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#f97316"/>
+              <stop offset="100%" stop-color="#facc15"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="pred-ring-center">
+          <div class="pred-salary-num">$${mlSalaryM.toFixed(1)}M</div>
+          <div class="pred-salary-tier">${mlTier}</div>
+        </div>
       </div>
-      <div class="pred-breakdown">Matches dashed line in Statistical Trend · age-adjusted</div>
+      <div class="pred-salary-sub">${mlSalaryPct !== null ? mlSalaryPct.toFixed(1) : "—"}% of salary cap</div>
+    </div>
+
+    <!-- Projections panel -->
+    <div class="pred-panel">
+      <div class="pred-panel-label">Next Season Projection</div>
+      <div class="pred-proj-grid">
+        <div class="pred-proj-tile">
+          <div class="pred-proj-val" style="color:#5b8af0">${projPts}</div>
+          <div class="pred-proj-key">PTS</div>
+        </div>
+        <div class="pred-proj-tile">
+          <div class="pred-proj-val" style="color:#3ecf8e">${projReb}</div>
+          <div class="pred-proj-key">REB</div>
+        </div>
+        <div class="pred-proj-tile">
+          <div class="pred-proj-val" style="color:#f97316">${projAst}</div>
+          <div class="pred-proj-key">AST</div>
+        </div>
+        <div class="pred-proj-tile">
+          <div class="pred-proj-val" style="color:#7a8fb0">${projMin}</div>
+          <div class="pred-proj-key">MIN</div>
+        </div>
+      </div>
+      <div style="font-size:0.6rem;color:var(--muted);text-align:center">Age ${Math.round(age)} · WS ${ws.toFixed(1)}</div>
     </div>
   `;
 }
