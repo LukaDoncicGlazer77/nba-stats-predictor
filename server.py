@@ -127,11 +127,16 @@ class Handler(SimpleHTTPRequestHandler):
                       safe_float(bpm) AS net_rating,
                       safe_float(usg_percent) / 100 AS usg_pct,
                       safe_float(ts_percent) AS ts_pct,
+                      safe_float(per) AS per,
+                      safe_float(vorp) AS vorp,
+                      safe_float(ws) AS ws,
+                      safe_float(ows) AS ows,
+                      safe_float(dws) AS dws,
                       season,
                       safe_int(season) AS season_start
                     FROM archive_player_dashboard
                     ORDER BY player, season
-                """)
+                """, ())
             finally:
                 conn.close()
             return self.send_json_rows(rows)

@@ -17,6 +17,7 @@ from sklearn.metrics import mean_squared_error
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(ROOT, "nba.db")
 SALARY_CSV = os.path.join(ROOT, "..", "salary predicter", "archive (3)", "NBA Salaries(1990-2023).csv")
+SALARY_CSV_2526 = os.path.join(ROOT, "..", "salary predicter", "nba_2025_26_salaries.csv")
 MODEL_OUT = os.path.join(ROOT, "salary_model.pkl")
 
 # Salary cap in MILLIONS, keyed by season START year (e.g. 2022 = 2022-23 season)
@@ -76,7 +77,26 @@ sal["salary_pct"] = sal["salary_m"] / sal["cap_m"]
 # DB season = seasonStartYear + 1
 sal["season"] = (sal["seasonStartYear"] + 1).astype(int).astype(str)
 sal["name_key"] = sal["playerName"].apply(clean_name)
-print(f"  {len(sal)} salary rows loaded")
+print(f"  {len(sal)} historical salary rows loaded")
+
+# ── 1b. Add 2025-26 salary data ──────────────────────────────────────────────
+print("Loading 2025-26 salary CSV…")
+sal2526 = pd.read_csv(SALARY_CSV_2526, skiprows=1)
+sal2526 = sal2526[["Player", "2025-26"]].copy()
+sal2526.columns = ["playerName", "salary_str"]
+sal2526 = sal2526.dropna(subset=["salary_str"])
+sal2526 = sal2526[sal2526["salary_str"].str.strip() != ""]
+sal2526["salary_m"] = sal2526["salary_str"].apply(parse_salary) / 1_000_000
+sal2526 = sal2526[sal2526["salary_m"] > 0]
+sal2526["seasonStartYear"] = 2025
+sal2526["cap_m"] = SALARY_CAPS_M[2025]  # $155M
+sal2526["salary_pct"] = sal2526["salary_m"] / sal2526["cap_m"]
+sal2526["season"] = "2026"  # DB season = seasonStartYear + 1
+sal2526["name_key"] = sal2526["playerName"].apply(clean_name)
+sal2526 = sal2526[["name_key", "season", "salary_pct"]]
+print(f"  {len(sal2526)} 2025-26 salary rows loaded")
+
+sal = pd.concat([sal[["name_key", "season", "salary_pct"]], sal2526], ignore_index=True)
 
 # ── 2. Load per-game stats from SQLite ───────────────────────────────────────
 print("Loading per-game stats from DB…")
@@ -128,8 +148,7 @@ stats["name_key"] = stats["player"].apply(clean_name)
 print(f"  {len(stats)} stat rows after merge")
 
 # ── 4. Join with salary data ──────────────────────────────────────────────────
-df = pd.merge(stats, sal[["name_key", "season", "salary_pct"]],
-              on=["name_key", "season"], how="inner")
+df = pd.merge(stats, sal, on=["name_key", "season"], how="inner")
 print(f"  {len(df)} rows after joining salary data")
 
 # ── 5. Feature engineering ────────────────────────────────────────────────────
