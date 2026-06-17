@@ -231,6 +231,23 @@ class Handler(SimpleHTTPRequestHandler):
                 "team_standings": [dict(r) for r in team_standings],
             })
 
+        if parsed.path == "/api/playoffs":
+            season = (params.get("season", ["2026"])[0] or "2026").strip()
+            conn = connect()
+            try:
+                rows = q(conn, """
+                    SELECT season, conference, round,
+                           team1, team1_abbrev, team1_seed, team1_wins,
+                           team2, team2_abbrev, team2_seed, team2_wins,
+                           winner_abbrev
+                    FROM archive_playoff_series
+                    WHERE season = ?
+                    ORDER BY conference, round, team1_seed
+                """, (season,))
+            finally:
+                conn.close()
+            return self.send_json_rows(rows)
+
         if parsed.path == "/api/draft":
             season = (params.get("season", ["2025"])[0] or "2025").strip()
             conn = connect()

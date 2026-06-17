@@ -186,7 +186,7 @@ async function loadDashboard(season) {
     $("#westStandings").innerHTML = west.map(standingRow).join("");
 
     $("#sidebarDbStatus").textContent = `${s} data loaded`;
-    renderPlayoffBracket(data.team_standings, s);
+    await renderPlayoffBracket(data.team_standings, s);
   } catch (e) {
     console.warn("Dashboard load failed", e);
     $("#sidebarDbStatus").textContent = "DB error";
@@ -202,82 +202,104 @@ $("#dashboardSeasonSelect").addEventListener("change", (e) => {
 
 const EAST_ABBREVS = new Set(["ATL","BOS","BRK","CHO","CHA","CHI","CLE","DET","IND","MIL","MIA","NYK","ORL","PHI","TOR","WAS"]);
 
-function renderPlayoffBracket(allTeams, season) {
+async function renderPlayoffBracket(allTeams, season) {
   const bracket = $("#playoffBracket");
   const note = $("#bracketNote");
   if (!bracket) return;
 
+  // Try to fetch real series data first
+  let seriesData = [];
+  try {
+    seriesData = await fetch(`/api/playoffs?season=${season}`).then(r => r.json());
+  } catch(e) {}
+
+  if (seriesData.length > 0) {
+    // Render real bracket from series data
+    if (note) note.textContent = "Official playoff results";
+
+    const bySeries = (conf, round) => seriesData.filter(s => s.conference === conf && s.round === round);
+
+    const seriesSlot = (s, which) => {
+      const abbrev = which === 1 ? s.team1_abbrev : s.team2_abbrev;
+      const name = which === 1 ? s.team1 : s.team2;
+      const seed = which === 1 ? s.team1_seed : s.team2_seed;
+      const wins = which === 1 ? s.team1_wins : s.team2_wins;
+      const isWinner = abbrev === s.winner_abbrev;
+      const shortName = name.split(" ").slice(-1)[0];
+      return `<div class="b-slot${isWinner ? " b-winner" : ""}">
+        <span class="b-seed-num">${seed}</span>
+        <span class="b-team-name">${shortName}</span>
+        <span class="b-team-rec">${wins}</span>
+      </div>`;
+    };
+
+    const seriesBlock = (s) => `
+      <div class="b-matchup">
+        ${seriesSlot(s, 1)}
+        <div class="b-vs">vs</div>
+        ${seriesSlot(s, 2)}
+      </div>`;
+
+    const tbd2 = () => `<div class="b-matchup b-matchup-tbd"><div class="b-slot b-tbd"><span class="b-team-name">TBD</span></div><div class="b-vs">vs</div><div class="b-slot b-tbd"><span class="b-team-name">TBD</span></div></div>`;
+
+    const confRounds = (conf, label, west = false) => {
+      const r1series = bySeries(conf, 1);
+      const r2series = bySeries(conf, 2);
+      const r3series = bySeries(conf, 3);
+      const r1 = `<div class="b-round"><div class="b-round-label">First Round</div>${r1series.length ? r1series.map(seriesBlock).join("") : tbd2()+tbd2()}</div>`;
+      const r2 = `<div class="b-round"><div class="b-round-label">Semifinals</div>${r2series.length ? r2series.map(seriesBlock).join("") : tbd2()+tbd2()}</div>`;
+      const r3 = `<div class="b-round"><div class="b-round-label">Conf Finals</div>${r3series.length ? r3series.map(seriesBlock).join("") : tbd2()}</div>`;
+      const rounds = west ? [r3, r2, r1].join("") : [r1, r2, r3].join("");
+      return `<div class="b-conf"><div class="b-conf-label">${label}</div><div class="b-rounds">${rounds}</div></div>`;
+    };
+
+    const finals = bySeries("Finals", 4);
+    const finalsHtml = finals.length ? seriesBlock(finals[0]) : `<div class="b-slot b-tbd"><span class="b-team-name">East Champion</span></div><div class="b-vs">vs</div><div class="b-slot b-tbd"><span class="b-team-name">West Champion</span></div>`;
+
+    bracket.innerHTML = `<div class="b-wrap">
+      ${confRounds("East","Eastern Conference",false)}
+      <div class="b-finals"><div class="b-finals-label">🏆 NBA Finals</div><div class="b-finals-box">${finalsHtml}</div></div>
+      ${confRounds("West","Western Conference",true)}
+    </div>`;
+    return;
+  }
+
+  // Fallback: render from standings
   const playoffTeams = allTeams.filter((t) => String(t.playoffs).toUpperCase() === "TRUE");
   const enoughData = playoffTeams.length >= 14;
-
   let eastSeeds, westSeeds;
   if (enoughData) {
     eastSeeds = playoffTeams.filter((t) => EAST_ABBREVS.has(t.abbreviation)).sort((a, b) => b.w - a.w).slice(0, 8);
     westSeeds = playoffTeams.filter((t) => !EAST_ABBREVS.has(t.abbreviation)).sort((a, b) => b.w - a.w).slice(0, 8);
     if (note) note.textContent = "First-round matchups by regular-season seeding";
   } else {
-    // Infer from wins for incomplete/in-progress seasons
     eastSeeds = allTeams.filter((t) => EAST_ABBREVS.has(t.abbreviation)).sort((a, b) => b.w - a.w).slice(0, 8);
     westSeeds = allTeams.filter((t) => !EAST_ABBREVS.has(t.abbreviation)).sort((a, b) => b.w - a.w).slice(0, 8);
     if (note) note.textContent = "Projected — based on current standings";
   }
 
-  const teamSlot = (seeds, seedNum, isWinner = false) => {
+  const teamSlot = (seeds, seedNum) => {
     const t = seeds[seedNum - 1];
     if (!t) return `<div class="b-slot b-tbd"><span class="b-seed-num">${seedNum}</span><span class="b-team-name">TBD</span></div>`;
-    return `<div class="b-slot${isWinner ? " b-winner" : ""}">
-      <span class="b-seed-num">${seedNum}</span>
-      <span class="b-team-name">${t.team}</span>
-      <span class="b-team-rec">${t.w}–${t.l}</span>
-    </div>`;
+    return `<div class="b-slot"><span class="b-seed-num">${seedNum}</span><span class="b-team-name">${t.team}</span><span class="b-team-rec">${t.w}–${t.l}</span></div>`;
   };
 
-  const matchup = (seeds, hi, lo) => `
-    <div class="b-matchup">
-      ${teamSlot(seeds, hi)}
-      <div class="b-vs">vs</div>
-      ${teamSlot(seeds, lo)}
-    </div>`;
-
+  const matchup = (seeds, hi, lo) => `<div class="b-matchup">${teamSlot(seeds,hi)}<div class="b-vs">vs</div>${teamSlot(seeds,lo)}</div>`;
   const tbd2 = () => `<div class="b-matchup b-matchup-tbd"><div class="b-slot b-tbd"><span class="b-team-name">TBD</span></div><div class="b-vs">vs</div><div class="b-slot b-tbd"><span class="b-team-name">TBD</span></div></div>`;
 
   const confBracket = (seeds, label, west = false) => {
-    const r1 = `<div class="b-round">
-        <div class="b-round-label">First Round</div>
-        ${matchup(seeds, 1, 8)}
-        ${matchup(seeds, 4, 5)}
-        ${matchup(seeds, 2, 7)}
-        ${matchup(seeds, 3, 6)}
-      </div>`;
-    const r2 = `<div class="b-round">
-        <div class="b-round-label">Semifinals</div>
-        ${tbd2()}
-        ${tbd2()}
-      </div>`;
-    const cf = `<div class="b-round">
-        <div class="b-round-label">Conf Finals</div>
-        ${tbd2()}
-      </div>`;
+    const r1 = `<div class="b-round"><div class="b-round-label">First Round</div>${matchup(seeds,1,8)}${matchup(seeds,4,5)}${matchup(seeds,2,7)}${matchup(seeds,3,6)}</div>`;
+    const r2 = `<div class="b-round"><div class="b-round-label">Semifinals</div>${tbd2()}${tbd2()}</div>`;
+    const cf = `<div class="b-round"><div class="b-round-label">Conf Finals</div>${tbd2()}</div>`;
     const rounds = west ? [cf, r2, r1].join("") : [r1, r2, cf].join("");
-    return `<div class="b-conf">
-      <div class="b-conf-label">${label}</div>
-      <div class="b-rounds">${rounds}</div>
-    </div>`;
+    return `<div class="b-conf"><div class="b-conf-label">${label}</div><div class="b-rounds">${rounds}</div></div>`;
   };
 
-  bracket.innerHTML = `
-    <div class="b-wrap">
-      ${confBracket(eastSeeds, "Eastern Conference", false)}
-      <div class="b-finals">
-        <div class="b-finals-label">🏆 NBA Finals</div>
-        <div class="b-finals-box">
-          <div class="b-slot b-tbd"><span class="b-team-name">East Champion</span></div>
-          <div class="b-vs">vs</div>
-          <div class="b-slot b-tbd"><span class="b-team-name">West Champion</span></div>
-        </div>
-      </div>
-      ${confBracket(westSeeds, "Western Conference", true)}
-    </div>`;
+  bracket.innerHTML = `<div class="b-wrap">
+    ${confBracket(eastSeeds,"Eastern Conference",false)}
+    <div class="b-finals"><div class="b-finals-label">🏆 NBA Finals</div><div class="b-finals-box"><div class="b-slot b-tbd"><span class="b-team-name">East Champion</span></div><div class="b-vs">vs</div><div class="b-slot b-tbd"><span class="b-team-name">West Champion</span></div></div></div>
+    ${confBracket(westSeeds,"Western Conference",true)}
+  </div>`;
 }
 
 // ── Players ──────────────────────────────────────────────────────────────────
