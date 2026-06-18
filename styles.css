@@ -1628,7 +1628,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 
 .b-conf {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -1772,8 +1772,9 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 170px;
-  max-width: 190px;
+  width: 180px;
+  min-width: 180px;
+  flex-shrink: 0;
   padding: 0 10px;
   gap: 14px;
 }
