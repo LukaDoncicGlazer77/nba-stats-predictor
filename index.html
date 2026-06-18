@@ -10,10 +10,100 @@
     <meta property="og:title" content="StatFuel" />
     <meta property="og:description" content="Explore NBA player stats, career trends, draft prospects, and award history." />
     <meta property="og:type" content="website" />
-    <link rel="stylesheet" href="styles.css?v=20260617-redesign1" />
+    <link rel="stylesheet" href="styles.css?v=20260618-login1" />
   </head>
   <body>
-    <div class="app-shell">
+
+    <!-- Login Screen -->
+    <div id="loginScreen">
+      <div class="login-bg-glow"></div>
+      <div class="login-card">
+        <!-- Logo -->
+        <div class="login-logo">
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="22" cy="22" r="22" fill="#0b1729"/>
+            <circle cx="22" cy="22" r="14" fill="none" stroke="#c0392b" stroke-width="2.2"/>
+            <line x1="22" y1="8" x2="22" y2="36" stroke="#c0392b" stroke-width="1.8"/>
+            <path d="M8 22 Q15 17 22 22 Q29 27 36 22" fill="none" stroke="#c0392b" stroke-width="1.8"/>
+            <path d="M8 22 Q15 27 22 22 Q29 17 36 22" fill="none" stroke="#c0392b" stroke-width="1.8"/>
+            <path d="M18 6 Q14 12 15 18 Q16 24 18 28 Q20 34 22 38" fill="none" stroke="rgba(255,100,60,0.7)" stroke-width="8" stroke-linecap="round" filter="url(#f)"/>
+            <defs>
+              <filter id="f"><feGaussianBlur stdDeviation="3"/></filter>
+            </defs>
+            <path d="M19 5 Q15 11 16 18 Q17 24 19 28 Q21 33 22 37" fill="none" stroke="#ff6b35" stroke-width="3.5" stroke-linecap="round"/>
+          </svg>
+          <span class="login-brand">StatFuel</span>
+        </div>
+
+        <h1 class="login-title">Welcome back</h1>
+        <p class="login-sub">Sign in to your StatFuel account</p>
+
+        <div id="loginError" class="login-error hidden"></div>
+
+        <form id="loginForm">
+          <div class="login-field">
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required />
+          </div>
+          <div class="login-field">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required />
+          </div>
+          <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
+        </form>
+
+        <div class="login-divider"><span>or</span></div>
+
+        <button class="login-guest-btn" id="loginGuestBtn">Continue as Guest</button>
+
+        <p class="login-footer">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+      </div>
+    </div>
+
+    <!-- Signup Screen -->
+    <div id="signupScreen" class="hidden">
+      <div class="login-bg-glow"></div>
+      <div class="login-card">
+        <div class="login-logo">
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="22" cy="22" r="22" fill="#0b1729"/>
+            <circle cx="22" cy="22" r="14" fill="none" stroke="#c0392b" stroke-width="2.2"/>
+            <line x1="22" y1="8" x2="22" y2="36" stroke="#c0392b" stroke-width="1.8"/>
+            <path d="M8 22 Q15 17 22 22 Q29 27 36 22" fill="none" stroke="#c0392b" stroke-width="1.8"/>
+            <path d="M8 22 Q15 27 22 22 Q29 17 36 22" fill="none" stroke="#c0392b" stroke-width="1.8"/>
+            <path d="M18 6 Q14 12 15 18 Q16 24 18 28 Q20 34 22 38" fill="none" stroke="rgba(255,100,60,0.7)" stroke-width="8" stroke-linecap="round" filter="url(#f2)"/>
+            <defs><filter id="f2"><feGaussianBlur stdDeviation="3"/></filter></defs>
+            <path d="M19 5 Q15 11 16 18 Q17 24 19 28 Q21 33 22 37" fill="none" stroke="#ff6b35" stroke-width="3.5" stroke-linecap="round"/>
+          </svg>
+          <span class="login-brand">StatFuel</span>
+        </div>
+
+        <h1 class="login-title">Create account</h1>
+        <p class="login-sub">Start exploring NBA analytics</p>
+
+        <div id="signupError" class="login-error hidden"></div>
+
+        <form id="signupForm">
+          <div class="login-field">
+            <label for="signupEmail">Email</label>
+            <input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="email" required />
+          </div>
+          <div class="login-field">
+            <label for="signupPassword">Password</label>
+            <input type="password" id="signupPassword" placeholder="Min. 6 characters" autocomplete="new-password" required />
+          </div>
+          <button type="submit" class="login-btn" id="signupBtn">Create Account</button>
+        </form>
+
+        <div class="login-divider"><span>or</span></div>
+
+        <button class="login-guest-btn" id="signupGuestBtn">Continue as Guest</button>
+
+        <p class="login-footer">Already have an account? <a href="#" id="showLogin">Sign in</a></p>
+      </div>
+    </div>
+
+    <div class="app-shell" id="appShell" style="display:none">
 
       <!-- Sidebar Navigation -->
       <nav class="sidebar" aria-label="Main navigation">
@@ -535,7 +625,84 @@
 
       </main>
     </div>
+    </div><!-- /appShell -->
 
     <script src="app.js?v=20260617-curve2"></script>
+    <script>
+      // ── Auth gate ──────────────────────────────────────────────────────────
+      const USERS_KEY = 'sf_users';
+      const SESSION_KEY = 'sf_session';
+
+      function getUsers() {
+        try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch { return {}; }
+      }
+      function saveUsers(u) { localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+      function showApp() {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('signupScreen').style.display = 'none';
+        document.getElementById('appShell').style.display = '';
+      }
+      function showError(id, msg) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.classList.remove('hidden');
+      }
+      function clearError(id) { document.getElementById(id).classList.add('hidden'); }
+
+      // Check existing session
+      if (localStorage.getItem(SESSION_KEY)) showApp();
+
+      // Toggle between login / signup
+      document.getElementById('showSignup').addEventListener('click', e => {
+        e.preventDefault();
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('signupScreen').style.display = '';
+      });
+      document.getElementById('showLogin').addEventListener('click', e => {
+        e.preventDefault();
+        document.getElementById('signupScreen').style.display = 'none';
+        document.getElementById('loginScreen').style.display = '';
+      });
+
+      // Guest
+      document.getElementById('loginGuestBtn').addEventListener('click', () => {
+        localStorage.setItem(SESSION_KEY, 'guest');
+        showApp();
+      });
+      document.getElementById('signupGuestBtn').addEventListener('click', () => {
+        localStorage.setItem(SESSION_KEY, 'guest');
+        showApp();
+      });
+
+      // Sign in
+      document.getElementById('loginForm').addEventListener('submit', e => {
+        e.preventDefault();
+        clearError('loginError');
+        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+        const pass  = document.getElementById('loginPassword').value;
+        const users = getUsers();
+        if (!users[email] || users[email] !== pass) {
+          showError('loginError', 'Incorrect email or password.');
+          return;
+        }
+        localStorage.setItem(SESSION_KEY, email);
+        showApp();
+      });
+
+      // Sign up
+      document.getElementById('signupForm').addEventListener('submit', e => {
+        e.preventDefault();
+        clearError('signupError');
+        const email = document.getElementById('signupEmail').value.trim().toLowerCase();
+        const pass  = document.getElementById('signupPassword').value;
+        if (pass.length < 6) { showError('signupError', 'Password must be at least 6 characters.'); return; }
+        const users = getUsers();
+        if (users[email]) { showError('signupError', 'An account with this email already exists.'); return; }
+        users[email] = pass;
+        saveUsers(users);
+        localStorage.setItem(SESSION_KEY, email);
+        showApp();
+      });
+    </script>
   </body>
 </html>
