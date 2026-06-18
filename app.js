@@ -1381,11 +1381,12 @@ $("#draftSeasonSelect").addEventListener("change", (e) => loadDraft(e.target.val
 // ── Comparisons ──────────────────────────────────────────────────────────────
 
 let compareA = null, compareB = null;
+let cmpActiveTab = "overview";
 
 function setupCompareSearch(inputId, dropdownId, onSelect) {
   const input = $(`#${inputId}`);
   const dropdown = $(`#${dropdownId}`);
-
+  if (!input) return;
   input.addEventListener("input", () => {
     const q = input.value.toLowerCase().trim();
     if (!q || players.length === 0) { dropdown.classList.remove("open"); return; }
@@ -1402,37 +1403,353 @@ function setupCompareSearch(inputId, dropdownId, onSelect) {
       });
     });
   });
-
   document.addEventListener("click", (e) => {
     if (!input.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove("open");
   });
 }
 
+// Tab switching
+document.addEventListener("click", (e) => {
+  const tab = e.target.closest(".cmp-tab");
+  if (!tab) return;
+  document.querySelectorAll(".cmp-tab").forEach(t => t.classList.remove("active"));
+  tab.classList.add("active");
+  cmpActiveTab = tab.dataset.tab;
+  renderComparison();
+});
+
+function cmpAvatar(player, size = 52) {
+  const bg = (player.colors && player.colors[0]) || "#1e3a5f";
+  const ini = player.name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+  return `<div class="cmp-avatar" style="width:${size}px;height:${size}px;background:${bg}">
+    <img src="/api/player-photo/${player.playerId}" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;border-radius:inherit"/>
+    <span style="position:relative;z-index:1;font-size:${size*0.3}px;font-weight:900;color:#fff">${ini}</span>
+  </div>`;
+}
+
+function cmpEffScore(player) {
+  const last = latestSeason(player);
+  if (!last) return 0;
+  const per = parseFloat(last.per) || 15;
+  const bpm = parseFloat(last.net) || 0;
+  const ts  = (parseFloat(last.ts) || 50) / 100;
+  const pts = parseFloat(last.pts) || 0;
+  const ast = parseFloat(last.ast) || 0;
+  const reb = parseFloat(last.reb) || 0;
+  const vorp= parseFloat(last.vorp) || 0;
+  return Math.round(
+    Math.min(100,Math.max(0,((per-5)/30)*100))*0.20 +
+    Math.min(100,Math.max(0,((bpm+5)/20)*100))*0.15 +
+    Math.min(100,Math.max(0,((ts-0.40)/0.35)*100))*0.10 +
+    Math.min(100,Math.max(0,((vorp+1)/9)*100))*0.15 +
+    Math.min(100,(pts/35)*100)*0.20 +
+    Math.min(100,(ast/12)*100)*0.10 +
+    Math.min(100,(reb/15)*100)*0.10
+  );
+}
+
+function renderPlayerBar() {
+  const renderSlot = (player, slotId, inputId) => {
+    const slot = $(`#${slotId}`);
+    if (!slot) return;
+    if (!player) {
+      slot.querySelector(".cmp-slot-inner").style.display = "flex";
+      slot.querySelector(".cmp-selected-card") && slot.querySelector(".cmp-selected-card").remove();
+      return;
+    }
+    slot.querySelector(".cmp-slot-inner").style.display = "none";
+    let card = slot.querySelector(".cmp-selected-card");
+    if (!card) { card = document.createElement("div"); card.className = "cmp-selected-card"; slot.prepend(card); }
+    const last = latestSeason(player);
+    const score = cmpEffScore(player);
+    const tierLabel = score>=80?"MVP Caliber":score>=65?"All-Star":score>=50?"Starter":score>=35?"Rotation":"Developmental";
+    const tierColor = score>=80?"#f0c040":score>=65?"#5b8af0":score>=50?"#3ecf8e":score>=35?"#7a8fb0":"#555";
+    card.innerHTML = `
+      <div class="cmp-selected-inner">
+        ${cmpAvatar(player, 56)}
+        <div class="cmp-selected-info">
+          <div class="cmp-selected-name">${player.name}</div>
+          <div class="cmp-selected-meta">${player.position} · ${last?.team||"—"} · ${last?.season||"—"}</div>
+          <div class="cmp-selected-meta" style="color:var(--muted)">${last?.pts!=null?`${(+last.pts).toFixed(1)} PTS`:"—"} · ${last?.reb!=null?`${(+last.reb).toFixed(1)} REB`:"—"} · ${last?.ast!=null?`${(+last.ast).toFixed(1)} AST`:"—"}</div>
+        </div>
+        <div class="cmp-eff-badge" style="border-color:${tierColor};color:${tierColor}">
+          <div class="cmp-eff-num">${score}</div>
+          <div class="cmp-eff-lbl">${tierLabel}</div>
+        </div>
+        <button class="cmp-remove-btn" data-slot="${slotId}">✕</button>
+      </div>`;
+  };
+  renderSlot(compareA, "cmpSlotA", "compareSearchA");
+  renderSlot(compareB, "cmpSlotB", "compareSearchB");
+}
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".cmp-remove-btn");
+  if (!btn) return;
+  if (btn.dataset.slot === "cmpSlotA") { compareA = null; $("#compareSearchA").value = ""; }
+  if (btn.dataset.slot === "cmpSlotB") { compareB = null; $("#compareSearchB").value = ""; }
+  renderPlayerBar();
+  renderComparison();
+});
+
+function drawRadar(canvasId, playerA, playerB, la, lb) {
+  const canvas = $(`#${canvasId}`);
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  const cx = w/2, cy = h/2, r = Math.min(w,h)*0.36;
+  const labels = ["PTS","REB","AST","STL","BLK","3PM","TS%"];
+  const maxes  = [35,   15,   12,   3,    3,    5,    85];
+  const getVals = (s) => [
+    +s.pts||0, +s.reb||0, +s.ast||0, +s.stl||0, +s.blk||0, +s.three||0, +s.ts||0
+  ];
+  const vA = getVals(la), vB = getVals(lb);
+  const n = labels.length;
+  const angle = (i) => (Math.PI*2/n)*i - Math.PI/2;
+
+  ctx.clearRect(0,0,w,h);
+  // Grid rings
+  for (let ring=1; ring<=4; ring++) {
+    ctx.beginPath();
+    for (let i=0;i<n;i++) {
+      const a=angle(i), rr=r*(ring/4);
+      i===0?ctx.moveTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr):ctx.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr);
+    }
+    ctx.closePath();
+    ctx.strokeStyle="rgba(255,255,255,0.07)"; ctx.lineWidth=1; ctx.stroke();
+  }
+  // Spokes
+  for (let i=0;i<n;i++) {
+    const a=angle(i);
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);
+    ctx.strokeStyle="rgba(255,255,255,0.07)"; ctx.lineWidth=1; ctx.stroke();
+  }
+  // Draw polygon helper
+  const drawPoly = (vals, color) => {
+    ctx.beginPath();
+    vals.forEach((v,i) => {
+      const pct = Math.min(v/maxes[i],1);
+      const a=angle(i);
+      const x=cx+Math.cos(a)*r*pct, y=cy+Math.sin(a)*r*pct;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.closePath();
+    ctx.fillStyle=color.replace(")",",0.18)").replace("rgb","rgba"); ctx.fill();
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
+  };
+  drawPoly(vA, playerA.colors[0]||"#5b8af0");
+  drawPoly(vB, playerB.colors[0]||"#f97316");
+  // Labels
+  ctx.fillStyle="rgba(220,232,255,0.65)"; ctx.font="bold 11px system-ui"; ctx.textAlign="center";
+  labels.forEach((lbl,i) => {
+    const a=angle(i), lx=cx+Math.cos(a)*(r+18), ly=cy+Math.sin(a)*(r+18)+4;
+    ctx.fillText(lbl,lx,ly);
+  });
+}
+
 function renderComparison() {
   const container = $("#comparisonContent");
+  renderPlayerBar();
   if (!compareA || !compareB) {
-    container.innerHTML = `<div class="compare-placeholder">Select two players above to compare their stats.</div>`;
+    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚖️</div><div>Search for two players above to compare their stats.</div></div>`;
     return;
   }
   const la = latestSeason(compareA), lb = latestSeason(compareB);
-  const stats = [
-    ["PTS", "pts"], ["REB", "reb"], ["AST", "ast"], ["3P", "three"],
-    ["STL", "stl"], ["BLK", "blk"], ["TOV", "tov"], ["TS%", "ts"], ["USG%", "usg"],
+  if (!la || !lb) { container.innerHTML = `<div class="compare-placeholder">No season data found for one of the players.</div>`; return; }
+
+  const statRows = [
+    ["Points",    "pts",   false],["Rebounds","reb",  false],["Assists","ast",  false],
+    ["3-Pointers","three", false],["Steals",  "stl",  false],["Blocks", "blk",  false],
+    ["Turnovers", "tov",   true], ["TS%",     "ts",   false],["USG%",   "usg",  false],
+    ["Minutes",   "min",   false],["Games",   "gp",   false],
   ];
-  const cardHtml = (player, latest, other) => `
-    <div class="compare-card">
-      <h3>${player.name}</h3>
-      <p class="compare-team">${latest.team || "—"} · ${player.position} · ${latest.season}</p>
-      ${stats.map(([label, key]) => {
-        const val = latest[key], oval = other[key];
-        const better = (key === "tov") ? val < oval : val > oval;
-        return `<div class="compare-stat-row">
-          <span class="compare-stat-label">${label}</span>
-          <span class="compare-stat-val ${better ? "better" : ""}">${fmt(val, key)}</span>
-        </div>`;
-      }).join("")}
-    </div>`;
-  container.innerHTML = `<div class="compare-cards">${cardHtml(compareA, la, lb)}${cardHtml(compareB, lb, la)}</div>`;
+  const advRows = [
+    ["PER",  "per", false],["BPM",  "net", false],["VORP","vorp",false],
+    ["WS",   "ws",  false],["OWS",  "ows", false],["DWS", "dws", false],
+  ];
+
+  const fmtV = (v, key) => {
+    if (v==null||v===undefined||v==="") return "—";
+    if (key==="ts"||key==="usg") return (+v).toFixed(1)+"%";
+    return (+v).toFixed(1);
+  };
+
+  const statTableRows = (rows, la, lb) => rows.map(([label,key,lowerBetter]) => {
+    const va = parseFloat(la[key]), vb = parseFloat(lb[key]);
+    const aWins = !isNaN(va)&&!isNaN(vb)&&(lowerBetter?va<vb:va>vb);
+    const bWins = !isNaN(va)&&!isNaN(vb)&&(lowerBetter?vb<va:vb>va);
+    const bar = (v, max) => {
+      const pct = Math.min(100, Math.max(0, (v/max)*100));
+      return `<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:${pct}%"></div></div>`;
+    };
+    const maxes = {pts:40,reb:18,ast:14,three:6,stl:3,blk:3,tov:6,ts:90,usg:45,min:42,gp:82};
+    const mx = maxes[key]||20;
+    return `<tr class="cmp-stat-row">
+      <td class="cmp-td-a ${aWins?"cmp-win":""}">
+        <div class="cmp-td-inner-a">
+          <span class="cmp-stat-num">${fmtV(la[key],key)}</span>
+          ${bar(va||0,mx)}
+        </div>
+      </td>
+      <td class="cmp-td-label">${label}</td>
+      <td class="cmp-td-b ${bWins?"cmp-win":""}">
+        <div class="cmp-td-inner-b">
+          ${bar(vb||0,mx)}
+          <span class="cmp-stat-num">${fmtV(lb[key],key)}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+
+  // Similar players (by closest PTS+REB+AST)
+  const similarTo = (player, la) => players
+    .filter(p=>p.playerId!==player.playerId&&p.playerId!==compareA.playerId&&p.playerId!==compareB.playerId)
+    .map(p=>{const s=latestSeason(p);if(!s)return null;
+      const d=Math.abs((+s.pts||0)-(+la.pts||0))+Math.abs((+s.reb||0)-(+la.reb||0))+Math.abs((+s.ast||0)-(+la.ast||0));
+      return{p,s,d};}).filter(Boolean).sort((a,b)=>a.d-b.d).slice(0,5);
+
+  const simRowsA = similarTo(compareA, la);
+  const simRowsB = similarTo(compareB, lb);
+
+  if (cmpActiveTab === "overview") {
+    container.innerHTML = `
+      <div class="cmp-overview">
+        <!-- Radar -->
+        <div class="cmp-pcard">
+          <div class="cmp-pcard-title">Attribute Radar</div>
+          <div class="cmp-radar-legend">
+            <span style="color:${compareA.colors[0]||"#5b8af0"}">■ ${compareA.name}</span>
+            <span style="color:${compareB.colors[0]||"#f97316"}">■ ${compareB.name}</span>
+          </div>
+          <canvas id="cmpRadar" width="280" height="280"></canvas>
+        </div>
+        <!-- Key Stats table -->
+        <div class="cmp-pcard cmp-stats-card">
+          <div class="cmp-pcard-title">Key Statistics</div>
+          <div class="cmp-table-header">
+            <span>${compareA.name}</span>
+            <span></span>
+            <span>${compareB.name}</span>
+          </div>
+          <table class="cmp-table"><tbody>${statTableRows(statRows,la,lb)}</tbody></table>
+        </div>
+        <!-- Advanced metrics -->
+        <div class="cmp-pcard">
+          <div class="cmp-pcard-title">Advanced Metrics</div>
+          <div class="cmp-table-header">
+            <span>${compareA.name}</span>
+            <span></span>
+            <span>${compareB.name}</span>
+          </div>
+          <table class="cmp-table"><tbody>${statTableRows(advRows,la,lb)}</tbody></table>
+        </div>
+      </div>`;
+    setTimeout(() => drawRadar("cmpRadar", compareA, compareB, la, lb), 0);
+
+  } else if (cmpActiveTab === "advanced") {
+    const allAdv = [
+      ["PER","per",false],["True Shooting%","ts",false],["Usage%","usg",false],
+      ["BPM","net",false],["Offensive BPM","obpm",false],["Defensive BPM","dbpm",false],
+      ["VORP","vorp",false],["Win Shares","ws",false],["Off Win Shares","ows",false],
+      ["Def Win Shares","dws",false],["WS/48","ws48",false],
+    ];
+    container.innerHTML = `
+      <div class="cmp-adv-page">
+        <div class="cmp-pcard cmp-full">
+          <div class="cmp-pcard-title">Advanced Metrics · ${la.season}</div>
+          <div class="cmp-table-header">
+            <span>${compareA.name}</span><span></span><span>${compareB.name}</span>
+          </div>
+          <table class="cmp-table"><tbody>${statTableRows(allAdv,la,lb)}</tbody></table>
+        </div>
+      </div>`;
+
+  } else if (cmpActiveTab === "trajectory") {
+    container.innerHTML = `
+      <div class="cmp-traj-page">
+        <div class="cmp-pcard cmp-full">
+          <div class="cmp-pcard-title">Career Trajectory Comparison</div>
+          <div class="cmp-traj-controls">
+            ${["pts","reb","ast","three","stl","blk"].map(m=>`<button class="cmp-traj-btn${m==="pts"?" active":""}" data-metric="${m}">${m.toUpperCase()}</button>`).join("")}
+          </div>
+          <canvas id="cmpTrajChart" width="1200" height="400"></canvas>
+          <div class="cmp-radar-legend" style="margin-top:12px">
+            <span style="color:${compareA.colors[0]||"#5b8af0"}">— ${compareA.name}</span>
+            <span style="color:${compareB.colors[0]||"#f97316"}">— ${compareB.name}</span>
+          </div>
+        </div>
+      </div>`;
+    let trajMetric = "pts";
+    const drawTraj = () => {
+      const canvas = $("#cmpTrajChart"); if(!canvas) return;
+      const ctx=canvas.getContext("2d"), w=canvas.width, h=canvas.height;
+      const pad={top:24,right:24,bottom:40,left:48};
+      const pw=w-pad.left-pad.right, ph=h-pad.top-pad.bottom;
+      const seasA = compareA.seasons.filter(s=>s[trajMetric]!=null).map(s=>({x:+s.age||0,y:+s[trajMetric]}));
+      const seasB = compareB.seasons.filter(s=>s[trajMetric]!=null).map(s=>({x:+s.age||0,y:+s[trajMetric]}));
+      const allPts = [...seasA,...seasB];
+      if (!allPts.length) return;
+      const minX=Math.min(...allPts.map(p=>p.x)), maxX=Math.max(...allPts.map(p=>p.x));
+      const maxY=Math.max(...allPts.map(p=>p.y))*1.15;
+      const px=(v)=>pad.left+((v-minX)/(maxX-minX||1))*pw;
+      const py=(v)=>pad.top+ph-(v/maxY)*ph;
+      ctx.clearRect(0,0,w,h);
+      ctx.fillStyle="#0b1729"; ctx.fillRect(0,0,w,h);
+      // Grid
+      for(let i=0;i<=4;i++){
+        const y=pad.top+(ph/4)*i, val=maxY-(maxY/4)*i;
+        ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);
+        ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=1;ctx.stroke();
+        ctx.fillStyle="rgba(220,232,255,0.5)";ctx.font="11px system-ui";ctx.textAlign="right";
+        ctx.fillText(val.toFixed(1),pad.left-6,y+4);
+      }
+      // Age labels
+      ctx.fillStyle="rgba(220,232,255,0.5)"; ctx.font="11px system-ui"; ctx.textAlign="center";
+      for(let age=Math.ceil(minX);age<=maxX;age+=2) ctx.fillText(age,px(age),h-10);
+      // Lines
+      const drawLine=(seas,color)=>{
+        if(!seas.length)return;
+        ctx.beginPath();
+        seas.forEach((p,i)=>{i===0?ctx.moveTo(px(p.x),py(p.y)):ctx.lineTo(px(p.x),py(p.y));});
+        ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.stroke();
+        seas.forEach(p=>{ctx.beginPath();ctx.arc(px(p.x),py(p.y),3.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();});
+      };
+      drawLine(seasA, compareA.colors[0]||"#5b8af0");
+      drawLine(seasB, compareB.colors[0]||"#f97316");
+    };
+    setTimeout(drawTraj,0);
+    document.querySelectorAll(".cmp-traj-btn").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        document.querySelectorAll(".cmp-traj-btn").forEach(b=>b.classList.remove("active"));
+        btn.classList.add("active");
+        trajMetric=btn.dataset.metric;
+        drawTraj();
+      });
+    });
+
+  } else if (cmpActiveTab === "similar") {
+    const simCard = (player, rows) => `
+      <div class="cmp-pcard cmp-sim-card">
+        <div class="cmp-pcard-title">Similar to ${player.name}</div>
+        <div class="cmp-sim-list">
+          ${rows.map((r,i)=>`
+            <div class="cmp-sim-row">
+              <span class="cmp-sim-rank">${i+1}</span>
+              ${cmpAvatar(r.p,36)}
+              <div class="cmp-sim-info">
+                <div class="cmp-sim-name">${r.p.name}</div>
+                <div class="cmp-sim-meta">${r.p.position} · ${r.s.team||"—"}</div>
+              </div>
+              <div class="cmp-sim-stats">
+                <span>${(+r.s.pts||0).toFixed(1)} PTS</span>
+                <span>${(+r.s.reb||0).toFixed(1)} REB</span>
+                <span>${(+r.s.ast||0).toFixed(1)} AST</span>
+              </div>
+            </div>`).join("")}
+        </div>
+      </div>`;
+    container.innerHTML = `<div class="cmp-sim-page">${simCard(compareA,simRowsA)}${simCard(compareB,simRowsB)}</div>`;
+  }
 }
 
 setupCompareSearch("compareSearchA", "compareDropdownA", (p) => { compareA = p; });

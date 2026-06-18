@@ -10,7 +10,7 @@
     <meta property="og:title" content="StatFuel" />
     <meta property="og:description" content="Explore NBA player stats, career trends, draft prospects, and award history." />
     <meta property="og:type" content="website" />
-    <link rel="stylesheet" href="styles.css?v=20260618-xgb1" />
+    <link rel="stylesheet" href="styles.css?v=20260618-cmp1" />
   </head>
   <body>
 
@@ -476,29 +476,50 @@
 
         <!-- Comparisons Section -->
         <section class="page hidden" id="page-comparisons">
-          <div class="page-header">
+
+          <!-- Header -->
+          <div class="cmp-header">
             <div>
-              <h2>Comparisons</h2>
-              <p class="page-subtitle">Compare two players side by side</p>
+              <h2 class="cmp-title">Comparisons</h2>
+              <p class="cmp-sub">Search and compare NBA player stats and historical trends</p>
             </div>
+            <button class="cmp-add-btn" id="cmpAddBtn">+ Add Player</button>
           </div>
 
-          <div class="comparison-selectors">
-            <div class="compare-picker">
-              <label>Player A</label>
-              <input id="compareSearchA" type="search" placeholder="Search player..." class="compare-input" />
+          <!-- Player selector bar -->
+          <div class="cmp-player-bar" id="cmpPlayerBar">
+            <div class="cmp-search-slot" id="cmpSlotA">
+              <div class="cmp-slot-inner">
+                <span class="cmp-slot-icon">+</span>
+                <span class="cmp-slot-label">Add Player A</span>
+              </div>
+              <input id="compareSearchA" type="search" placeholder="Search player..." class="cmp-search-input" autocomplete="off"/>
               <div class="compare-dropdown" id="compareDropdownA"></div>
             </div>
-            <div class="vs-badge">VS</div>
-            <div class="compare-picker">
-              <label>Player B</label>
-              <input id="compareSearchB" type="search" placeholder="Search player..." class="compare-input" />
+            <div class="cmp-search-slot" id="cmpSlotB">
+              <div class="cmp-slot-inner">
+                <span class="cmp-slot-icon">+</span>
+                <span class="cmp-slot-label">Add Player B</span>
+              </div>
+              <input id="compareSearchB" type="search" placeholder="Search player..." class="cmp-search-input" autocomplete="off"/>
               <div class="compare-dropdown" id="compareDropdownB"></div>
             </div>
           </div>
 
+          <!-- Tab nav -->
+          <div class="cmp-tabs" id="cmpTabs">
+            <button class="cmp-tab active" data-tab="overview">Overview</button>
+            <button class="cmp-tab" data-tab="advanced">Advanced Metrics</button>
+            <button class="cmp-tab" data-tab="trajectory">Career Trajectory</button>
+            <button class="cmp-tab" data-tab="similar">Similar Players</button>
+          </div>
+
+          <!-- Content -->
           <div class="comparison-content" id="comparisonContent">
-            <div class="compare-placeholder">Select two players above to compare their stats.</div>
+            <div class="compare-placeholder">
+              <div class="compare-placeholder-icon">⚖️</div>
+              <div>Search for two players above to compare their stats.</div>
+            </div>
           </div>
         </section>
 
@@ -647,7 +668,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260618-xgb1"></script>
+    <script src="app.js?v=20260618-cmp1"></script>
     <script>
       // ── Auth gate ──────────────────────────────────────────────────────────
       const USERS_KEY = 'sf_users';
