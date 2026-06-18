@@ -649,8 +649,8 @@
       }
       function clearError(id) { document.getElementById(id).classList.add('hidden'); }
 
-      // Check existing session
-      if (localStorage.getItem(SESSION_KEY)) showApp();
+      // Always require sign in on load
+      localStorage.removeItem(SESSION_KEY);
 
       // Toggle between login / signup
       document.getElementById('showSignup').addEventListener('click', e => {
