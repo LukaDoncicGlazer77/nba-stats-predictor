@@ -785,11 +785,26 @@ async function renderPredictions(player, projections = []) {
   const perVal = parseFloat(last.per) || 15;
   const ws     = parseFloat(last.ws) || 0;
 
+  const pts     = parseFloat(last.pts) || 0;
+  const ast     = parseFloat(last.ast) || 0;
+  const reb     = parseFloat(last.reb) || 0;
+
   const perScore  = Math.min(100, Math.max(0, ((perVal - 5) / 30) * 100));
   const bpmScore  = Math.min(100, Math.max(0, ((bpm + 5) / 20) * 100));
   const tsScore   = Math.min(100, Math.max(0, ((tsPct - 0.40) / 0.35) * 100));
   const vorpScore = Math.min(100, Math.max(0, ((vorp + 1) / 9) * 100));
-  const effScore  = Math.round(perScore * 0.3 + bpmScore * 0.25 + tsScore * 0.2 + vorpScore * 0.25);
+  const ptsScore  = Math.min(100, Math.max(0, (pts / 35) * 100));
+  const astScore  = Math.min(100, Math.max(0, (ast / 12) * 100));
+  const rebScore  = Math.min(100, Math.max(0, (reb / 15) * 100));
+  const effScore  = Math.round(
+    perScore  * 0.20 +
+    bpmScore  * 0.15 +
+    tsScore   * 0.10 +
+    vorpScore * 0.15 +
+    ptsScore  * 0.20 +
+    astScore  * 0.10 +
+    rebScore  * 0.10
+  );
 
   const [tierLabel, tierColor] =
     effScore >= 80 ? ["MVP Caliber", "#f0c040"] :
