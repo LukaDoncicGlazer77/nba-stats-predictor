@@ -540,21 +540,37 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.match(r"^/api/player-photo/([a-z0-9]+)$", parsed.path)
         if m:
             player_id = m.group(1)
-            url = f"https://www.basketball-reference.com/req/202106291/images/players/{player_id}.jpg"
-            try:
-                req = urllib.request.Request(url, headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Referer": "https://www.basketball-reference.com/",
-                })
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    data = resp.read()
+            urls = [
+                f"https://www.basketball-reference.com/req/202106291/images/players/{player_id}.jpg",
+                f"https://www.basketball-reference.com/req/202106291/images/players/{player_id}_200x200.jpg",
+                f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png",
+            ]
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://www.basketball-reference.com/",
+                "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+            }
+            data = None
+            content_type = "image/jpeg"
+            for url in urls:
+                try:
+                    req = urllib.request.Request(url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=6) as resp:
+                        if resp.status == 200:
+                            data = resp.read()
+                            if url.endswith(".png"):
+                                content_type = "image/png"
+                            break
+                except Exception:
+                    continue
+            if data:
                 self.send_response(200)
-                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "public, max-age=86400")
                 self.end_headers()
                 self.wfile.write(data)
-            except Exception:
+            else:
                 self.send_response(404)
                 self.end_headers()
             return

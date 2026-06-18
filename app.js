@@ -26,16 +26,17 @@ function playerPhotoUrl(playerId) {
 
 function playerAvatar(playerId, name, colors, size = 48) {
   const url = playerPhotoUrl(playerId);
-  const bg = colors ? `linear-gradient(135deg,${colors[0]},${colors[1]})` : "#1a2540";
+  const bg = colors ? `linear-gradient(135deg,${colors[0]},${colors[1]})` : "linear-gradient(135deg,#1e3a5f,#0f2040)";
   const ini = initials(name || "?");
+  const fontSize = Math.round(size * 0.34);
   if (url) {
-    return `<span class="p-avatar" style="width:${size}px;height:${size}px;background:${bg}">
+    return `<span class="p-avatar" style="width:${size}px;height:${size}px;background:${bg};font-size:${fontSize}px">
       <img src="${url}" alt="${name}" width="${size}" height="${size}"
            onerror="this.style.display='none';this.parentElement.classList.add('p-avatar-fallback')" />
       <span class="p-avatar-ini">${ini}</span>
     </span>`;
   }
-  return `<span class="p-avatar p-avatar-fallback" style="width:${size}px;height:${size}px;background:${bg}">
+  return `<span class="p-avatar p-avatar-fallback" style="width:${size}px;height:${size}px;background:${bg};font-size:${fontSize}px">
     <span class="p-avatar-ini">${ini}</span>
   </span>`;
 }
