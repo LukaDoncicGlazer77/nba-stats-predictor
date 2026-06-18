@@ -1574,32 +1574,45 @@ function renderComparison() {
     return (+v).toFixed(1);
   };
 
+  const colorA = compareA.colors?.[0] || "#5b8af0";
+  const colorB = compareB.colors?.[0] || "#f97316";
+
   const statTableRows = (rows, la, lb) => rows.map(([label,key,lowerBetter]) => {
     const va = parseFloat(la[key]), vb = parseFloat(lb[key]);
     const aWins = !isNaN(va)&&!isNaN(vb)&&(lowerBetter?va<vb:va>vb);
     const bWins = !isNaN(va)&&!isNaN(vb)&&(lowerBetter?vb<va:vb>va);
-    const bar = (v, max) => {
-      const pct = Math.min(100, Math.max(0, (v/max)*100));
-      return `<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:${pct}%"></div></div>`;
-    };
-    const maxes = {pts:40,reb:18,ast:14,three:6,stl:3,blk:3,tov:6,ts:90,usg:45,min:42,gp:82};
+    const maxes = {pts:40,reb:18,ast:14,three:6,stl:3,blk:3,tov:6,ts:90,usg:45,min:42,gp:82,per:35,net:15,vorp:8,ws:15,ows:10,dws:8,ws48:0.3,obpm:12,dbpm:8};
     const mx = maxes[key]||20;
+    const pctA = Math.min(100,Math.max(0,((va||0)/mx)*100));
+    const pctB = Math.min(100,Math.max(0,((vb||0)/mx)*100));
+    const barA = `<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:${pctA}%;background:${aWins?colorA:"rgba(255,255,255,0.15)"}"></div></div>`;
+    const barB = `<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:${pctB}%;background:${bWins?colorB:"rgba(255,255,255,0.15)"}"></div></div>`;
     return `<tr class="cmp-stat-row">
       <td class="cmp-td-a ${aWins?"cmp-win":""}">
         <div class="cmp-td-inner-a">
-          <span class="cmp-stat-num">${fmtV(la[key],key)}</span>
-          ${bar(va||0,mx)}
+          <span class="cmp-stat-num" style="${aWins?`color:${colorA}`:""}">${fmtV(la[key],key)}</span>
+          ${barA}
         </div>
       </td>
       <td class="cmp-td-label">${label}</td>
       <td class="cmp-td-b ${bWins?"cmp-win":""}">
         <div class="cmp-td-inner-b">
-          ${bar(vb||0,mx)}
-          <span class="cmp-stat-num">${fmtV(lb[key],key)}</span>
+          ${barB}
+          <span class="cmp-stat-num" style="${bWins?`color:${colorB}`:""}">${fmtV(lb[key],key)}</span>
         </div>
       </td>
     </tr>`;
   }).join("");
+
+  const winCount = (rows, la, lb) => {
+    let wA=0,wB=0;
+    rows.forEach(([,key,lowerBetter])=>{
+      const va=parseFloat(la[key]),vb=parseFloat(lb[key]);
+      if(isNaN(va)||isNaN(vb))return;
+      if(lowerBetter?va<vb:va>vb)wA++; else if(lowerBetter?vb<va:vb>va)wB++;
+    });
+    return [wA,wB];
+  };
 
   // Similar players (by closest PTS+REB+AST)
   const similarTo = (player, la) => players
@@ -1612,36 +1625,48 @@ function renderComparison() {
   const simRowsB = similarTo(compareB, lb);
 
   if (cmpActiveTab === "overview") {
+    const [wA, wB] = winCount([...statRows,...advRows], la, lb);
     container.innerHTML = `
       <div class="cmp-overview">
-        <!-- Radar -->
-        <div class="cmp-pcard">
-          <div class="cmp-pcard-title">Attribute Radar</div>
-          <div class="cmp-radar-legend">
-            <span style="color:${compareA.colors[0]||"#5b8af0"}">■ ${compareA.name}</span>
-            <span style="color:${compareB.colors[0]||"#f97316"}">■ ${compareB.name}</span>
+        <!-- Left col: Radar + Advanced -->
+        <div style="display:grid;gap:14px">
+          <div class="cmp-pcard">
+            <div class="cmp-pcard-title">Attribute Radar</div>
+            <div class="cmp-radar-legend">
+              <span style="color:${colorA}">⬤ ${compareA.name}</span>
+              <span style="color:${colorB}">⬤ ${compareB.name}</span>
+            </div>
+            <canvas id="cmpRadar" width="280" height="280"></canvas>
           </div>
-          <canvas id="cmpRadar" width="280" height="280"></canvas>
+          <div class="cmp-pcard">
+            <div class="cmp-pcard-title">Advanced Metrics</div>
+            <div class="cmp-table-header">
+              <span style="color:${colorA}">${compareA.name.split(" ").pop()}</span>
+              <span style="text-align:center"></span>
+              <span style="color:${colorB};text-align:right">${compareB.name.split(" ").pop()}</span>
+            </div>
+            <table class="cmp-table"><tbody>${statTableRows(advRows,la,lb)}</tbody></table>
+          </div>
         </div>
-        <!-- Key Stats table -->
+        <!-- Right col: Win strip + Key Stats -->
         <div class="cmp-pcard cmp-stats-card">
-          <div class="cmp-pcard-title">Key Statistics</div>
+          <div class="cmp-win-strip">
+            <div class="cmp-win-a" style="background:${colorA}22">
+              ${cmpAvatar(compareA,28)}
+              <span style="color:${colorA}">${wA} wins</span>
+            </div>
+            <div class="cmp-win-divider"></div>
+            <div class="cmp-win-b" style="background:${colorB}22">
+              <span style="color:${colorB}">${wB} wins</span>
+              ${cmpAvatar(compareB,28)}
+            </div>
+          </div>
           <div class="cmp-table-header">
-            <span>${compareA.name}</span>
-            <span></span>
-            <span>${compareB.name}</span>
+            <span style="color:${colorA}">${compareA.name.split(" ").pop()}</span>
+            <span style="text-align:center">Stat</span>
+            <span style="color:${colorB};text-align:right">${compareB.name.split(" ").pop()}</span>
           </div>
           <table class="cmp-table"><tbody>${statTableRows(statRows,la,lb)}</tbody></table>
-        </div>
-        <!-- Advanced metrics -->
-        <div class="cmp-pcard">
-          <div class="cmp-pcard-title">Advanced Metrics</div>
-          <div class="cmp-table-header">
-            <span>${compareA.name}</span>
-            <span></span>
-            <span>${compareB.name}</span>
-          </div>
-          <table class="cmp-table"><tbody>${statTableRows(advRows,la,lb)}</tbody></table>
         </div>
       </div>`;
     setTimeout(() => drawRadar("cmpRadar", compareA, compareB, la, lb), 0);

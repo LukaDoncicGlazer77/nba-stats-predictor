@@ -2583,58 +2583,107 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 /* Overview grid */
 .cmp-overview {
   display: grid;
-  grid-template-columns: 300px 1fr 260px;
+  grid-template-columns: 320px 1fr;
+  grid-template-rows: auto auto;
   gap: 14px;
   align-items: start;
 }
+.cmp-overview .cmp-stats-card { grid-row: 1 / 3; }
 
 /* Radar */
 .cmp-radar-legend {
   display: flex;
-  gap: 16px;
-  font-size: 0.76rem;
-  margin-bottom: 10px;
+  gap: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 12px;
 }
+.cmp-radar-legend span { display: flex; align-items: center; gap: 6px; }
 #cmpRadar { display: block; margin: 0 auto; }
 
 /* Stat table */
 .cmp-table-header {
   display: grid;
-  grid-template-columns: 1fr 120px 1fr;
+  grid-template-columns: 1fr 110px 1fr;
   gap: 8px;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  margin-bottom: 8px;
-  text-align: center;
+  color: var(--ink);
+  margin-bottom: 4px;
 }
 .cmp-table-header span:first-child { text-align: left; }
 .cmp-table-header span:last-child { text-align: right; }
+
 .cmp-table { width: 100%; border-collapse: collapse; }
-.cmp-stat-row td { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.cmp-stat-row td { padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .cmp-stat-row:last-child td { border-bottom: none; }
-.cmp-td-a, .cmp-td-b { width: 40%; }
+.cmp-stat-row:hover td { background: rgba(255,255,255,0.02); }
+.cmp-td-a, .cmp-td-b { width: 42%; }
 .cmp-td-label {
   text-align: center;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
   white-space: nowrap;
-  padding: 0 8px;
-  width: 100px;
+  padding: 0 10px;
+  width: 110px;
 }
-.cmp-td-inner-a { display: flex; flex-direction: row-reverse; align-items: center; gap: 8px; }
-.cmp-td-inner-b { display: flex; align-items: center; gap: 8px; }
-.cmp-stat-num { font-size: 0.88rem; font-weight: 700; color: var(--ink); white-space: nowrap; min-width: 32px; text-align: center; }
-.cmp-bar-track { flex: 1; height: 4px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
-.cmp-bar-fill { height: 100%; background: var(--sidebar-active); border-radius: 99px; }
-.cmp-td-a.cmp-win .cmp-stat-num { color: var(--green); }
-.cmp-td-b.cmp-win .cmp-stat-num { color: var(--green); }
-.cmp-td-a.cmp-win .cmp-bar-fill { background: var(--green); }
-.cmp-td-b.cmp-win .cmp-bar-fill { background: var(--green); }
+.cmp-td-inner-a { display: flex; flex-direction: row-reverse; align-items: center; gap: 10px; }
+.cmp-td-inner-b { display: flex; align-items: center; gap: 10px; }
+.cmp-stat-num {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: rgba(220,232,255,0.6);
+  white-space: nowrap;
+  min-width: 36px;
+  text-align: center;
+  transition: color 0.15s;
+}
+.cmp-bar-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.cmp-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+.cmp-td-a .cmp-bar-fill { background: var(--color-a, var(--sidebar-active)); }
+.cmp-td-b .cmp-bar-fill { background: var(--color-b, #f97316); }
+.cmp-td-a.cmp-win .cmp-stat-num { color: #fff; font-size: 1rem; }
+.cmp-td-b.cmp-win .cmp-stat-num { color: #fff; font-size: 1rem; }
+.cmp-td-a.cmp-win .cmp-bar-track { background: rgba(255,255,255,0.08); }
+.cmp-td-b.cmp-win .cmp-bar-track { background: rgba(255,255,255,0.08); }
+
+/* Win count strip */
+.cmp-win-strip {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  height: 36px;
+}
+.cmp-win-a, .cmp-win-b {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  height: 100%;
+}
+.cmp-win-divider {
+  width: 1px;
+  height: 100%;
+  background: rgba(0,0,0,0.3);
+}
 
 /* Advanced page */
 .cmp-adv-page { display: grid; gap: 14px; }
