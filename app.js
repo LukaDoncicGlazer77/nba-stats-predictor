@@ -61,7 +61,42 @@ function latestSeason(player) {
 
 let currentSection = "dashboard";
 
+const MEMBERS_ONLY = new Set(["players","player-profile","watchlist","comparisons","team-dashboard","reports","analytics","lineup"]);
+
+function isLoggedIn() {
+  const s = localStorage.getItem('sf_session');
+  return s && s !== 'guest';
+}
+
+function showLoginWall() {
+  const existing = document.getElementById('loginWallModal');
+  if (existing) { existing.style.display = 'flex'; return; }
+  const modal = document.createElement('div');
+  modal.id = 'loginWallModal';
+  modal.innerHTML = `
+    <div class="lw-card">
+      <div class="lw-icon">🔒</div>
+      <h3 class="lw-title">Members Only</h3>
+      <p class="lw-sub">Create a free account or sign in to access this section.</p>
+      <button class="lw-btn" id="lwSignInBtn">Sign In / Create Account</button>
+      <button class="lw-dismiss" id="lwDismissBtn">Maybe later</button>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('lwSignInBtn').addEventListener('click', () => {
+    modal.style.display = 'none';
+    localStorage.removeItem('sf_session');
+    location.reload();
+  });
+  document.getElementById('lwDismissBtn').addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+}
+
 function navigate(section) {
+  if (MEMBERS_ONLY.has(section) && !isLoggedIn()) {
+    showLoginWall();
+    return;
+  }
   document.querySelectorAll(".page").forEach((p) => p.classList.add("hidden"));
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
   const page = $(`#page-${section}`);
