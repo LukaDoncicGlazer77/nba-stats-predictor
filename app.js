@@ -870,6 +870,17 @@ async function renderPredictions(player, projections = []) {
                  mlSalaryM >= 15 ? "Starter"       :
                  mlSalaryM >= 7  ? "Role Player"   : "Minimum";
 
+  // XGBoost stats prediction
+  let xgPreds = null;
+  try {
+    const res = await fetch(`/api/stats-predict?player_id=${encodeURIComponent(player.playerId)}`);
+    if (res.ok) { const d = await res.json(); xgPreds = d.predictions; }
+  } catch (_) {}
+
+  const fmt1 = (v, fallback="—") => v != null ? Number(v).toFixed(1) : fallback;
+  const fmtPct = (v, fallback="—") => v != null ? (Number(v) * 100).toFixed(1) + "%" : fallback;
+  const nextSeasonLabel = xgPreds ? `${(parseInt(last.season)||2025)+1}-${String((parseInt(last.season)||2025)+2).slice(2)}` : "Next Season";
+
   // Circular ring math — r=42, circumference≈263.9
   const ringR = 42, ringC = 2 * Math.PI * ringR;
   const ringOffset = ringC * (1 - Math.min(mlSalaryM, 62) / 62);
@@ -932,28 +943,43 @@ async function renderPredictions(player, projections = []) {
       <div class="pred-salary-sub">${mlSalaryPct !== null ? mlSalaryPct.toFixed(1) : "—"}% of salary cap</div>
     </div>
 
-    <!-- Projections panel -->
-    <div class="pred-panel">
-      <div class="pred-panel-label">Next Season Projection</div>
-      <div class="pred-proj-grid">
-        <div class="pred-proj-tile">
-          <div class="pred-proj-val" style="color:#5b8af0">${projPts}</div>
-          <div class="pred-proj-key">PTS</div>
+    <!-- XGBoost Stats Prediction panel -->
+    <div class="pred-panel pred-xg-panel">
+      <div class="pred-panel-label">XGBoost Forecast · ${nextSeasonLabel}</div>
+      <div class="pred-xg-grid">
+        <div class="pred-xg-tile">
+          <div class="pred-xg-val" style="color:#5b8af0">${fmt1(xgPreds?.pts_per_game, projPts)}</div>
+          <div class="pred-xg-key">PTS</div>
         </div>
-        <div class="pred-proj-tile">
-          <div class="pred-proj-val" style="color:#3ecf8e">${projReb}</div>
-          <div class="pred-proj-key">REB</div>
+        <div class="pred-xg-tile">
+          <div class="pred-xg-val" style="color:#3ecf8e">${fmt1(xgPreds?.trb_per_game, projReb)}</div>
+          <div class="pred-xg-key">REB</div>
         </div>
-        <div class="pred-proj-tile">
-          <div class="pred-proj-val" style="color:#f97316">${projAst}</div>
-          <div class="pred-proj-key">AST</div>
+        <div class="pred-xg-tile">
+          <div class="pred-xg-val" style="color:#f97316">${fmt1(xgPreds?.ast_per_game, projAst)}</div>
+          <div class="pred-xg-key">AST</div>
         </div>
-        <div class="pred-proj-tile">
-          <div class="pred-proj-val" style="color:#7a8fb0">${projMin}</div>
-          <div class="pred-proj-key">MIN</div>
+        <div class="pred-xg-tile">
+          <div class="pred-xg-val" style="color:#a78bfa">${fmt1(xgPreds?.stl_per_game)}</div>
+          <div class="pred-xg-key">STL</div>
+        </div>
+        <div class="pred-xg-tile">
+          <div class="pred-xg-val" style="color:#f87171">${fmt1(xgPreds?.blk_per_game)}</div>
+          <div class="pred-xg-key">BLK</div>
+        </div>
+        <div class="pred-xg-tile">
+          <div class="pred-xg-val" style="color:#34d399">${fmt1(xgPreds?.x3p_per_game)}</div>
+          <div class="pred-xg-key">3PM</div>
         </div>
       </div>
-      <div style="font-size:0.6rem;color:var(--muted);text-align:center">Age ${Math.round(age)} · WS ${ws.toFixed(1)}</div>
+      <div class="pred-xg-adv">
+        <span>FG% <b>${xgPreds ? (xgPreds.fg_percent*100).toFixed(1)+"%" : "—"}</b></span>
+        <span>TS% <b>${xgPreds ? (xgPreds.ts_percent*100).toFixed(1)+"%" : "—"}</b></span>
+        <span>PER <b>${fmt1(xgPreds?.per)}</b></span>
+        <span>VORP <b>${fmt1(xgPreds?.vorp)}</b></span>
+        <span>WS <b>${fmt1(xgPreds?.ws)}</b></span>
+      </div>
+      <div class="pred-xg-note">XGBoost · 18k seasons trained</div>
     </div>
   `;
 }

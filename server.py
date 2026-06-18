@@ -31,6 +31,23 @@ def _load_salary_model():
         print(f"Could not load salary model: {e}")
     return _salary_model
 
+# ── Stats prediction model (loaded once) ───────────────────────────────────
+_stats_model = None
+def _load_stats_model():
+    global _stats_model
+    if _stats_model is not None:
+        return _stats_model
+    model_path = ROOT / "stats_model.pkl"
+    if not model_path.exists():
+        return None
+    try:
+        import joblib
+        _stats_model = joblib.load(model_path)
+        print("Stats model loaded.")
+    except Exception as e:
+        print(f"Could not load stats model: {e}")
+    return _stats_model
+
 SALARY_CAPS_M = {
     2015: 70.00, 2016: 94.143, 2017: 99.093, 2018: 101.869, 2019: 109.14,
     2020: 109.14, 2021: 112.414, 2022: 123.655, 2023: 136.021, 2024: 140.588,
@@ -418,6 +435,105 @@ class Handler(SimpleHTTPRequestHandler):
                 "salary_pct": round(salary_pct * 100, 1),
                 "predicted_salary_m": predicted_m,
                 "cap_m": cap_m,
+            })
+
+        if parsed.path == "/api/stats-predict":
+            player_id = (params.get("player_id", [""])[0] or "").strip()
+            if not player_id:
+                return self.send_json({"error": "player_id required"}, status=400)
+            bundle = _load_stats_model()
+            if bundle is None:
+                return self.send_json({"error": "Stats model not available"}, status=503)
+
+            conn = connect()
+            try:
+                rows = q(conn, """
+                    SELECT
+                        safe_float(p.age) AS age,
+                        safe_float(p.g) AS g,
+                        safe_float(p.mp_per_game) AS mp_per_game,
+                        safe_float(p.pts_per_game) AS pts_per_game,
+                        safe_float(p.trb_per_game) AS trb_per_game,
+                        safe_float(p.ast_per_game) AS ast_per_game,
+                        safe_float(p.stl_per_game) AS stl_per_game,
+                        safe_float(p.blk_per_game) AS blk_per_game,
+                        safe_float(p.tov_per_game) AS tov_per_game,
+                        safe_float(p.fg_percent) AS fg_percent,
+                        safe_float(p.x3p_per_game) AS x3p_per_game,
+                        safe_float(p.ft_percent) AS ft_percent,
+                        safe_float(p.fga_per_game) AS fga_per_game,
+                        safe_float(p.x3pa_per_game) AS x3pa_per_game,
+                        safe_float(a.per) AS per,
+                        safe_float(a.ts_percent) AS ts_percent,
+                        safe_float(a.usg_percent) AS usg_percent,
+                        safe_float(a.ws) AS ws,
+                        safe_float(a.ws_48) AS ws_48,
+                        safe_float(a.bpm) AS bpm,
+                        safe_float(a.vorp) AS vorp,
+                        safe_float(a.obpm) AS obpm,
+                        safe_float(a.dbpm) AS dbpm,
+                        safe_float(a.ows) AS ows,
+                        safe_float(a.dws) AS dws,
+                        p.pos,
+                        safe_int(p.season) AS season
+                    FROM archive_player_per_game p
+                    JOIN archive_advanced a
+                      ON a.player_id = p.player_id AND a.season = p.season
+                    WHERE p.player_id = ?
+                    ORDER BY safe_int(p.season) DESC
+                    LIMIT 2
+                """, (player_id,))
+            finally:
+                conn.close()
+
+            if not rows:
+                return self.send_json({"error": "Player not found"}, status=404)
+
+            import numpy as np
+
+            models   = bundle["models"]
+            features = bundle["features"]
+            lag_cols = bundle["lag_cols"]
+            POSITIONS = bundle["positions"]
+            targets  = bundle["targets"]
+
+            s0 = dict(rows[0])  # most recent season
+            s1 = dict(rows[1]) if len(rows) > 1 else {}
+
+            def sf(d, k): return float(d.get(k) or 0)
+
+            feat_vals = {}
+            feat_vals["prev_age"] = sf(s0, "age")
+
+            for col in lag_cols:
+                feat_vals[f"lag1_{col}"] = sf(s0, col)
+                feat_vals[f"lag2_{col}"] = sf(s1, col) if s1 else 0.0
+                feat_vals[f"delta_{col}"] = feat_vals[f"lag1_{col}"] - feat_vals[f"lag2_{col}"]
+
+            pos_primary = (s0.get("pos") or "SF").split("-")[0].strip()
+            if pos_primary not in POSITIONS:
+                pos_primary = "SF"
+            for pos in POSITIONS:
+                feat_vals[f"Pos_{pos}"] = 1.0 if pos_primary == pos else 0.0
+
+            X = np.array([[feat_vals.get(f, 0.0) for f in features]])
+
+            preds = {}
+            for target, model in models.items():
+                val = float(model.predict(X)[0])
+                preds[target] = round(max(0, val), 2)
+
+            # Cap sensible ranges
+            preds["fg_percent"]  = round(min(preds["fg_percent"],  0.75), 3)
+            preds["ts_percent"]  = round(min(preds["ts_percent"],  0.85), 3)
+            preds["x3p_per_game"] = round(min(preds["x3p_per_game"], 15), 2)
+
+            current_season = int(s0.get("season") or 2026)
+            return self.send_json({
+                "player_id": player_id,
+                "current_season": current_season,
+                "next_season": current_season + 1,
+                "predictions": preds,
             })
 
         # Photo proxy
