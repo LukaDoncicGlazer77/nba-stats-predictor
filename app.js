@@ -1809,72 +1809,19 @@ async function renderCareerOutcomeView(container, prospect) {
 // ── Overview ──────────────────────────────────────────────────────────────────
 function renderOverviewTab(container, active) {
   const statRows = [["Points","pts",false],["Rebounds","reb",false],["Assists","ast",false],["3PM","three",false],["Steals","stl",false],["Blocks","blk",false],["Turnovers","tov",true],["TS%","ts",false],["USG%","usg",false],["Minutes","min",false]];
-  const advRows  = [["PER","per",false],["BPM","net",false],["VORP","vorp",false],["WS","ws",false],["OBPM","obpm",false],["DBPM","dbpm",false]];
   container.innerHTML = `
-    <div class="cmp-overview4">
-      <div style="display:grid;gap:14px;align-content:start">
-        <div class="cmp-pcard">
-          <div class="cmp-pcard-title">Attribute Radar</div>
-          <div class="cmp-radar-legend">${active.map(a=>`<span style="color:${a.color}">⬤ ${a.player.name.split(" ").pop()}</span>`).join("")}</div>
-          <canvas id="cmpRadar" width="240" height="240" style="display:block;margin:0 auto"></canvas>
-        </div>
-        <div class="cmp-pcard">
-          <div class="cmp-pcard-title">Key Statistics</div>
-          ${build4Table(statRows,active)}
-        </div>
+    <div class="cmp-overview2">
+      <div class="cmp-pcard">
+        <div class="cmp-pcard-title">Attribute Radar</div>
+        <div class="cmp-radar-legend">${active.map(a=>`<span style="color:${a.color}">⬤ ${a.player.name.split(" ").pop()}</span>`).join("")}</div>
+        <canvas id="cmpRadar" width="240" height="240" style="display:block;margin:0 auto"></canvas>
       </div>
       <div class="cmp-pcard">
-        <div class="cmp-pcard-title">Advanced Metrics</div>
-        ${build4Table(advRows,active)}
-        <div class="cmp-pcard-title" style="margin-top:18px">Core Stats</div>
-        ${build4Table([["Points","pts",false],["Rebounds","reb",false],["Assists","ast",false],["Steals","stl",false],["Blocks","blk",false],["3PM","three",false]],active)}
-      </div>
-      <div class="cmp-pcard">
-        <div class="cmp-pcard-title">Similar Players <span style="font-size:0.72rem;font-weight:400;color:var(--muted)">· ${active[0].player.name}</span></div>
-        <div class="cmp-sim-list" id="cmpOverviewSim"><div style="color:var(--muted);font-size:0.8rem;padding:12px 0">Loading...</div></div>
+        <div class="cmp-pcard-title">Key Statistics</div>
+        ${build4Table(statRows,active)}
       </div>
     </div>`;
   setTimeout(()=>drawSpider4("cmpRadar",active),0);
-  loadOverviewSimilar(active[0].player);
-}
-
-async function loadOverviewSimilar(anchor) {
-  const el = $("#cmpOverviewSim");
-  if (!el) return;
-  try {
-    const similar = await fetchArchetypeSimilar(anchor);
-    if (similar && similar.length) {
-      el.innerHTML = similar.slice(0,6).map((s,i)=>`
-        <div class="cmp-sim-row">
-          <span class="cmp-sim-rank">${i+1}</span>
-          <div class="cmp-sim-info">
-            <div class="cmp-sim-name">${escapeHtml(s.player_name)}</div>
-            <div class="cmp-sim-meta">${s.season||""} &middot; ${(s.dominant_engine||"").replace(/_/g," ")}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:0.88rem;font-weight:800;color:var(--sidebar-active)">${Math.round(s.similarity)}%</div>
-            <div style="font-size:0.62rem;color:var(--muted)">match</div>
-          </div>
-        </div>`).join("");
-      return;
-    }
-  } catch {}
-  const rows = players.filter(p=>p.playerId!==anchor.playerId)
-    .map(p=>{const s=latestSeason(p);if(!s)return null;const sim=cmpLocalSimilarity(anchor,p);return{p,s,sim};})
-    .filter(r=>r&&r.sim>0).sort((a,b)=>b.sim-a.sim).slice(0,6);
-  if (!rows.length) { el.innerHTML=`<div style="color:var(--muted);font-size:0.8rem">No data</div>`; return; }
-  el.innerHTML=rows.map((r,i)=>`
-    <div class="cmp-sim-row">
-      <span class="cmp-sim-rank">${i+1}</span>
-      <div class="cmp-sim-info">
-        <div class="cmp-sim-name">${r.p.name}</div>
-        <div class="cmp-sim-meta">${r.p.position} · ${r.s.team||"—"}</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:0.88rem;font-weight:800;color:var(--sidebar-active)">${r.sim}%</div>
-        <div style="font-size:0.62rem;color:var(--muted)">match</div>
-      </div>
-    </div>`).join("");
 }
 
 function drawSpider4(canvasId, active) {

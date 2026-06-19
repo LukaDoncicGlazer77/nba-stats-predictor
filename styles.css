@@ -2751,6 +2751,15 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
    column instead of shrinking to fit. */
 .cmp-overview4 > * { min-width: 0; }
 
+/* 2-col overview: Attribute Radar + Key Statistics only */
+.cmp-overview2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.cmp-overview2 > * { min-width: 0; }
+
 /* Radar legend */
 .cmp-radar-legend {
   display: flex;
@@ -2833,24 +2842,6 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .cmp-ring-label { font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .cmp-ring-vals { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
 .cmp-ring-val { font-size: 0.65rem; padding: 1px 5px; border-radius: 4px; font-weight: 800; }
-
-/* Similar players overview list */
-.cmp-sim-list { display: grid; gap: 8px; }
-.cmp-sim-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--card-border);
-  transition: background 0.13s;
-}
-.cmp-sim-row:hover { background: rgba(255,255,255,0.05); }
-.cmp-sim-rank { font-size: 0.72rem; font-weight: 700; color: var(--muted); width: 14px; text-align: center; flex-shrink: 0; }
-.cmp-sim-info { flex: 1; min-width: 0; }
-.cmp-sim-name { font-size: 0.84rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cmp-sim-meta { font-size: 0.7rem; color: var(--muted); }
 
 /* Explanation / comp cards */
 .cmp-comp-grid {
