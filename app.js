@@ -1453,7 +1453,7 @@ const CMP_LABELS = ["A", "B", "C", "D"];
 let comparePlayers = [null, null, null, null];
 let cmpActiveTab = "overview";
 let cmpMode = "current";
-let cmpApiCache = {};
+let archetypeSimCache = {};
 
 function cmpColor(i) { return CMP_COLORS[i % 4]; }
 
@@ -1521,14 +1521,23 @@ function cmpLocalSimilarity(pA, pB) {
   return Math.round(cosine * penalty * 100);
 }
 
-async function fetchCmpApi(name) {
-  if (cmpApiCache[name]) return cmpApiCache[name];
+// Backs "Similar Players" panels with the real archetype/comp engine
+// (archetype_engine.py's same_stage_comps -- playstyle/efficiency/advanced/
+// physical weighted, not raw stat cosine) instead of a local fallback.
+async function fetchArchetypeSimilar(player) {
+  if (archetypeSimCache[player.playerId]) return archetypeSimCache[player.playerId];
+  const last = latestSeason(player);
+  if (!last || !last.playerId || !last.season) return null;
   try {
-    const r = await fetch(`/api/player-comparison/${encodeURIComponent(name)}`);
-    if (!r.ok) return null;
-    const data = await r.json();
-    cmpApiCache[name] = data;
-    return data;
+    const url = `/api/archetype?player_id=${encodeURIComponent(last.playerId)}&season=${encodeURIComponent(last.season)}`;
+    const report = await fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    const similar = (report.same_stage_comps || []).map((c) => ({
+      player: c.player, player_name: c.player, season: c.season,
+      similarity: c.similarity, dominant_engine: c.dominant_engine,
+      explanation: c.explanation, breakdown: c.breakdown,
+    }));
+    archetypeSimCache[player.playerId] = similar;
+    return similar;
   } catch { return null; }
 }
 
@@ -1815,14 +1824,14 @@ async function loadOverviewSimilar(anchor) {
   const el = $("#cmpOverviewSim");
   if (!el) return;
   try {
-    const data = await fetchCmpApi(anchor.name);
-    if (data && data.similar && data.similar.length) {
-      el.innerHTML = data.similar.slice(0,6).map((s,i)=>`
+    const similar = await fetchArchetypeSimilar(anchor);
+    if (similar && similar.length) {
+      el.innerHTML = similar.slice(0,6).map((s,i)=>`
         <div class="cmp-sim-row">
           <span class="cmp-sim-rank">${i+1}</span>
           <div class="cmp-sim-info">
-            <div class="cmp-sim-name">${s.player_name}</div>
-            <div class="cmp-sim-meta">${s.pos||""} · ${s.season||""}</div>
+            <div class="cmp-sim-name">${escapeHtml(s.player_name)}</div>
+            <div class="cmp-sim-meta">${s.season||""} &middot; ${(s.dominant_engine||"").replace(/_/g," ")}</div>
           </div>
           <div style="text-align:right">
             <div style="font-size:0.88rem;font-weight:800;color:var(--sidebar-active)">${Math.round(s.similarity)}%</div>
@@ -2039,14 +2048,12 @@ function renderSimilarTab(container, active) {
 async function fetchSimilarTab(anchor) {
   const el=$("#cmpSimilarContent");if(!el)return;
   try {
-    const data=await fetchCmpApi(anchor.name);
-    if(data&&data.similar&&data.similar.length){
-      el.innerHTML=`<div class="cmp-comp-grid">${data.similar.slice(0,8).map(s=>{
-        const reasons=(s.explanation&&s.explanation.reasons)||[];
-        const diverges=(s.explanation&&s.explanation.divergences)||[];
-        const narrative=(s.explanation&&s.explanation.narrative)||"";
+    const similar=await fetchArchetypeSimilar(anchor);
+    if(similar&&similar.length){
+      el.innerHTML=`<div class="cmp-comp-grid">${similar.slice(0,8).map(s=>{
+        const narrative=s.explanation||"";
         const simPct=Math.round(s.similarity);
-        const subs=s.sub_scores||{};
+        const subs=s.breakdown||{};
         const simColor=simPct>=80?"var(--green)":simPct>=60?"var(--sidebar-active)":"var(--muted)";
         const subBar=(label,val)=>{
           if(val==null)return"";
@@ -2061,20 +2068,17 @@ async function fetchSimilarTab(anchor) {
               <div class="cmp-comp-score-lbl">Overall</div>
             </div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:0.9rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.player||s.player_name||""}</div>
-              <div style="font-size:0.7rem;color:var(--muted)">${s.pos||""} · ${s.team||""} · ${s.season||""}</div>
-              ${s.archetype?`<div class="cmp-arch-badge">${s.archetype}</div>`:""}
+              <div style="font-size:0.9rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(s.player||s.player_name||"")}</div>
+              <div style="font-size:0.7rem;color:var(--muted)">${s.season||""} &middot; ${(s.dominant_engine||"").replace(/_/g," ")}</div>
             </div>
           </div>
           <div class="cmp-sub-scores">
-            ${subBar("Statistical",subs.statistical)}
-            ${subBar("Play Style",subs.playstyle)}
-            ${subBar("Physical",subs.physical)}
-            ${subBar("Trajectory",subs.trajectory)}
+            ${subBar("Play Style",subs.playstyle_similarity)}
+            ${subBar("Stats (eff-adj.)",subs.efficiency_adjusted_stats_similarity)}
+            ${subBar("Advanced",subs.advanced_metrics_similarity)}
+            ${subBar("Physical",subs.physical_similarity)}
           </div>
-          ${narrative?`<div class="cmp-comp-narrative">${narrative}</div>`:""}
-          ${reasons.length?`<div class="cmp-comp-reasons">${reasons.filter(r=>!r.startsWith("Same archetype")).slice(0,3).map(r=>`<div class="cmp-comp-reason">${r}</div>`).join("")}</div>`:""}
-          ${diverges.length?`<div style="margin-top:4px">${diverges.map(d=>`<div class="cmp-comp-diverge">${d}</div>`).join("")}</div>`:""}
+          ${narrative?`<div class="cmp-comp-narrative">${escapeHtml(narrative)}</div>`:""}
         </div>`;
       }).join("")}</div>`;
       return;
