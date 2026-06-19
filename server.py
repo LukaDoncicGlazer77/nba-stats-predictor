@@ -12,6 +12,8 @@ from urllib.parse import parse_qs, urlparse
 import psycopg2
 import psycopg2.extras
 
+import archetype_engine
+
 ROOT = Path(__file__).resolve().parent
 
 # ── Salary model (loaded once at startup) ──────────────────────────────────
@@ -346,6 +348,20 @@ class Handler(SimpleHTTPRequestHandler):
             finally:
                 conn.close()
             return self.send_json_rows(rows)
+
+        if parsed.path == "/api/archetype":
+            player_id = (params.get("player_id", [""])[0] or "").strip()
+            season = (params.get("season", [""])[0] or "").strip()
+            if not player_id or not season:
+                return self.send_json({"error": "player_id and season required"}, status=400)
+            conn = connect()
+            try:
+                report = archetype_engine.build_player_report(conn, q, player_id, season)
+            finally:
+                conn.close()
+            if report is None:
+                return self.send_json({"error": "No qualified season found for that player_id/season"}, status=404)
+            return self.send_json(report)
 
         if parsed.path == "/api/salary-predict":
             player_id = (params.get("player_id", [""])[0] or "").strip()

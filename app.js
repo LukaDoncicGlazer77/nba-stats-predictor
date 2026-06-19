@@ -614,6 +614,7 @@ function renderPlayerProfile() {
   renderProjection(player, projections);
   renderSeasonTable(player);
   renderPredictions(player, projections);
+  loadArchetypePanel(player);
   syncControls();
   drawRadar(player);
   drawChart(player, projections, true);
@@ -798,6 +799,69 @@ function computeTypicalRangeByAge(metric) {
 }
 
 // ── Predictions & Value ──────────────────────────────────────────────────────
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function loadArchetypePanel(player) {
+  const panel = $("#archetypePanel");
+  const sub = $("#archetypeSub");
+  if (!panel) return;
+  const last = latestSeason(player);
+  if (!last || !last.playerId || !last.season) {
+    panel.innerHTML = "<p class='pcard-summary'>Archetype data unavailable for this player.</p>";
+    return;
+  }
+  panel.innerHTML = "<p class='pcard-summary'>Loading archetype model&hellip;</p>";
+  try {
+    const url = `/api/archetype?player_id=${encodeURIComponent(last.playerId)}&season=${encodeURIComponent(last.season)}`;
+    const report = await fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    renderArchetypePanel(report, player);
+    if (sub) sub.textContent = `${report.season} · ${report.development_stage.replace("_", " ")}`;
+  } catch (e) {
+    panel.innerHTML = "<p class='pcard-summary'>Archetype data unavailable for this player/season.</p>";
+  }
+}
+
+function renderArchetypePanel(report, player) {
+  const panel = $("#archetypePanel");
+  if (!panel) return;
+
+  const weights = Object.entries(report.archetype_weights)
+    .filter(([, w]) => w > 1)
+    .sort((a, b) => b[1] - a[1]);
+  const weightBars = weights
+    .map(
+      ([label, w]) => `<div><dt>${escapeHtml(label)}</dt><dd>${w}%</dd></div>`
+    )
+    .join("");
+
+  const sameStageRows = report.same_stage_comps
+    .map(
+      (c) => `<li>${escapeHtml(c.player)} (${c.season}) &mdash; ${c.similarity}%</li>`
+    )
+    .join("");
+  const projectedRows = report.projected_engine_comps
+    .map(
+      (c) => `<li>${escapeHtml(c.player)} (${c.season}) &mdash; ${c.engine_similarity}% engine match</li>`
+    )
+    .join("");
+
+  panel.innerHTML = `
+    <div class="overview-top-row">
+      <div class="profile-col">
+        <div class="pfact-grid">${weightBars}</div>
+      </div>
+      <div class="profile-col">
+        <p class="pcard-summary"><strong>Same-stage comps</strong> &mdash; strict &plusmn;2yr age/experience band, true statistical comparison:</p>
+        <ul class="pcard-notes">${sameStageRows}</ul>
+        <p class="pcard-summary" style="margin-top:14px;"><strong>Projected engine comps</strong> &mdash; scouting layer, no age band, offensive-engine match only:</p>
+        <ul class="pcard-notes">${projectedRows}</ul>
+      </div>
+    </div>
+  `;
+}
 
 async function renderPredictions(player, projections = []) {
   const el = $("#predGrid");
