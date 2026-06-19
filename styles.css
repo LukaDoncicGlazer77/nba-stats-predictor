@@ -1594,6 +1594,14 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   line-height: 1.55;
 }
 
+.comp-explanation {
+  display: block;
+  margin-top: 2px;
+  color: rgba(220,232,255,0.55);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
 /* Overview layout */
 .overview-top-row {
   display: grid;

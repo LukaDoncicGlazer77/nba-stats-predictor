@@ -8,6 +8,13 @@ f_tr, dbpm and real age for every season 1947-2026 (including Wemby/Chet/
 Luka), so unlike the prototype this needs NO era-blending or derived-stat
 estimation -- it queries one already-correct table.
 
+Comp scoring (_composite_similarity) is a weighted blend of four embeddings
+-- playstyle (how offense is generated), efficiency-adjusted stats (how
+much, discounted for empty volume), advanced impact metrics, and physical
+profile -- specifically so two players with similar raw usage/assist
+volume but different efficiency and turnover profiles don't read as
+comps just because their box scores rhyme.
+
 Public entry point: build_player_report(conn, player_id, season) -> dict,
 used by the /api/archetype endpoint in server.py.
 
@@ -20,14 +27,25 @@ import math
 from collections import defaultdict
 
 MIN_GAMES_SEASON = 20  # garbage-time/injury-shortened-season filter (per_game table has no MP total column, g is the available volume signal)
+HIGH_USAGE_THRESHOLD = 30.0  # absolute usg_percent cutoff for "efficiency under load"
 
 A_KEYS = ["heliocentric_engine", "secondary_playmaker", "off_ball_scorer", "non_creator_finisher"]
 B_KEYS = ["rim_protector", "versatile_defender"]
 C_KEYS = ["three_pt_pressure", "interior_pressure"]
 
-WEIGHT_A, WEIGHT_DE, WEIGHT_B, WEIGHT_C, WEIGHT_AGE = 0.45, 0.25, 0.15, 0.10, 0.05
-USAGE_ORDER = {"low": 0, "medium": 1, "high": 2, "extreme": 3}
-PLAYMAKING_ORDER = {"low": 0, "medium": 1, "high": 2}
+# Per-season percentile columns. The "_pr" suffix on each is added by add_percentiles().
+PERCENTILE_COLS = [
+    "usg_pct", "ast_pct", "blk_pct", "drb_pct", "stl_pct", "fg3a_rate", "ft_rate",
+    "ts_pct", "tov_pct", "bpm", "obpm", "vorp", "pts_pg", "trb_pg", "ht_in", "wt",
+]
+
+# Final comp score = weighted combination of four embeddings: how a player generates
+# offense (playstyle), how much they produce once you discount empty volume
+# (efficiency-adjusted stats), broader two-way impact (advanced metrics), and body
+# profile (physical). This replaces a single raw usage/assist vector specifically so
+# that two high-usage, high-assist players with very different efficiency and
+# turnover profiles don't read as comps just because their box scores rhyme.
+COMP_WEIGHTS = {"playstyle": 0.40, "stats": 0.30, "advanced": 0.20, "physical": 0.10}
 
 
 # ── data loading ─────────────────────────────────────────────────────────
@@ -47,34 +65,56 @@ def load_pool(conn, q):
     exist in this dataset)."""
     adv_rows = q(conn, """
         SELECT player, player_id, season, age, usg_percent, ast_percent,
-               blk_percent, drb_percent, stl_percent, x3p_ar, f_tr, dbpm
+               blk_percent, drb_percent, stl_percent, x3p_ar, f_tr, dbpm,
+               ts_percent, tov_percent, bpm, obpm, vorp
         FROM archive_advanced
     """)
-    games_rows = q(conn, "SELECT player_id, season, g FROM archive_player_per_game")
+    games_rows = q(conn, """
+        SELECT player_id, season, g, pts_per_game, trb_per_game
+        FROM archive_player_per_game
+    """)
+    physical_rows = q(conn, "SELECT player_id, ht_in_in, wt FROM archive_player_career_info")
 
     games_by_key = {}
     for r in games_rows:
         key = (r["player_id"], r["season"])
         g = _to_float(r["g"]) or 0
-        if key not in games_by_key or g > games_by_key[key]:
-            games_by_key[key] = g
+        if key not in games_by_key or g > games_by_key[key]["games"]:
+            games_by_key[key] = {
+                "games": g,
+                "pts_pg": _to_float(r["pts_per_game"]),
+                "trb_pg": _to_float(r["trb_per_game"]),
+            }
+
+    physical_by_player = {
+        r["player_id"]: (_to_float(r["ht_in_in"]), _to_float(r["wt"])) for r in physical_rows
+    }
 
     pool = []
     for r in adv_rows:
         key = (r["player_id"], r["season"])
-        games = games_by_key.get(key)
+        per_game = games_by_key.get(key)
+        games = per_game["games"] if per_game else None
         usg, ast, blk, drb, stl = (
             _to_float(r["usg_percent"]), _to_float(r["ast_percent"]), _to_float(r["blk_percent"]),
             _to_float(r["drb_percent"]), _to_float(r["stl_percent"]),
         )
         if None in (usg, ast, blk, drb, stl) or games is None or games < MIN_GAMES_SEASON:
             continue
+        ht_in, wt = physical_by_player.get(r["player_id"], (None, None))
         pool.append({
             "player": r["player"], "player_id": r["player_id"],
             "season": int(r["season"]), "age": _to_float(r["age"]), "games": games,
             "usg_pct": usg, "ast_pct": ast, "blk_pct": blk, "drb_pct": drb, "stl_pct": stl,
             "fg3a_rate": _to_float(r["x3p_ar"]) or 0.0, "ft_rate": _to_float(r["f_tr"]) or 0.0,
             "dbpm": _to_float(r["dbpm"]),
+            # efficiency / impact signals -- absent for some early-era seasons (e.g.
+            # turnovers weren't tracked league-wide before 1973-74), handled as
+            # missing-but-neutral in add_percentiles() rather than dropped.
+            "ts_pct": _to_float(r["ts_percent"]), "tov_pct": _to_float(r["tov_percent"]),
+            "bpm": _to_float(r["bpm"]), "obpm": _to_float(r["obpm"]), "vorp": _to_float(r["vorp"]),
+            "pts_pg": per_game["pts_pg"], "trb_pg": per_game["trb_pg"],
+            "ht_in": ht_in, "wt": wt,
         })
 
     pool.sort(key=lambda p: (p["player_id"], p["season"]))
@@ -94,11 +134,38 @@ def add_percentiles(pool):
         by_season[p["season"]].append(p)
 
     for season_rows in by_season.values():
-        n = len(season_rows)
-        for col in ["usg_pct", "ast_pct", "blk_pct", "drb_pct", "stl_pct", "fg3a_rate", "ft_rate"]:
-            ordered = sorted(season_rows, key=lambda p: p[col])
+        for col in PERCENTILE_COLS:
+            present = [p for p in season_rows if p.get(col) is not None]
+            n = len(present)
+            if n == 0:
+                continue
+            ordered = sorted(present, key=lambda p: p[col])
             for i, p in enumerate(ordered):
                 p[f"{col}_pr"] = (i + 1) / n
+        for p in season_rows:
+            for col in PERCENTILE_COLS:
+                p.setdefault(f"{col}_pr", 0.5)  # missing data -> neutral, not dropped
+    return pool
+
+
+def add_efficiency_under_load(pool):
+    """Ranks TS% only among genuinely high-usage seasons (usg_pct > 30) within that
+    season -- isolates how well a player scores once an offense is actually run
+    through them, rather than letting raw usage volume stand in for efficiency.
+    Seasons below the threshold get None here and fall back to plain ts_pct_pr."""
+    by_season = defaultdict(list)
+    for p in pool:
+        if p["usg_pct"] > HIGH_USAGE_THRESHOLD and p["ts_pct"] is not None:
+            by_season[p["season"]].append(p)
+
+    for rows in by_season.values():
+        n = len(rows)
+        ordered = sorted(rows, key=lambda p: p["ts_pct"])
+        for i, p in enumerate(ordered):
+            p["efficiency_under_load_pr"] = (i + 1) / n
+
+    for p in pool:
+        p.setdefault("efficiency_under_load_pr", None)
     return pool
 
 
@@ -176,6 +243,7 @@ def development_stage(experience):
 
 def annotate(pool):
     add_percentiles(pool)
+    add_efficiency_under_load(pool)
     for p in pool:
         creation = creation_burden(p)
         defense = defensive_role(p)
@@ -189,6 +257,32 @@ def annotate(pool):
         p["named_mix"] = named_archetype_mix(p, creation, defense, scoring, usage)
         p["dominant_engine"] = max(creation, key=creation.get)
         p["dev_stage"] = development_stage(p["experience"])
+
+        # efficiency_signal: TS% ranked specifically among high-usage seasons when this
+        # was one (genuine "engine" efficiency), else plain TS% percentile.
+        p["efficiency_signal"] = (
+            p["efficiency_under_load_pr"] if p["efficiency_under_load_pr"] is not None else p["ts_pct_pr"]
+        )
+        p["ball_security"] = 1 - p["tov_pct_pr"]
+        # usage weighted by how well that usage is converted, not the raw usage itself
+        p["usage_efficiency"] = p["usg_pct_pr"] * p["efficiency_signal"]
+
+        p["playstyle_vec"] = [
+            creation["heliocentric_engine"] / 100, creation["secondary_playmaker"] / 100,
+            creation["off_ball_scorer"] / 100, creation["non_creator_finisher"] / 100,
+            scoring["three_pt_pressure"] / 100, scoring["interior_pressure"] / 100,
+            p["ball_security"], p["efficiency_signal"], p["usage_efficiency"],
+        ]
+        # efficiency-adjusted production volume: raw counting stats discounted (not
+        # zeroed) by how efficiently they were produced, so a high-usage/low-efficiency
+        # stat line no longer reads as equivalent to a high-usage/high-efficiency one.
+        eff_mult = 0.5 + 0.5 * p["efficiency_signal"]
+        p["stats_vec"] = [
+            p["pts_pg_pr"] * eff_mult, p["ast_pct_pr"] * eff_mult,
+            p["trb_pg_pr"], p["stl_pct_pr"], p["blk_pct_pr"],
+        ]
+        p["advanced_vec"] = [p["bpm_pr"], p["obpm_pr"], p["vorp_pr"]]
+        p["physical_vec"] = [p["ht_in_pr"], p["wt_pr"]] if p["ht_in"] is not None and p["wt"] is not None else None
     return pool
 
 
@@ -200,50 +294,107 @@ def _cosine(va, vb):
     return dot / (na * nb) if na and nb else 0.0
 
 
-def _ordinal_sim(a, b, order):
-    span = max(order.values()) or 1
-    return 1 - abs(order[a] - order[b]) / span
-
-
 def _age_band_ok(a, b, band=2):
     if a["age"] is not None and b["age"] is not None:
         return abs(a["age"] - b["age"]) <= band
     return abs(a["experience"] - b["experience"]) <= band
 
 
-def _same_stage_similarity(a, b):
-    if not _age_band_ok(a, b):
-        return None
-    a_sim = _cosine([a["A"][k] for k in A_KEYS], [b["A"][k] for k in A_KEYS])
-    de_sim = (
-        _ordinal_sim(a["D_usage_level"], b["D_usage_level"], USAGE_ORDER)
-        + _ordinal_sim(a["E_playmaking_level"], b["E_playmaking_level"], PLAYMAKING_ORDER)
-    ) / 2
-    b_sim = _cosine([a["B"][k] for k in B_KEYS], [b["B"][k] for k in B_KEYS])
-    c_sim = _cosine([a["C"][k] for k in C_KEYS], [b["C"][k] for k in C_KEYS])
-    if a["age"] is not None and b["age"] is not None:
-        age_sim = max(0.0, 1 - abs(a["age"] - b["age"]) / 5)
-    else:
-        age_sim = max(0.0, 1 - abs(a["experience"] - b["experience"]) / 5)
+def _composite_similarity(a, b):
+    """The shared scoring core for both comp layers: a weighted combination of
+    playstyle (how offense is generated), efficiency-adjusted stats (how much,
+    discounted for empty volume), advanced two-way impact, and physical profile.
+    Falls back to dropping the physical term (renormalizing the rest) when height/
+    weight is missing for either player-season, rather than scoring it as 0."""
+    playstyle_sim = _cosine(a["playstyle_vec"], b["playstyle_vec"])
+    stats_sim = _cosine(a["stats_vec"], b["stats_vec"])
+    advanced_sim = _cosine(a["advanced_vec"], b["advanced_vec"])
+    physical_sim = (
+        _cosine(a["physical_vec"], b["physical_vec"])
+        if a["physical_vec"] is not None and b["physical_vec"] is not None else None
+    )
 
-    score = 100 * (WEIGHT_A * a_sim + WEIGHT_DE * de_sim + WEIGHT_B * b_sim + WEIGHT_C * c_sim + WEIGHT_AGE * age_sim)
-    if a_sim < 0.85:
-        score = min(score, 60.0)
-    return round(score, 1)
+    terms = [(COMP_WEIGHTS["playstyle"], playstyle_sim), (COMP_WEIGHTS["stats"], stats_sim),
+             (COMP_WEIGHTS["advanced"], advanced_sim)]
+    if physical_sim is not None:
+        terms.append((COMP_WEIGHTS["physical"], physical_sim))
+    total_w = sum(w for w, _ in terms)
+    score = sum(w * s for w, s in terms) / total_w
+
+    # Penalty for false equivalence: near-identical box-score volume but a clearly
+    # different creation mechanism/efficiency profile (e.g. two high-usage,
+    # high-assist guards who diverge sharply on scoring efficiency and ball
+    # security) should not score as a strong comp just because the stat line rhymes.
+    if stats_sim > 0.85 and playstyle_sim < 0.55:
+        score = min(score, 0.55)
+
+    # Direct efficiency-divergence penalty: cosine similarity on mostly-positive,
+    # role-aligned vectors can stay high even when efficiency_signal diverges sharply
+    # (e.g. two similar-usage, similar-role engines where one converts that load far
+    # more efficiently than the other), since the role dims dominate the dot product.
+    # This compares the scalar gap directly so that divergence isn't diluted away.
+    efficiency_divergence = abs(a["efficiency_signal"] - b["efficiency_signal"])
+    if efficiency_divergence > 0.25:
+        score *= max(0.4, 1 - efficiency_divergence)
+
+    breakdown = {
+        "playstyle_similarity": round(100 * playstyle_sim, 1),
+        "efficiency_adjusted_stats_similarity": round(100 * stats_sim, 1),
+        "advanced_metrics_similarity": round(100 * advanced_sim, 1),
+        "physical_similarity": round(100 * physical_sim, 1) if physical_sim is not None else None,
+        "efficiency_divergence": round(100 * efficiency_divergence, 1),
+    }
+    return round(100 * score, 1), breakdown
+
+
+def _efficiency_label(pr):
+    if pr is None:
+        return "unknown efficiency"
+    return ("elite efficiency" if pr >= 0.85 else "strong efficiency" if pr >= 0.65
+            else "average efficiency" if pr >= 0.35 else "below-average efficiency")
+
+
+def _usage_label(level):
+    return {"extreme": "primary, ball-dominant", "high": "high-usage",
+            "medium": "moderate-usage", "low": "low-usage"}[level]
+
+
+def explain_comp(target, cand, breakdown):
+    """Plain-language basketball explanation for a single comp result: role,
+    usage, creation type, and efficiency -- not just a similarity percentage."""
+    t_role, c_role = target["dominant_engine"].replace("_", " "), cand["dominant_engine"].replace("_", " ")
+    t_eff_pr = target["efficiency_under_load_pr"] if target["efficiency_under_load_pr"] is not None else target["ts_pct_pr"]
+    c_eff_pr = cand["efficiency_under_load_pr"] if cand["efficiency_under_load_pr"] is not None else cand["ts_pct_pr"]
+
+    parts = []
+    if t_role == c_role:
+        parts.append(
+            f"Both project primarily as a {t_role} ({_usage_label(target['D_usage_level'])} usage vs "
+            f"{_usage_label(cand['D_usage_level'])} usage)."
+        )
+    else:
+        parts.append(f"{target['player']} reads as a {t_role}; {cand['player']} reads as a {c_role} -- different primary offensive roles.")
+    parts.append(f"Scoring efficiency under offensive load: {_efficiency_label(t_eff_pr)} vs {_efficiency_label(c_eff_pr)}.")
+    if breakdown["efficiency_divergence"] > 25:
+        parts.append(f"Efficiency profiles diverge by {breakdown['efficiency_divergence']} percentile points despite similar roles/volume -- score is penalized for this, treat as a partial comp, not a true one.")
+    elif breakdown["efficiency_adjusted_stats_similarity"] - breakdown["playstyle_similarity"] > 25:
+        parts.append("Box-score volume looks similar, but the underlying creation/efficiency profile diverges -- treat this as a partial comp, not a true one.")
+    return " ".join(parts)
 
 
 def same_stage_comps(target, pool, top_n=5):
-    """SAME-STAGE COMPS: strict +/-2 age/experience band, full weighted score."""
+    """SAME-STAGE COMPS: strict +/-2 age/experience band, full composite score."""
     results = []
     for cand in pool:
         if cand["player_id"] == target["player_id"]:
             continue
-        score = _same_stage_similarity(target, cand)
-        if score is None:
+        if not _age_band_ok(target, cand):
             continue
+        score, breakdown = _composite_similarity(target, cand)
         results.append({
             "player": cand["player"], "season": cand["season"], "similarity": score,
-            "dominant_engine": cand["dominant_engine"],
+            "dominant_engine": cand["dominant_engine"], "breakdown": breakdown,
+            "explanation": explain_comp(target, cand, breakdown),
         })
     results.sort(key=lambda r: -r["similarity"])
     seen, out = set(), []
@@ -258,16 +409,16 @@ def same_stage_comps(target, pool, top_n=5):
 
 
 def projected_engine_comps(target, pool, top_n=5):
-    """PROJECTED ENGINE COMPS (scouting layer): no age band, A-vector cosine only."""
-    target_vec = [target["A"][k] for k in A_KEYS]
+    """PROJECTED ENGINE COMPS (scouting layer): no age band, same composite score."""
     results = []
     for cand in pool:
         if cand["player_id"] == target["player_id"]:
             continue
-        sim = _cosine(target_vec, [cand["A"][k] for k in A_KEYS])
+        score, breakdown = _composite_similarity(target, cand)
         results.append({
             "player": cand["player"], "season": cand["season"],
-            "engine_similarity": round(sim * 100, 1), "dominant_engine": cand["dominant_engine"],
+            "engine_similarity": score, "dominant_engine": cand["dominant_engine"], "breakdown": breakdown,
+            "explanation": explain_comp(target, cand, breakdown),
         })
     results.sort(key=lambda r: -r["engine_similarity"])
     seen, out = set(), []
