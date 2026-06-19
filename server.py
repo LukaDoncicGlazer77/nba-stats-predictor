@@ -359,10 +359,20 @@ class Handler(SimpleHTTPRequestHandler):
                 rank = safe_int_py(prospect.get("rank")) or 30
 
                 picks = q(conn, """
-                    WITH rookie_pos AS (
-                        SELECT DISTINCT ON (player_id) player_id, pos
+                    WITH season_rows AS (
+                        -- A traded player has one row per team plus a 2TM/3TM/.. aggregate
+                        -- row for that season; keep only the aggregate (or the lone row
+                        -- if there was no trade) so career stats aren't double-counted.
+                        SELECT DISTINCT ON (player_id, season)
+                               player_id, season, pos, pts_per_game, trb_per_game, ast_per_game
                         FROM archive_player_per_game
                         WHERE safe_int(season) IS NOT NULL
+                        ORDER BY player_id, season,
+                                 CASE WHEN team ~ 'TM$' THEN 0 ELSE 1 END
+                    ),
+                    rookie_pos AS (
+                        SELECT DISTINCT ON (player_id) player_id, pos
+                        FROM season_rows
                         ORDER BY player_id, safe_int(season) ASC
                     ),
                     career AS (
@@ -372,7 +382,7 @@ class Handler(SimpleHTTPRequestHandler):
                                ROUND(AVG(safe_float(ast_per_game))::numeric, 1) AS career_ast,
                                COUNT(season) AS seasons_played,
                                ROUND(MAX(safe_float(pts_per_game))::numeric, 1) AS peak_pts
-                        FROM archive_player_per_game
+                        FROM season_rows
                         GROUP BY player_id
                     )
                     SELECT d.player, d.player_id, d.season AS draft_season, d.overall_pick, d.college,
