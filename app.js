@@ -1584,7 +1584,19 @@ function renderPlayerBar() {
     }
     const last = latestSeason(player);
     const score = cmpEffScore(player);
-    const simScore = i === 0 ? 100 : cmpLocalSimilarity(comparePlayers[0], player);
+    // Prefer the real comp engine (playstyle/efficiency-weighted) over the raw
+    // stat-cosine fallback whenever we have it; fetch it in the background and
+    // re-render once available rather than blocking this synchronous render.
+    let simScore = i === 0 ? 100 : cmpLocalSimilarity(comparePlayers[0], player);
+    if (i !== 0 && comparePlayers[0]) {
+      const cached = archetypeSimCache[comparePlayers[0].playerId];
+      if (cached) {
+        const match = cached.find((s) => s.player === player.name);
+        if (match) simScore = Math.round(match.similarity);
+      } else {
+        fetchArchetypeSimilar(comparePlayers[0]).then(() => renderPlayerBar());
+      }
+    }
     return `<div class="cmp-search-slot cmp-slot-filled" id="cmpSlot${i}" data-slot="${i}">
       <div class="cmp-slot-color-bar" style="background:${color}"></div>
       <div class="cmp-selected-inner">
