@@ -1660,7 +1660,10 @@ document.addEventListener("click", e => {
     document.querySelectorAll(".cmp-mode-btn").forEach(b => b.classList.remove("active"));
     modeBtn.classList.add("active");
     cmpMode = modeBtn.dataset.mode;
-    if (cmpMode === "career") comparePlayers = [comparePlayers[0], null, null, null];
+    if (cmpMode === "career") {
+      const slot0 = comparePlayers[0];
+      comparePlayers = [slot0 && slot0.isProspect ? slot0 : null, null, null, null];
+    }
     const cmpTabs = $("#cmpTabs");
     if (cmpTabs) cmpTabs.style.display = cmpMode === "career" ? "none" : "";
     if (cmpMode !== "current" && !prospectsLoaded) {
