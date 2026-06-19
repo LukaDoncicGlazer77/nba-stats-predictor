@@ -2726,6 +2726,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
   padding: 18px 20px;
+  min-width: 0; /* allow shrinking inside grid tracks instead of overflowing */
 }
 .cmp-pcard-title {
   font-size: 0.7rem;
@@ -2744,6 +2745,11 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   gap: 14px;
   align-items: start;
 }
+/* Grid items default to min-width:auto, which sizes to their content's
+   min-content width -- without this, a wide table inside a narrow track
+   (e.g. the 290px Key Statistics column) overflows visibly into the next
+   column instead of shrinking to fit. */
+.cmp-overview4 > * { min-width: 0; }
 
 /* Radar legend */
 .cmp-radar-legend {
@@ -2757,7 +2763,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .cmp-radar-legend span { display: flex; align-items: center; gap: 5px; }
 
 /* 4-column stat table */
-.cmp-table4 { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.cmp-table4 { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font-size: 0.8rem; }
 .cmp-table4 thead th {
   padding: 3px 6px 6px;
   font-size: 0.7rem;
@@ -2780,6 +2786,9 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   font-size: 0.72rem;
   font-weight: 500;
   color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cmp-table4 tbody tr:last-child td { border-bottom: none; }
 .cmp-table4 tbody tr:hover td { background: rgba(255,255,255,0.02); }
