@@ -1544,16 +1544,33 @@ function cmpAvatar(player, size = 52) {
 function renderPlayerBar() {
   const bar = $("#cmpPlayerBar");
   if (!bar) return;
-  bar.innerHTML = comparePlayers.map((player, i) => {
+  const slots = cmpMode === "career" ? comparePlayers.slice(0, 1) : comparePlayers;
+  bar.innerHTML = slots.map((player, i) => {
     const color = cmpColor(i);
     if (!player) {
+      const label = cmpMode === "career" ? "Add Draft Prospect" :
+        cmpMode === "prospect" ? `Add Player/Prospect ${CMP_LABELS[i]}` : `Add Player ${CMP_LABELS[i]}`;
       return `<div class="cmp-search-slot" id="cmpSlot${i}" data-slot="${i}">
         <div class="cmp-slot-inner">
           <span class="cmp-slot-icon">+</span>
-          <span class="cmp-slot-label">Add Player ${CMP_LABELS[i]}</span>
+          <span class="cmp-slot-label">${label}</span>
           <input id="cmpSearch${i}" type="search" placeholder="Search by name..." class="cmp-search-input" autocomplete="off" spellcheck="false"/>
         </div>
         <div class="compare-dropdown" id="cmpDrop${i}"></div>
+      </div>`;
+    }
+    if (player.isProspect) {
+      return `<div class="cmp-search-slot cmp-slot-filled" id="cmpSlot${i}" data-slot="${i}">
+        <div class="cmp-slot-color-bar" style="background:${color}"></div>
+        <div class="cmp-selected-inner">
+          ${cmpAvatar(player, 44)}
+          <div class="cmp-selected-info">
+            <div class="cmp-selected-name">${player.name}</div>
+            <div class="cmp-selected-meta">${player.position||"—"} · ${player.team||"—"} · ${player.status||"Prospect"}</div>
+            <div class="cmp-selected-meta">${player.height||"—"} · ${player.weight||"—"} · Mock Rank #${player.rank||"—"}</div>
+          </div>
+          <button class="cmp-remove-btn" data-slot="${i}">✕</button>
+        </div>
       </div>`;
     }
     const last = latestSeason(player);
@@ -1582,7 +1599,7 @@ function renderPlayerBar() {
       </div>
     </div>`;
   }).join("");
-  comparePlayers.forEach((p, i) => { if (!p) setupCmpSearch(i); });
+  slots.forEach((p, i) => { if (!p) setupCmpSearch(i); });
 }
 
 function setupCmpSearch(i) {
@@ -1591,13 +1608,16 @@ function setupCmpSearch(i) {
   if (!input || !dropdown) return;
   input.addEventListener("input", () => {
     const q = input.value.toLowerCase().trim();
-    if (!q || !players.length) { dropdown.classList.remove("open"); return; }
-    const matches = players.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
-    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${p.name}">${p.name} <span style="color:var(--muted);font-size:0.75em">· ${latestSeason(p)?.team||""}</span></div>`).join("");
+    const pool = cmpMode === "career" ? allProspects.map(wrapProspect)
+      : cmpMode === "prospect" ? [...players, ...allProspects.map(wrapProspect)]
+      : players;
+    if (!q || !pool.length) { dropdown.classList.remove("open"); return; }
+    const matches = pool.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
+    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${p.name}">${p.name} <span style="color:var(--muted);font-size:0.75em">· ${p.isProspect ? (p.team||"Prospect") : (latestSeason(p)?.team||"")}</span></div>`).join("");
     dropdown.classList.toggle("open", matches.length > 0);
     dropdown.querySelectorAll(".compare-option").forEach(opt => {
       opt.addEventListener("click", () => {
-        const found = players.find(p => p.name === opt.dataset.name);
+        const found = pool.find(p => p.name === opt.dataset.name);
         if (found) { comparePlayers[i] = found; renderPlayerBar(); renderComparison(); }
         dropdown.classList.remove("open");
       });
@@ -1631,8 +1651,35 @@ document.addEventListener("click", e => {
     document.querySelectorAll(".cmp-mode-btn").forEach(b => b.classList.remove("active"));
     modeBtn.classList.add("active");
     cmpMode = modeBtn.dataset.mode;
+    if (cmpMode === "career") comparePlayers = [comparePlayers[0], null, null, null];
+    const cmpTabs = $("#cmpTabs");
+    if (cmpTabs) cmpTabs.style.display = cmpMode === "career" ? "none" : "";
+    if (cmpMode !== "current" && !prospectsLoaded) {
+      loadProspects().then(() => { renderPlayerBar(); renderComparison(); });
+    }
+    renderPlayerBar();
+    renderComparison();
   }
 });
+
+function wrapProspect(p) {
+  return {
+    name: p.name,
+    playerId: null,
+    team: p.school,
+    position: p.pos,
+    height: p.height,
+    weight: p.weight,
+    age: parseFloat(p.age) || null,
+    country: p.country,
+    college: p.school,
+    colors: [stableColor(p.name), stableColor(p.name, 3)],
+    seasons: [],
+    isProspect: true,
+    rank: p.rank,
+    status: p.status,
+  };
+}
 
 function activePlayers() {
   return comparePlayers.map((p,i) => p ? {player:p, color:cmpColor(i), idx:i} : null).filter(Boolean);
@@ -1661,6 +1708,15 @@ function build4Table(rows, active) {
 function renderComparison() {
   const container = $("#comparisonContent");
   if (!container) return;
+  if (cmpMode === "career") {
+    const prospect = comparePlayers[0];
+    if (!prospect) {
+      container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚖</div><div>Search for a draft prospect above to project their career outcome.</div></div>`;
+      return;
+    }
+    renderCareerOutcomeView(container, prospect);
+    return;
+  }
   const active = activePlayers();
   if (active.length < 1) {
     container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚖</div><div>Search for players above to compare their stats and profiles.</div></div>`;
@@ -1677,6 +1733,50 @@ function renderComparison() {
   else if (tab==="trajectory")  renderTrajectoryTab(container,active);
   else if (tab==="statprofile") renderStatProfileTab(container,active);
   else if (tab==="similar")     renderSimilarTab(container,active);
+}
+
+// ── Career Outcome (prospect projection) ───────────────────────────────────────
+async function renderCareerOutcomeView(container, prospect) {
+  container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⏳</div><div>Projecting career outcome for ${prospect.name}...</div></div>`;
+  let data;
+  try {
+    data = await fetch(`/api/prospect-outcome?name=${encodeURIComponent(prospect.name)}`).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+  } catch (e) {
+    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚠</div><div>Couldn't load a career outcome projection for ${prospect.name}.</div></div>`;
+    return;
+  }
+  const { comps, summary } = data;
+  if (!comps.length) {
+    container.innerHTML = `<div class="compare-placeholder"><div>No comparable historical draft picks found for ${prospect.name}.</div></div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div class="cmp-pcard" style="max-width:920px;margin:0 auto">
+      <div class="cmp-pcard-title">Projected Career Outcome — ${prospect.name}</div>
+      <p style="color:var(--muted);font-size:0.85rem;margin:4px 0 16px">
+        Based on ${summary.comp_count} historical draft picks near projected slot #${prospect.rank}${prospect.position ? ` at a similar position (${prospect.position})` : ""}.
+      </p>
+      <div class="cmp-overview4" style="grid-template-columns:repeat(4,1fr);gap:12px">
+        <div class="cmp-pcard"><div class="cmp-pcard-title">Avg Career PTS</div><div style="font-size:1.6rem;font-weight:800">${summary.avg_career_pts ?? "—"}</div></div>
+        <div class="cmp-pcard"><div class="cmp-pcard-title">Avg Career REB</div><div style="font-size:1.6rem;font-weight:800">${summary.avg_career_reb ?? "—"}</div></div>
+        <div class="cmp-pcard"><div class="cmp-pcard-title">Avg Career AST</div><div style="font-size:1.6rem;font-weight:800">${summary.avg_career_ast ?? "—"}</div></div>
+        <div class="cmp-pcard"><div class="cmp-pcard-title">Avg Seasons Played</div><div style="font-size:1.6rem;font-weight:800">${summary.avg_seasons_played ?? "—"}</div></div>
+      </div>
+      <div class="cmp-pcard-title" style="margin-top:18px">Closest Historical Draft Comps</div>
+      <table class="cmp-table4">
+        <thead><tr><th>Player</th><th>Pick</th><th>Draft Yr</th><th>Career PTS</th><th>Career REB</th><th>Career AST</th><th>Seasons</th></tr></thead>
+        <tbody>${comps.map(c => `<tr>
+          <td>${c.player}</td>
+          <td>#${c.overall_pick}</td>
+          <td>${c.draft_season}</td>
+          <td>${c.career_pts ?? "—"}</td>
+          <td>${c.career_reb ?? "—"}</td>
+          <td>${c.career_ast ?? "—"}</td>
+          <td>${c.seasons_played ?? "—"}</td>
+        </tr>`).join("")}</tbody>
+      </table>
+    </div>`;
 }
 
 // ── Overview ──────────────────────────────────────────────────────────────────

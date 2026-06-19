@@ -77,6 +77,13 @@ def q1(conn, sql, params=()):
     return cur.fetchone()
 
 
+def safe_int_py(val):
+    try:
+        return int(str(val).strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def to_json(obj):
     """JSON serializer that handles Decimal and other PostgreSQL types."""
     if isinstance(obj, decimal.Decimal):
@@ -335,6 +342,91 @@ class Handler(SimpleHTTPRequestHandler):
             finally:
                 conn.close()
             return self.send_json_rows(rows)
+
+        if parsed.path == "/api/prospect-outcome":
+            name = (params.get("name", [""])[0] or "").strip()
+            if not name:
+                return self.send_json({"error": "name required"}, status=400)
+            conn = connect()
+            try:
+                prospect_rows = q(conn, """
+                    SELECT rank, name, pos, age, school, height, weight, status, country
+                    FROM archive_draft_prospects_2026 WHERE name = ?
+                """, (name,))
+                if not prospect_rows:
+                    return self.send_json({"error": "Prospect not found"}, status=404)
+                prospect = dict(prospect_rows[0])
+                rank = safe_int_py(prospect.get("rank")) or 30
+
+                picks = q(conn, """
+                    WITH rookie_pos AS (
+                        SELECT DISTINCT ON (player_id) player_id, pos
+                        FROM archive_player_per_game
+                        WHERE safe_int(season) IS NOT NULL
+                        ORDER BY player_id, safe_int(season) ASC
+                    ),
+                    career AS (
+                        SELECT player_id,
+                               ROUND(AVG(safe_float(pts_per_game))::numeric, 1) AS career_pts,
+                               ROUND(AVG(safe_float(trb_per_game))::numeric, 1) AS career_reb,
+                               ROUND(AVG(safe_float(ast_per_game))::numeric, 1) AS career_ast,
+                               COUNT(season) AS seasons_played,
+                               ROUND(MAX(safe_float(pts_per_game))::numeric, 1) AS peak_pts
+                        FROM archive_player_per_game
+                        GROUP BY player_id
+                    )
+                    SELECT d.player, d.player_id, d.season AS draft_season, d.overall_pick, d.college,
+                           rp.pos AS rookie_pos,
+                           c.career_pts, c.career_reb, c.career_ast, c.seasons_played, c.peak_pts
+                    FROM archive_draft_pick_history d
+                    JOIN career c ON c.player_id = d.player_id
+                    LEFT JOIN rookie_pos rp ON rp.player_id = d.player_id
+                    WHERE safe_int(d.overall_pick) IS NOT NULL
+                """)
+            finally:
+                conn.close()
+
+            def pos_bucket(pos):
+                p = (pos or "").upper()
+                bucket = set()
+                if "G" in p:
+                    bucket.add("G")
+                if "F" in p:
+                    bucket.add("F")
+                if "C" in p:
+                    bucket.add("C")
+                return bucket
+
+            prospect_buckets = pos_bucket(prospect.get("pos"))
+            scored = []
+            for row in picks:
+                r = dict(row)
+                pick = safe_int_py(r.get("overall_pick"))
+                if pick is None:
+                    continue
+                position_match = bool(prospect_buckets & pos_bucket(r.get("rookie_pos")))
+                pick_distance = abs(pick - rank)
+                draft_season = safe_int_py(r.get("draft_season")) or 0
+                r["pick_distance"] = pick_distance
+                r["position_match"] = position_match
+                scored.append((pick_distance - (8 if position_match else 0), -draft_season, r))
+
+            scored.sort(key=lambda triple: triple[:2])
+            comps = [r for *_, r in scored[:8]]
+
+            def avg(key):
+                vals = [float(c[key]) for c in comps if c.get(key) is not None]
+                return round(sum(vals) / len(vals), 1) if vals else None
+
+            summary = {
+                "avg_career_pts": avg("career_pts"),
+                "avg_career_reb": avg("career_reb"),
+                "avg_career_ast": avg("career_ast"),
+                "avg_seasons_played": avg("seasons_played"),
+                "comp_count": len(comps),
+            }
+
+            return self.send_json({"prospect": prospect, "comps": comps, "summary": summary})
 
         if parsed.path == "/api/allstars":
             conn = connect()
