@@ -1800,6 +1800,9 @@ async function renderCareerOutcomeView(container, prospect) {
           <td>${c.seasons_played ?? "—"}</td>
         </tr>`).join("")}</tbody>
       </table>
+      <p style="color:var(--muted);font-size:0.72rem;margin-top:12px">
+        Comps are matched by draft slot and position only (no measurables or scouting data for 2026 prospects) — treat as a rough historical baseline, not a scouting projection. Recently drafted comps reflect only 1–2 seasons of data.
+      </p>
     </div>`;
 }
 
