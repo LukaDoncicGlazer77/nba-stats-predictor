@@ -1381,52 +1381,17 @@ $("#draftSeasonSelect").addEventListener("change", (e) => loadDraft(e.target.val
 
 // ── Comparisons ──────────────────────────────────────────────────────────────
 
-let compareA = null, compareB = null;
+// ── Comparisons (4-player, 6-tab, engine-wired) ───────────────────────────────
+
+const CMP_COLORS = ["#5b8af0", "#f97316", "#3ecf8e", "#f5c842"];
+const CMP_LABELS = ["A", "B", "C", "D"];
+
+let comparePlayers = [null, null, null, null];
 let cmpActiveTab = "overview";
+let cmpMode = "current";
+let cmpApiCache = {};
 
-function setupCompareSearch(inputId, dropdownId, onSelect) {
-  const input = $(`#${inputId}`);
-  const dropdown = $(`#${dropdownId}`);
-  if (!input) return;
-  input.addEventListener("input", () => {
-    const q = input.value.toLowerCase().trim();
-    if (!q || players.length === 0) { dropdown.classList.remove("open"); return; }
-    const matches = players.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 8);
-    dropdown.innerHTML = matches.map((p) => `<div class="compare-option" data-name="${p.name}">${p.name} · ${p.team}</div>`).join("");
-    dropdown.classList.toggle("open", matches.length > 0);
-    dropdown.querySelectorAll(".compare-option").forEach((opt) => {
-      opt.addEventListener("click", () => {
-        const player = players.find((p) => p.name === opt.dataset.name);
-        onSelect(player);
-        input.value = player.name;
-        dropdown.classList.remove("open");
-        renderComparison();
-      });
-    });
-  });
-  document.addEventListener("click", (e) => {
-    if (!input.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove("open");
-  });
-}
-
-// Tab switching
-document.addEventListener("click", (e) => {
-  const tab = e.target.closest(".cmp-tab");
-  if (!tab) return;
-  document.querySelectorAll(".cmp-tab").forEach(t => t.classList.remove("active"));
-  tab.classList.add("active");
-  cmpActiveTab = tab.dataset.tab;
-  renderComparison();
-});
-
-function cmpAvatar(player, size = 52) {
-  const bg = (player.colors && player.colors[0]) || "#1e3a5f";
-  const ini = player.name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
-  return `<div class="cmp-avatar" style="width:${size}px;height:${size}px;background:${bg}">
-    <img src="/api/player-photo/${player.playerId}" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;border-radius:inherit"/>
-    <span style="position:relative;z-index:1;font-size:${size*0.3}px;font-weight:900;color:#fff">${ini}</span>
-  </div>`;
-}
+function cmpColor(i) { return CMP_COLORS[i % 4]; }
 
 function cmpEffScore(player) {
   const last = latestSeason(player);
@@ -1449,337 +1414,533 @@ function cmpEffScore(player) {
   );
 }
 
+function cmpPosGroup(pos) {
+  if (!pos) return null;
+  const p = pos.toUpperCase();
+  if (/\bC\b/.test(p) || p.includes("PF") || p === "F-C" || p === "C-F") return "Big";
+  if (p.includes("PG") || p.includes("SG") || p === "G" || p === "G-F") return "Guard";
+  return "Wing";
+}
+
+function cmpPosPenalty(posA, posB) {
+  const gA = cmpPosGroup(posA), gB = cmpPosGroup(posB);
+  if (!gA || !gB || gA === gB) return 1.0;
+  if ((gA === "Guard" && gB === "Big") || (gA === "Big" && gB === "Guard")) return 0.70;
+  return 0.88;
+}
+
+function cmpLocalSimilarity(pA, pB) {
+  if (!pA || !pB) return 0;
+  const la = latestSeason(pA), lb = latestSeason(pB);
+  if (!la || !lb) return 0;
+  // Weighted feature set — scoring efficiency and playmaking matter most
+  const features = [
+    {k:"pts",  w:1.5, max:40},
+    {k:"ast",  w:2.0, max:14},
+    {k:"reb",  w:1.0, max:18},
+    {k:"ts",   w:1.5, max:70},
+    {k:"usg",  w:1.5, max:42},
+    {k:"net",  w:2.0, max:15, offset:5},
+    {k:"stl",  w:0.8, max:3.5},
+    {k:"blk",  w:0.8, max:4},
+    {k:"three",w:1.2, max:6},
+  ];
+  let dot=0, magA=0, magB=0;
+  features.forEach(({k, w, max, offset=0}) => {
+    const va=(parseFloat(la[k])||0)+offset, vb=(parseFloat(lb[k])||0)+offset;
+    const na=(va/max)*w, nb=(vb/max)*w;
+    dot+=na*nb; magA+=na*na; magB+=nb*nb;
+  });
+  if (!magA || !magB) return 0;
+  const cosine = dot / (Math.sqrt(magA) * Math.sqrt(magB));
+  const penalty = cmpPosPenalty(pA.position, pB.position);
+  return Math.round(cosine * penalty * 100);
+}
+
+async function fetchCmpApi(name) {
+  if (cmpApiCache[name]) return cmpApiCache[name];
+  try {
+    const r = await fetch(`/api/player-comparison/${encodeURIComponent(name)}`);
+    if (!r.ok) return null;
+    const data = await r.json();
+    cmpApiCache[name] = data;
+    return data;
+  } catch { return null; }
+}
+
+function cmpAvatar(player, size = 52) {
+  const bg = (player.colors && player.colors[0]) || "#1e3a5f";
+  const ini = player.name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+  return `<div class="cmp-avatar" style="width:${size}px;height:${size}px;background:${bg}">
+    <img src="/api/player-photo/${player.playerId}" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;border-radius:inherit"/>
+    <span style="position:relative;z-index:1;font-size:${size*0.3}px;font-weight:900;color:#fff">${ini}</span>
+  </div>`;
+}
+
 function renderPlayerBar() {
-  const renderSlot = (player, slotId, inputId) => {
-    const slot = $(`#${slotId}`);
-    if (!slot) return;
+  const bar = $("#cmpPlayerBar");
+  if (!bar) return;
+  bar.innerHTML = comparePlayers.map((player, i) => {
+    const color = cmpColor(i);
     if (!player) {
-      slot.querySelector(".cmp-slot-inner").style.display = "flex";
-      slot.querySelector(".cmp-selected-card") && slot.querySelector(".cmp-selected-card").remove();
-      return;
+      return `<div class="cmp-search-slot" id="cmpSlot${i}" data-slot="${i}">
+        <div class="cmp-slot-inner">
+          <span class="cmp-slot-icon">+</span>
+          <span class="cmp-slot-label">Add Player ${CMP_LABELS[i]}</span>
+          <input id="cmpSearch${i}" type="search" placeholder="Search by name..." class="cmp-search-input" autocomplete="off" spellcheck="false"/>
+        </div>
+        <div class="compare-dropdown" id="cmpDrop${i}"></div>
+      </div>`;
     }
-    slot.querySelector(".cmp-slot-inner").style.display = "none";
-    let card = slot.querySelector(".cmp-selected-card");
-    if (!card) { card = document.createElement("div"); card.className = "cmp-selected-card"; slot.prepend(card); }
     const last = latestSeason(player);
     const score = cmpEffScore(player);
-    const tierLabel = score>=80?"MVP Caliber":score>=65?"All-Star":score>=50?"Starter":score>=35?"Rotation":"Developmental";
-    const tierColor = score>=80?"#f0c040":score>=65?"#5b8af0":score>=50?"#3ecf8e":score>=35?"#7a8fb0":"#555";
-    card.innerHTML = `
+    const simScore = i === 0 ? 100 : cmpLocalSimilarity(comparePlayers[0], player);
+    return `<div class="cmp-search-slot cmp-slot-filled" id="cmpSlot${i}" data-slot="${i}">
+      <div class="cmp-slot-color-bar" style="background:${color}"></div>
       <div class="cmp-selected-inner">
-        ${cmpAvatar(player, 56)}
+        ${cmpAvatar(player, 44)}
         <div class="cmp-selected-info">
           <div class="cmp-selected-name">${player.name}</div>
           <div class="cmp-selected-meta">${player.position} · ${last?.team||"—"} · ${last?.season||"—"}</div>
-          <div class="cmp-selected-meta" style="color:var(--muted)">${last?.pts!=null?`${(+last.pts).toFixed(1)} PTS`:"—"} · ${last?.reb!=null?`${(+last.reb).toFixed(1)} REB`:"—"} · ${last?.ast!=null?`${(+last.ast).toFixed(1)} AST`:"—"}</div>
+          <div class="cmp-selected-meta">${last?.pts!=null?`${(+last.pts).toFixed(1)} PTS`:"—"} · ${last?.reb!=null?`${(+last.reb).toFixed(1)} REB`:"—"} · ${last?.ast!=null?`${(+last.ast).toFixed(1)} AST`:"—"}</div>
         </div>
-        <div class="cmp-eff-badge" style="border-color:${tierColor};color:${tierColor}">
-          <div class="cmp-eff-num">${score}</div>
-          <div class="cmp-eff-lbl">${tierLabel}</div>
+        <div class="cmp-badge-col">
+          <div class="cmp-sim-badge">
+            <div class="cmp-badge-num" style="color:${color}">${simScore}</div>
+            <div class="cmp-badge-lbl">Similarity</div>
+          </div>
+          <div class="cmp-draft-badge">
+            <div class="cmp-badge-num" style="color:var(--gold)">${score}</div>
+            <div class="cmp-badge-lbl">Draftability</div>
+          </div>
         </div>
-        <button class="cmp-remove-btn" data-slot="${slotId}">✕</button>
-      </div>`;
-  };
-  renderSlot(compareA, "cmpSlotA", "compareSearchA");
-  renderSlot(compareB, "cmpSlotB", "compareSearchB");
+        <button class="cmp-remove-btn" data-slot="${i}">✕</button>
+      </div>
+    </div>`;
+  }).join("");
+  comparePlayers.forEach((p, i) => { if (!p) setupCmpSearch(i); });
 }
 
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest(".cmp-remove-btn");
-  if (!btn) return;
-  if (btn.dataset.slot === "cmpSlotA") { compareA = null; $("#compareSearchA").value = ""; }
-  if (btn.dataset.slot === "cmpSlotB") { compareB = null; $("#compareSearchB").value = ""; }
-  renderPlayerBar();
-  renderComparison();
+function setupCmpSearch(i) {
+  const input = $(`#cmpSearch${i}`);
+  const dropdown = $(`#cmpDrop${i}`);
+  if (!input || !dropdown) return;
+  input.addEventListener("input", () => {
+    const q = input.value.toLowerCase().trim();
+    if (!q || !players.length) { dropdown.classList.remove("open"); return; }
+    const matches = players.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
+    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${p.name}">${p.name} <span style="color:var(--muted);font-size:0.75em">· ${latestSeason(p)?.team||""}</span></div>`).join("");
+    dropdown.classList.toggle("open", matches.length > 0);
+    dropdown.querySelectorAll(".compare-option").forEach(opt => {
+      opt.addEventListener("click", () => {
+        const found = players.find(p => p.name === opt.dataset.name);
+        if (found) { comparePlayers[i] = found; renderPlayerBar(); renderComparison(); }
+        dropdown.classList.remove("open");
+      });
+    });
+  });
+}
+
+// Single delegated listener for all comparisons interactions
+document.addEventListener("click", e => {
+  // Close dropdowns
+  if (!e.target.closest(".compare-dropdown") && !e.target.closest(".cmp-search-input")) {
+    document.querySelectorAll(".compare-dropdown.open").forEach(d => d.classList.remove("open"));
+  }
+  // Remove player slot
+  const removeBtn = e.target.closest(".cmp-remove-btn");
+  if (removeBtn) {
+    const i = parseInt(removeBtn.dataset.slot);
+    if (!isNaN(i)) { comparePlayers[i] = null; renderPlayerBar(); renderComparison(); }
+  }
+  // Tab switch
+  const tab = e.target.closest(".cmp-tab");
+  if (tab && tab.closest("#cmpTabs")) {
+    document.querySelectorAll("#cmpTabs .cmp-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    cmpActiveTab = tab.dataset.tab;
+    renderComparison();
+  }
+  // Mode switch
+  const modeBtn = e.target.closest(".cmp-mode-btn");
+  if (modeBtn) {
+    document.querySelectorAll(".cmp-mode-btn").forEach(b => b.classList.remove("active"));
+    modeBtn.classList.add("active");
+    cmpMode = modeBtn.dataset.mode;
+  }
 });
 
-function drawRadar(canvasId, playerA, playerB, la, lb) {
-  const canvas = $(`#${canvasId}`);
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width, h = canvas.height;
-  const cx = w/2, cy = h/2, r = Math.min(w,h)*0.36;
-  const labels = ["PTS","REB","AST","STL","BLK","3PM","TS%"];
-  const maxes  = [35,   15,   12,   3,    3,    5,    85];
-  const getVals = (s) => [
-    +s.pts||0, +s.reb||0, +s.ast||0, +s.stl||0, +s.blk||0, +s.three||0, +s.ts||0
-  ];
-  const vA = getVals(la), vB = getVals(lb);
-  const n = labels.length;
-  const angle = (i) => (Math.PI*2/n)*i - Math.PI/2;
+function activePlayers() {
+  return comparePlayers.map((p,i) => p ? {player:p, color:cmpColor(i), idx:i} : null).filter(Boolean);
+}
 
-  ctx.clearRect(0,0,w,h);
-  // Grid rings
-  for (let ring=1; ring<=4; ring++) {
-    ctx.beginPath();
-    for (let i=0;i<n;i++) {
-      const a=angle(i), rr=r*(ring/4);
-      i===0?ctx.moveTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr):ctx.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr);
-    }
-    ctx.closePath();
-    ctx.strokeStyle="rgba(255,255,255,0.07)"; ctx.lineWidth=1; ctx.stroke();
-  }
-  // Spokes
-  for (let i=0;i<n;i++) {
-    const a=angle(i);
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);
-    ctx.strokeStyle="rgba(255,255,255,0.07)"; ctx.lineWidth=1; ctx.stroke();
-  }
-  // Draw polygon helper
-  const drawPoly = (vals, color) => {
-    ctx.beginPath();
-    vals.forEach((v,i) => {
-      const pct = Math.min(v/maxes[i],1);
-      const a=angle(i);
-      const x=cx+Math.cos(a)*r*pct, y=cy+Math.sin(a)*r*pct;
-      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-    });
-    ctx.closePath();
-    ctx.fillStyle=color.replace(")",",0.18)").replace("rgb","rgba"); ctx.fill();
-    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
-  };
-  drawPoly(vA, playerA.colors[0]||"#5b8af0");
-  drawPoly(vB, playerB.colors[0]||"#f97316");
-  // Labels
-  ctx.fillStyle="rgba(220,232,255,0.65)"; ctx.font="bold 11px system-ui"; ctx.textAlign="center";
-  labels.forEach((lbl,i) => {
-    const a=angle(i), lx=cx+Math.cos(a)*(r+18), ly=cy+Math.sin(a)*(r+18)+4;
-    ctx.fillText(lbl,lx,ly);
-  });
+const fmtV = (v, key) => {
+  if (v==null||v===undefined||v==="") return "—";
+  if (key==="ts"||key==="usg") return (+v).toFixed(1)+"%";
+  return (+v).toFixed(1);
+};
+
+function build4Table(rows, active) {
+  return `<table class="cmp-table4">
+    <thead><tr><th>Stat</th>${active.map(a=>`<th style="color:${a.color}">${a.player.name.split(" ").slice(-1)[0]}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map(([label,key,lb])=>{
+      const vals=active.map(a=>{const s=latestSeason(a.player);return s?parseFloat(s[key]):NaN;});
+      const valid=vals.filter(v=>!isNaN(v));
+      const best=valid.length?(lb?Math.min(...valid):Math.max(...valid)):null;
+      return `<tr><td>${label}</td>${vals.map((v,i)=>{
+        const isBest=best!==null&&!isNaN(v)&&v===best;
+        return `<td class="${isBest?"t4-best":""}" style="${isBest?`color:${active[i].color}`:""}">${fmtV(isNaN(v)?null:v,key)}</td>`;
+      }).join("")}</tr>`;
+    }).join("")}</tbody></table>`;
 }
 
 function renderComparison() {
   const container = $("#comparisonContent");
-  renderPlayerBar();
-  if (!compareA || !compareB) {
-    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚖️</div><div>Search for two players above to compare their stats.</div></div>`;
+  if (!container) return;
+  const active = activePlayers();
+  if (active.length < 1) {
+    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚖</div><div>Search for players above to compare their stats and profiles.</div></div>`;
     return;
   }
-  const la = latestSeason(compareA), lb = latestSeason(compareB);
-  if (!la || !lb) { container.innerHTML = `<div class="compare-placeholder">No season data found for one of the players.</div>`; return; }
-
-  const statRows = [
-    ["Points",    "pts",   false],["Rebounds","reb",  false],["Assists","ast",  false],
-    ["3-Pointers","three", false],["Steals",  "stl",  false],["Blocks", "blk",  false],
-    ["Turnovers", "tov",   true], ["TS%",     "ts",   false],["USG%",   "usg",  false],
-    ["Minutes",   "min",   false],["Games",   "gp",   false],
-  ];
-  const advRows = [
-    ["PER",  "per", false],["BPM",  "net", false],["VORP","vorp",false],
-    ["WS",   "ws",  false],["OWS",  "ows", false],["DWS", "dws", false],
-  ];
-
-  const fmtV = (v, key) => {
-    if (v==null||v===undefined||v==="") return "—";
-    if (key==="ts"||key==="usg") return (+v).toFixed(1)+"%";
-    return (+v).toFixed(1);
-  };
-
-  const colorA = compareA.colors?.[0] || "#5b8af0";
-  const colorB = compareB.colors?.[0] || "#f97316";
-
-  const statTableRows = (rows, la, lb) => rows.map(([label,key,lowerBetter]) => {
-    const va = parseFloat(la[key]), vb = parseFloat(lb[key]);
-    const aWins = !isNaN(va)&&!isNaN(vb)&&(lowerBetter?va<vb:va>vb);
-    const bWins = !isNaN(va)&&!isNaN(vb)&&(lowerBetter?vb<va:vb>va);
-    const maxes = {pts:40,reb:18,ast:14,three:6,stl:3,blk:3,tov:6,ts:90,usg:45,min:42,gp:82,per:35,net:15,vorp:8,ws:15,ows:10,dws:8,ws48:0.3,obpm:12,dbpm:8};
-    const mx = maxes[key]||20;
-    const pctA = Math.min(100,Math.max(0,((va||0)/mx)*100));
-    const pctB = Math.min(100,Math.max(0,((vb||0)/mx)*100));
-    const barA = `<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:${pctA}%;background:${aWins?colorA:"rgba(255,255,255,0.15)"}"></div></div>`;
-    const barB = `<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:${pctB}%;background:${bWins?colorB:"rgba(255,255,255,0.15)"}"></div></div>`;
-    return `<tr class="cmp-stat-row">
-      <td class="cmp-td-a ${aWins?"cmp-win":""}">
-        <div class="cmp-td-inner-a">
-          <span class="cmp-stat-num" style="${aWins?`color:${colorA}`:""}">${fmtV(la[key],key)}</span>
-          ${barA}
-        </div>
-      </td>
-      <td class="cmp-td-label">${label}</td>
-      <td class="cmp-td-b ${bWins?"cmp-win":""}">
-        <div class="cmp-td-inner-b">
-          ${barB}
-          <span class="cmp-stat-num" style="${bWins?`color:${colorB}`:""}">${fmtV(lb[key],key)}</span>
-        </div>
-      </td>
-    </tr>`;
-  }).join("");
-
-  const winCount = (rows, la, lb) => {
-    let wA=0,wB=0;
-    rows.forEach(([,key,lowerBetter])=>{
-      const va=parseFloat(la[key]),vb=parseFloat(lb[key]);
-      if(isNaN(va)||isNaN(vb))return;
-      if(lowerBetter?va<vb:va>vb)wA++; else if(lowerBetter?vb<va:vb>va)wB++;
-    });
-    return [wA,wB];
-  };
-
-  // Similar players (by closest PTS+REB+AST)
-  const similarTo = (player, la) => players
-    .filter(p=>p.playerId!==player.playerId&&p.playerId!==compareA.playerId&&p.playerId!==compareB.playerId)
-    .map(p=>{const s=latestSeason(p);if(!s)return null;
-      const d=Math.abs((+s.pts||0)-(+la.pts||0))+Math.abs((+s.reb||0)-(+la.reb||0))+Math.abs((+s.ast||0)-(+la.ast||0));
-      return{p,s,d};}).filter(Boolean).sort((a,b)=>a.d-b.d).slice(0,5);
-
-  const simRowsA = similarTo(compareA, la);
-  const simRowsB = similarTo(compareB, lb);
-
-  if (cmpActiveTab === "overview") {
-    const [wA, wB] = winCount([...statRows,...advRows], la, lb);
-    container.innerHTML = `
-      <div class="cmp-overview">
-        <!-- Left col: Radar + Advanced -->
-        <div style="display:grid;gap:14px">
-          <div class="cmp-pcard">
-            <div class="cmp-pcard-title">Attribute Radar</div>
-            <div class="cmp-radar-legend">
-              <span style="color:${colorA}">⬤ ${compareA.name}</span>
-              <span style="color:${colorB}">⬤ ${compareB.name}</span>
-            </div>
-            <canvas id="cmpRadar" width="280" height="280"></canvas>
-          </div>
-          <div class="cmp-pcard">
-            <div class="cmp-pcard-title">Advanced Metrics</div>
-            <div class="cmp-table-header">
-              <span style="color:${colorA}">${compareA.name.split(" ").pop()}</span>
-              <span style="text-align:center"></span>
-              <span style="color:${colorB};text-align:right">${compareB.name.split(" ").pop()}</span>
-            </div>
-            <table class="cmp-table"><tbody>${statTableRows(advRows,la,lb)}</tbody></table>
-          </div>
-        </div>
-        <!-- Right col: Win strip + Key Stats -->
-        <div class="cmp-pcard cmp-stats-card">
-          <div class="cmp-win-strip">
-            <div class="cmp-win-a" style="background:${colorA}22">
-              ${cmpAvatar(compareA,28)}
-              <span style="color:${colorA}">${wA} wins</span>
-            </div>
-            <div class="cmp-win-divider"></div>
-            <div class="cmp-win-b" style="background:${colorB}22">
-              <span style="color:${colorB}">${wB} wins</span>
-              ${cmpAvatar(compareB,28)}
-            </div>
-          </div>
-          <div class="cmp-table-header">
-            <span style="color:${colorA}">${compareA.name.split(" ").pop()}</span>
-            <span style="text-align:center">Stat</span>
-            <span style="color:${colorB};text-align:right">${compareB.name.split(" ").pop()}</span>
-          </div>
-          <table class="cmp-table"><tbody>${statTableRows(statRows,la,lb)}</tbody></table>
-        </div>
-      </div>`;
-    setTimeout(() => drawRadar("cmpRadar", compareA, compareB, la, lb), 0);
-
-  } else if (cmpActiveTab === "advanced") {
-    const allAdv = [
-      ["PER","per",false],["True Shooting%","ts",false],["Usage%","usg",false],
-      ["BPM","net",false],["Offensive BPM","obpm",false],["Defensive BPM","dbpm",false],
-      ["VORP","vorp",false],["Win Shares","ws",false],["Off Win Shares","ows",false],
-      ["Def Win Shares","dws",false],["WS/48","ws48",false],
-    ];
-    container.innerHTML = `
-      <div class="cmp-adv-page">
-        <div class="cmp-pcard cmp-full">
-          <div class="cmp-pcard-title">Advanced Metrics · ${la.season}</div>
-          <div class="cmp-table-header">
-            <span>${compareA.name}</span><span></span><span>${compareB.name}</span>
-          </div>
-          <table class="cmp-table"><tbody>${statTableRows(allAdv,la,lb)}</tbody></table>
-        </div>
-      </div>`;
-
-  } else if (cmpActiveTab === "trajectory") {
-    container.innerHTML = `
-      <div class="cmp-traj-page">
-        <div class="cmp-pcard cmp-full">
-          <div class="cmp-pcard-title">Career Trajectory Comparison</div>
-          <div class="cmp-traj-controls">
-            ${["pts","reb","ast","three","stl","blk"].map(m=>`<button class="cmp-traj-btn${m==="pts"?" active":""}" data-metric="${m}">${m.toUpperCase()}</button>`).join("")}
-          </div>
-          <canvas id="cmpTrajChart" width="1200" height="400"></canvas>
-          <div class="cmp-radar-legend" style="margin-top:12px">
-            <span style="color:${compareA.colors[0]||"#5b8af0"}">— ${compareA.name}</span>
-            <span style="color:${compareB.colors[0]||"#f97316"}">— ${compareB.name}</span>
-          </div>
-        </div>
-      </div>`;
-    let trajMetric = "pts";
-    const drawTraj = () => {
-      const canvas = $("#cmpTrajChart"); if(!canvas) return;
-      const ctx=canvas.getContext("2d"), w=canvas.width, h=canvas.height;
-      const pad={top:24,right:24,bottom:40,left:48};
-      const pw=w-pad.left-pad.right, ph=h-pad.top-pad.bottom;
-      const seasA = compareA.seasons.filter(s=>s[trajMetric]!=null).map(s=>({x:+s.age||0,y:+s[trajMetric]}));
-      const seasB = compareB.seasons.filter(s=>s[trajMetric]!=null).map(s=>({x:+s.age||0,y:+s[trajMetric]}));
-      const allPts = [...seasA,...seasB];
-      if (!allPts.length) return;
-      const minX=Math.min(...allPts.map(p=>p.x)), maxX=Math.max(...allPts.map(p=>p.x));
-      const maxY=Math.max(...allPts.map(p=>p.y))*1.15;
-      const px=(v)=>pad.left+((v-minX)/(maxX-minX||1))*pw;
-      const py=(v)=>pad.top+ph-(v/maxY)*ph;
-      ctx.clearRect(0,0,w,h);
-      ctx.fillStyle="#0b1729"; ctx.fillRect(0,0,w,h);
-      // Grid
-      for(let i=0;i<=4;i++){
-        const y=pad.top+(ph/4)*i, val=maxY-(maxY/4)*i;
-        ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);
-        ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=1;ctx.stroke();
-        ctx.fillStyle="rgba(220,232,255,0.5)";ctx.font="11px system-ui";ctx.textAlign="right";
-        ctx.fillText(val.toFixed(1),pad.left-6,y+4);
-      }
-      // Age labels
-      ctx.fillStyle="rgba(220,232,255,0.5)"; ctx.font="11px system-ui"; ctx.textAlign="center";
-      for(let age=Math.ceil(minX);age<=maxX;age+=2) ctx.fillText(age,px(age),h-10);
-      // Lines
-      const drawLine=(seas,color)=>{
-        if(!seas.length)return;
-        ctx.beginPath();
-        seas.forEach((p,i)=>{i===0?ctx.moveTo(px(p.x),py(p.y)):ctx.lineTo(px(p.x),py(p.y));});
-        ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.stroke();
-        seas.forEach(p=>{ctx.beginPath();ctx.arc(px(p.x),py(p.y),3.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();});
-      };
-      drawLine(seasA, compareA.colors[0]||"#5b8af0");
-      drawLine(seasB, compareB.colors[0]||"#f97316");
-    };
-    setTimeout(drawTraj,0);
-    document.querySelectorAll(".cmp-traj-btn").forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        document.querySelectorAll(".cmp-traj-btn").forEach(b=>b.classList.remove("active"));
-        btn.classList.add("active");
-        trajMetric=btn.dataset.metric;
-        drawTraj();
-      });
-    });
-
-  } else if (cmpActiveTab === "similar") {
-    const simCard = (player, rows) => `
-      <div class="cmp-pcard cmp-sim-card">
-        <div class="cmp-pcard-title">Similar to ${player.name}</div>
-        <div class="cmp-sim-list">
-          ${rows.map((r,i)=>`
-            <div class="cmp-sim-row">
-              <span class="cmp-sim-rank">${i+1}</span>
-              ${cmpAvatar(r.p,36)}
-              <div class="cmp-sim-info">
-                <div class="cmp-sim-name">${r.p.name}</div>
-                <div class="cmp-sim-meta">${r.p.position} · ${r.s.team||"—"}</div>
-              </div>
-              <div class="cmp-sim-stats">
-                <span>${(+r.s.pts||0).toFixed(1)} PTS</span>
-                <span>${(+r.s.reb||0).toFixed(1)} REB</span>
-                <span>${(+r.s.ast||0).toFixed(1)} AST</span>
-              </div>
-            </div>`).join("")}
-        </div>
-      </div>`;
-    container.innerHTML = `<div class="cmp-sim-page">${simCard(compareA,simRowsA)}${simCard(compareB,simRowsB)}</div>`;
+  if (active.length < 2) {
+    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">🔍</div><div>Add at least one more player to start comparing.</div></div>`;
+    return;
   }
+  const tab = cmpActiveTab;
+  if      (tab==="overview")    renderOverviewTab(container,active);
+  else if (tab==="advanced")    renderAdvancedTab(container,active);
+  else if (tab==="scouting")    renderScoutingTab(container,active);
+  else if (tab==="trajectory")  renderTrajectoryTab(container,active);
+  else if (tab==="statprofile") renderStatProfileTab(container,active);
+  else if (tab==="similar")     renderSimilarTab(container,active);
 }
 
-setupCompareSearch("compareSearchA", "compareDropdownA", (p) => { compareA = p; });
-setupCompareSearch("compareSearchB", "compareDropdownB", (p) => { compareB = p; });
+// ── Overview ──────────────────────────────────────────────────────────────────
+function renderOverviewTab(container, active) {
+  const statRows = [["Points","pts",false],["Rebounds","reb",false],["Assists","ast",false],["3PM","three",false],["Steals","stl",false],["Blocks","blk",false],["Turnovers","tov",true],["TS%","ts",false],["USG%","usg",false],["Minutes","min",false]];
+  const advRows  = [["PER","per",false],["BPM","net",false],["VORP","vorp",false],["WS","ws",false],["OBPM","obpm",false],["DBPM","dbpm",false]];
+  container.innerHTML = `
+    <div class="cmp-overview4">
+      <div style="display:grid;gap:14px;align-content:start">
+        <div class="cmp-pcard">
+          <div class="cmp-pcard-title">Attribute Radar</div>
+          <div class="cmp-radar-legend">${active.map(a=>`<span style="color:${a.color}">⬤ ${a.player.name.split(" ").pop()}</span>`).join("")}</div>
+          <canvas id="cmpRadar" width="240" height="240" style="display:block;margin:0 auto"></canvas>
+        </div>
+        <div class="cmp-pcard">
+          <div class="cmp-pcard-title">Key Statistics</div>
+          ${build4Table(statRows,active)}
+        </div>
+      </div>
+      <div class="cmp-pcard">
+        <div class="cmp-pcard-title">Advanced Metrics</div>
+        ${build4Table(advRows,active)}
+        <div class="cmp-pcard-title" style="margin-top:18px">Core Stats</div>
+        ${build4Table([["Points","pts",false],["Rebounds","reb",false],["Assists","ast",false],["Steals","stl",false],["Blocks","blk",false],["3PM","three",false]],active)}
+      </div>
+      <div class="cmp-pcard">
+        <div class="cmp-pcard-title">Similar Players <span style="font-size:0.72rem;font-weight:400;color:var(--muted)">· ${active[0].player.name}</span></div>
+        <div class="cmp-sim-list" id="cmpOverviewSim"><div style="color:var(--muted);font-size:0.8rem;padding:12px 0">Loading...</div></div>
+      </div>
+    </div>`;
+  setTimeout(()=>drawSpider4("cmpRadar",active),0);
+  loadOverviewSimilar(active[0].player);
+}
+
+async function loadOverviewSimilar(anchor) {
+  const el = $("#cmpOverviewSim");
+  if (!el) return;
+  try {
+    const data = await fetchCmpApi(anchor.name);
+    if (data && data.similar && data.similar.length) {
+      el.innerHTML = data.similar.slice(0,6).map((s,i)=>`
+        <div class="cmp-sim-row">
+          <span class="cmp-sim-rank">${i+1}</span>
+          <div class="cmp-sim-info">
+            <div class="cmp-sim-name">${s.player_name}</div>
+            <div class="cmp-sim-meta">${s.pos||""} · ${s.season||""}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:0.88rem;font-weight:800;color:var(--sidebar-active)">${Math.round(s.similarity)}%</div>
+            <div style="font-size:0.62rem;color:var(--muted)">match</div>
+          </div>
+        </div>`).join("");
+      return;
+    }
+  } catch {}
+  const rows = players.filter(p=>p.playerId!==anchor.playerId)
+    .map(p=>{const s=latestSeason(p);if(!s)return null;const sim=cmpLocalSimilarity(anchor,p);return{p,s,sim};})
+    .filter(r=>r&&r.sim>0).sort((a,b)=>b.sim-a.sim).slice(0,6);
+  if (!rows.length) { el.innerHTML=`<div style="color:var(--muted);font-size:0.8rem">No data</div>`; return; }
+  el.innerHTML=rows.map((r,i)=>`
+    <div class="cmp-sim-row">
+      <span class="cmp-sim-rank">${i+1}</span>
+      <div class="cmp-sim-info">
+        <div class="cmp-sim-name">${r.p.name}</div>
+        <div class="cmp-sim-meta">${r.p.position} · ${r.s.team||"—"}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:0.88rem;font-weight:800;color:var(--sidebar-active)">${r.sim}%</div>
+        <div style="font-size:0.62rem;color:var(--muted)">match</div>
+      </div>
+    </div>`).join("");
+}
+
+function drawSpider4(canvasId, active) {
+  const canvas=$(`#${canvasId}`);if(!canvas)return;
+  const ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height,cx=w/2,cy=h/2,r=Math.min(w,h)*0.36;
+  const labels=["PTS","REB","AST","STL","BLK","3PM","TS%"],maxes=[35,15,12,3,3,5,72];
+  const n=labels.length,angle=i=>(Math.PI*2/n)*i-Math.PI/2;
+  ctx.clearRect(0,0,w,h);
+  for(let ring=1;ring<=4;ring++){ctx.beginPath();for(let i=0;i<n;i++){const a=angle(i),rr=r*(ring/4);i===0?ctx.moveTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr):ctx.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr);}ctx.closePath();ctx.strokeStyle="rgba(255,255,255,0.07)";ctx.lineWidth=1;ctx.stroke();}
+  for(let i=0;i<n;i++){const a=angle(i);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);ctx.strokeStyle="rgba(255,255,255,0.07)";ctx.lineWidth=1;ctx.stroke();}
+  active.forEach(({player,color})=>{
+    const s=latestSeason(player);if(!s)return;
+    const vals=[+s.pts||0,+s.reb||0,+s.ast||0,+s.stl||0,+s.blk||0,+s.three||0,+s.ts||0];
+    ctx.beginPath();vals.forEach((v,i)=>{const pct=Math.min(v/maxes[i],1),a=angle(i),x=cx+Math.cos(a)*r*pct,y=cy+Math.sin(a)*r*pct;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+    ctx.closePath();ctx.save();ctx.globalAlpha=0.15;ctx.fillStyle=color;ctx.fill();ctx.restore();
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+  });
+  ctx.fillStyle="rgba(220,232,255,0.65)";ctx.font="bold 10px system-ui";ctx.textAlign="center";
+  labels.forEach((lbl,i)=>{const a=angle(i);ctx.fillText(lbl,cx+Math.cos(a)*(r+16),cy+Math.sin(a)*(r+16)+4);});
+}
+
+// ── Advanced Metrics ──────────────────────────────────────────────────────────
+function renderAdvancedTab(container, active) {
+  const rows=[["PER","per",false],["True Shooting%","ts",false],["Usage%","usg",false],["BPM","net",false],["Off BPM","obpm",false],["Def BPM","dbpm",false],["VORP","vorp",false],["Win Shares","ws",false],["Off WS","ows",false],["Def WS","dws",false],["Points","pts",false],["Rebounds","reb",false],["Assists","ast",false],["3PM","three",false],["Steals","stl",false],["Blocks","blk",false],["Turnovers","tov",true],["Minutes","min",false],["Games","gp",false]];
+  const season=latestSeason(active[0].player)?.season||"";
+  container.innerHTML=`<div class="cmp-pcard cmp-full">
+    <div class="cmp-pcard-title">Advanced Metrics · ${season}</div>
+    <div class="cmp-adv-header"><span>Metric</span>${active.map(a=>`<span style="color:${a.color}">${a.player.name}</span>`).join("")}</div>
+    ${build4Table(rows,active)}
+  </div>`;
+}
+
+// ── Scouting Report ───────────────────────────────────────────────────────────
+function renderScoutingTab(container, active) {
+  const cards=active.map(({player,color})=>{
+    const last=latestSeason(player),score=cmpEffScore(player);
+    const tier=score>=80?"MVP Caliber":score>=65?"All-Star":score>=50?"Starter":score>=35?"Rotation":"Developmental";
+    const arch=score>=80?"All-Around Star":score>=65?"Score-First Guard":score>=50?"Two-Way Wing":score>=35?"3-and-D Wing":"Floor Spacer";
+    const str=[],wk=[];
+    if(last){
+      if((+last.pts||0)>=20)str.push(`Elite scorer (${(+last.pts).toFixed(1)} PPG)`);
+      if((+last.ast||0)>=7) str.push(`Top distributor (${(+last.ast).toFixed(1)} APG)`);
+      if((+last.reb||0)>=8) str.push(`Strong rebounder (${(+last.reb).toFixed(1)} RPG)`);
+      if((+last.blk||0)>=1.5)str.push(`Rim protector (${(+last.blk).toFixed(1)} BPG)`);
+      if((+last.stl||0)>=1.5)str.push(`Ball-hawk (${(+last.stl).toFixed(1)} SPG)`);
+      if((+last.ts||0)>=60) str.push(`Efficient scorer (${(+last.ts).toFixed(1)} TS%)`);
+      if((+last.net||0)>=3) str.push(`High impact (${(+last.net).toFixed(1)} BPM)`);
+      if((+last.tov||0)>=3.5)wk.push(`Turnover-prone (${(+last.tov).toFixed(1)} TOV)`);
+      if((+last.ts||0)<50&&last.ts)wk.push(`Below-avg efficiency (${(+last.ts).toFixed(1)} TS%)`);
+      if((+last.net||0)<-1&&last.net)wk.push(`Negative impact (${(+last.net).toFixed(1)} BPM)`);
+      if(!str.length)str.push("Balanced contributor");
+      if(!wk.length)wk.push("No major concerns identified");
+    }
+    return `<div class="cmp-scout-card" style="border-top:3px solid ${color}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        ${cmpAvatar(player,42)}
+        <div style="flex:1;min-width:0">
+          <div class="cmp-scout-name">${player.name}</div>
+          <div class="cmp-scout-archetype">${arch}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:1.7rem;font-weight:900;color:${color};line-height:1">${score}</div>
+          <div style="font-size:0.6rem;color:var(--muted)">${tier}</div>
+        </div>
+      </div>
+      <div class="cmp-scout-section">Strengths</div>
+      ${str.slice(0,3).map(s=>`<div class="cmp-scout-item" style="color:var(--green)">✓ ${s}</div>`).join("")}
+      <div class="cmp-scout-section">Areas to Improve</div>
+      ${wk.slice(0,2).map(w=>`<div class="cmp-scout-item" style="color:var(--muted)">↑ ${w}</div>`).join("")}
+    </div>`;
+  }).join("");
+  container.innerHTML=`<div class="cmp-scout-grid">${cards}</div>`;
+}
+
+// ── Player Trajectories ───────────────────────────────────────────────────────
+function renderTrajectoryTab(container, active) {
+  const metrics=[{k:"pts",l:"PTS"},{k:"reb",l:"REB"},{k:"ast",l:"AST"},{k:"three",l:"3PM"},{k:"stl",l:"STL"},{k:"blk",l:"BLK"},{k:"net",l:"BPM"}];
+  container.innerHTML=`
+    <div class="cmp-pcard cmp-full">
+      <div class="cmp-pcard-title">Career Trajectory Comparison</div>
+      <div class="cmp-traj-controls">${metrics.map((m,i)=>`<button class="cmp-traj-btn${i===0?" active":""}" data-metric="${m.k}">${m.l}</button>`).join("")}</div>
+      <div class="cmp-radar-legend" style="margin-bottom:10px">${active.map(a=>`<span style="color:${a.color}">— ${a.player.name}</span>`).join("")}</div>
+      <canvas id="cmpTrajChart" width="1100" height="360" style="width:100%;height:auto;display:block"></canvas>
+    </div>`;
+  let trajMetric="pts";
+  const drawTraj=()=>{
+    const canvas=$("#cmpTrajChart");if(!canvas)return;
+    const ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
+    const pad={top:24,right:32,bottom:44,left:52},pw=w-pad.left-pad.right,ph=h-pad.top-pad.bottom;
+    const series=active.map(a=>({color:a.color,pts:a.player.seasons.filter(s=>s[trajMetric]!=null&&s.age!=null).map(s=>({x:+s.age||0,y:+s[trajMetric]})).sort((a,b)=>a.x-b.x)}));
+    const all=series.flatMap(s=>s.pts);
+    ctx.clearRect(0,0,w,h);ctx.fillStyle="#0b1729";ctx.fillRect(0,0,w,h);
+    if(!all.length)return;
+    const minX=Math.min(...all.map(p=>p.x)),maxX=Math.max(...all.map(p=>p.x));
+    const allY=all.map(p=>p.y),minY=Math.min(0,...allY),maxY=Math.max(...allY)*1.15;
+    const scX=v=>pad.left+((v-minX)/Math.max(maxX-minX,1))*pw;
+    const scY=v=>pad.top+ph-((v-minY)/Math.max(maxY-minY,0.01))*ph;
+    for(let i=0;i<=5;i++){
+      const y=pad.top+(ph/5)*i,val=maxY-((maxY-minY)/5)*i;
+      ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);ctx.strokeStyle="rgba(255,255,255,0.05)";ctx.lineWidth=1;ctx.stroke();
+      ctx.fillStyle="rgba(220,232,255,0.4)";ctx.font="11px system-ui";ctx.textAlign="right";ctx.fillText(val.toFixed(1),pad.left-6,y+4);
+    }
+    ctx.fillStyle="rgba(220,232,255,0.4)";ctx.font="11px system-ui";ctx.textAlign="center";
+    for(let age=Math.ceil(minX);age<=maxX;age+=2)ctx.fillText(age,scX(age),h-10);
+    series.forEach(({color,pts})=>{
+      if(!pts.length)return;
+      ctx.beginPath();pts.forEach((p,i)=>i===0?ctx.moveTo(scX(p.x),scY(p.y)):ctx.lineTo(scX(p.x),scY(p.y)));
+      ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.stroke();
+      pts.forEach(p=>{ctx.beginPath();ctx.arc(scX(p.x),scY(p.y),3.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();});
+    });
+  };
+  setTimeout(drawTraj,0);
+  document.querySelectorAll(".cmp-traj-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      document.querySelectorAll(".cmp-traj-btn").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");trajMetric=btn.dataset.metric;drawTraj();
+    });
+  });
+}
+
+// ── Stat Profile (ring charts) ────────────────────────────────────────────────
+const RING_STATS=[
+  {key:"pts",label:"PTS",max:40},{key:"reb",label:"REB",max:18},{key:"ast",label:"AST",max:14},
+  {key:"stl",label:"STL",max:3.5},{key:"blk",label:"BLK",max:4},{key:"ts",label:"TS%",max:72},
+  {key:"usg",label:"USG%",max:42},{key:"net",label:"BPM",max:15,offset:15},
+  {key:"ws",label:"WS",max:18},{key:"obpm",label:"OBPM",max:12,offset:12},
+  {key:"dbpm",label:"DBPM",max:8,offset:8},{key:"vorp",label:"VORP",max:8},
+];
+
+function renderStatProfileTab(container, active) {
+  const rings=RING_STATS.map((stat,i)=>`
+    <div class="cmp-ring-item">
+      <canvas id="ring_${i}" width="120" height="120"></canvas>
+      <div class="cmp-ring-label">${stat.label}</div>
+      <div class="cmp-ring-vals">${active.map(a=>{const s=latestSeason(a.player);const v=s?parseFloat(s[stat.key]):NaN;return `<span class="cmp-ring-val" style="background:${a.color}22;color:${a.color}">${isNaN(v)?"—":v.toFixed(1)}</span>`;}).join("")}</div>
+    </div>`).join("");
+  container.innerHTML=`
+    <div class="cmp-pcard cmp-full">
+      <div class="cmp-pcard-title">Stat Profile Comparison</div>
+      <div class="cmp-radar-legend" style="margin-bottom:16px">${active.map(a=>`<span style="color:${a.color}">⬤ ${a.player.name}</span>`).join("")}</div>
+      <div class="cmp-ring-grid">${rings}</div>
+    </div>`;
+  setTimeout(()=>{RING_STATS.forEach((stat,i)=>drawRingChart(`ring_${i}`,active,stat));},0);
+}
+
+function drawRingChart(canvasId, active, stat) {
+  const canvas=$(`#${canvasId}`);if(!canvas)return;
+  const ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height,cx=w/2,cy=h/2;
+  const outerR=Math.min(w,h)*0.43,trackW=Math.max(7,outerR*0.22),gap=trackW*0.28;
+  ctx.clearRect(0,0,w,h);
+  active.forEach(({player,color},i)=>{
+    const s=latestSeason(player),raw=s?parseFloat(s[stat.key]):NaN;
+    let pct=0;
+    if(!isNaN(raw)){pct=stat.offset?Math.min(1,Math.max(0,(raw+stat.offset)/(stat.max*2))):Math.min(1,Math.max(0,raw/stat.max));}
+    const r=outerR-i*(trackW+gap);if(r<4)return;
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=trackW;ctx.stroke();
+    if(pct>0.01){
+      ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+pct*Math.PI*2);ctx.strokeStyle=color;ctx.lineWidth=trackW;ctx.lineCap="round";ctx.stroke();ctx.lineCap="butt";
+    }
+  });
+}
+
+function buildLocalReasons(anchor, comp) {
+  const la = latestSeason(anchor), lb = latestSeason(comp);
+  if (!la || !lb) return [];
+  const reasons = [];
+  const close = (a, b, pct=0.15) => Math.abs(a-b) <= Math.max(a,b)*pct;
+  if (close(+la.pts||0, +lb.pts||0)) reasons.push("Similar scoring volume");
+  if (close(+la.ast||0, +lb.ast||0)) reasons.push("Similar playmaking rate");
+  if (close(+la.reb||0, +lb.reb||0)) reasons.push("Similar rebounding profile");
+  if (close(+la.ts||0,  +lb.ts||0))  reasons.push("Similar scoring efficiency");
+  if (close(+la.usg||0, +lb.usg||0)) reasons.push("Similar usage role");
+  if (close(+la.net||0, +lb.net||0, 0.25)) reasons.push("Similar overall impact");
+  if (cmpPosGroup(anchor.position) === cmpPosGroup(comp.position)) reasons.push(`Same position group (${cmpPosGroup(anchor.position)})`);
+  return reasons.slice(0, 4);
+}
+
+// ── Similar Players ───────────────────────────────────────────────────────────
+function renderSimilarTab(container, active) {
+  const anchor=active[0].player;
+  container.innerHTML=`
+    <div class="cmp-pcard cmp-full">
+      <div class="cmp-pcard-title">Similar Players · <span style="color:var(--sidebar-active);text-transform:none;letter-spacing:0">${anchor.name}</span></div>
+      <div id="cmpSimilarContent" style="color:var(--muted);font-size:0.85rem;padding:16px 0">Loading from comparison engine...</div>
+    </div>`;
+  fetchSimilarTab(anchor);
+}
+
+async function fetchSimilarTab(anchor) {
+  const el=$("#cmpSimilarContent");if(!el)return;
+  try {
+    const data=await fetchCmpApi(anchor.name);
+    if(data&&data.similar&&data.similar.length){
+      el.innerHTML=`<div class="cmp-comp-grid">${data.similar.slice(0,8).map(s=>{
+        const reasons=(s.explanation&&s.explanation.reasons)||[];
+        const diverges=(s.explanation&&s.explanation.divergences)||[];
+        const narrative=(s.explanation&&s.explanation.narrative)||"";
+        const simPct=Math.round(s.similarity);
+        const subs=s.sub_scores||{};
+        const simColor=simPct>=80?"var(--green)":simPct>=60?"var(--sidebar-active)":"var(--muted)";
+        const subBar=(label,val)=>{
+          if(val==null)return"";
+          const pct=Math.round(val);
+          const c=pct>=80?"var(--green)":pct>=60?"var(--sidebar-active)":"var(--muted)";
+          return `<div class="cmp-sub-row"><span class="cmp-sub-lbl">${label}</span><div class="cmp-sub-track"><div class="cmp-sub-fill" style="width:${pct}%;background:${c}"></div></div><span class="cmp-sub-val" style="color:${c}">${pct}%</span></div>`;
+        };
+        return `<div class="cmp-comp-card">
+          <div class="cmp-comp-header">
+            <div class="cmp-comp-score" style="border-color:${simColor}">
+              <div class="cmp-comp-score-num" style="color:${simColor}">${simPct}%</div>
+              <div class="cmp-comp-score-lbl">Overall</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:0.9rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.player||s.player_name||""}</div>
+              <div style="font-size:0.7rem;color:var(--muted)">${s.pos||""} · ${s.team||""} · ${s.season||""}</div>
+              ${s.archetype?`<div class="cmp-arch-badge">${s.archetype}</div>`:""}
+            </div>
+          </div>
+          <div class="cmp-sub-scores">
+            ${subBar("Statistical",subs.statistical)}
+            ${subBar("Play Style",subs.playstyle)}
+            ${subBar("Physical",subs.physical)}
+            ${subBar("Trajectory",subs.trajectory)}
+          </div>
+          ${narrative?`<div class="cmp-comp-narrative">${narrative}</div>`:""}
+          ${reasons.length?`<div class="cmp-comp-reasons">${reasons.filter(r=>!r.startsWith("Same archetype")).slice(0,3).map(r=>`<div class="cmp-comp-reason">${r}</div>`).join("")}</div>`:""}
+          ${diverges.length?`<div style="margin-top:4px">${diverges.map(d=>`<div class="cmp-comp-diverge">${d}</div>`).join("")}</div>`:""}
+        </div>`;
+      }).join("")}</div>`;
+      return;
+    }
+  } catch {}
+  // Local fallback with position-aware similarity
+  const rows=players.filter(p=>p.playerId!==anchor.playerId)
+    .map(p=>{const s=latestSeason(p);if(!s)return null;const sim=cmpLocalSimilarity(anchor,p);return{p,s,sim};})
+    .filter(r=>r&&r.sim>0).sort((a,b)=>b.sim-a.sim).slice(0,8);
+  if(!rows.length){el.innerHTML=`<div style="color:var(--muted)">No season data for this player.</div>`;return;}
+  el.innerHTML=`<div class="cmp-comp-grid">${rows.map(({p,s,sim})=>{
+    const simColor=sim>=80?"var(--green)":sim>=60?"var(--sidebar-active)":"var(--muted)";
+    const reasons=buildLocalReasons(anchor,p);
+    return `<div class="cmp-comp-card">
+      <div class="cmp-comp-header">
+        <div class="cmp-comp-score" style="border-color:${simColor}">
+          <div class="cmp-comp-score-num" style="color:${simColor}">${sim}%</div>
+          <div class="cmp-comp-score-lbl">Match</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:0.9rem;font-weight:800">${p.name}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">${p.position} · ${s.team||"—"} · ${s.season||"—"}</div>
+        </div>
+      </div>
+      ${reasons.length?`<div class="cmp-comp-reasons">${reasons.map(r=>`<div class="cmp-comp-reason">${r}</div>`).join("")}</div>`:""}
+    </div>`;
+  }).join("")}</div>`;
+}
+
+renderPlayerBar();
 
 // ── Watchlist ────────────────────────────────────────────────────────────────
 
@@ -1861,6 +2022,27 @@ document.addEventListener("click", (e) => {
 });
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
+
+(function initTopbar() {
+  const session = localStorage.getItem('sf_session');
+  const userEl  = document.getElementById('topbarUser');
+  const logoutEl = document.getElementById('topbarLogout');
+
+  if (userEl) {
+    if (session && session !== 'guest') {
+      userEl.textContent = session;
+    } else if (session === 'guest') {
+      userEl.textContent = 'Guest';
+    }
+  }
+
+  if (logoutEl) {
+    logoutEl.addEventListener('click', () => {
+      localStorage.removeItem('sf_session');
+      location.reload();
+    });
+  }
+})();
 
 loadDashboard();
 navigate("dashboard");

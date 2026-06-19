@@ -10,14 +10,16 @@
     <meta property="og:title" content="StatFuel" />
     <meta property="og:description" content="Explore NBA player stats, career trends, draft prospects, and award history." />
     <meta property="og:type" content="website" />
-    <link rel="stylesheet" href="styles.css?v=20260618-cmp3" />
+    <link rel="stylesheet" href="styles.css?v=20260618-ui1" />
   </head>
   <body>
 
     <!-- Login Screen -->
-    <div id="loginScreen">
+    <!-- Auth Screen (single card, tabbed) -->
+    <div id="authScreen">
       <div class="login-bg-glow"></div>
       <div class="login-card">
+
         <!-- Logo -->
         <div class="login-logo">
           <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -27,79 +29,52 @@
             <path d="M8 22 Q15 17 22 22 Q29 27 36 22" fill="none" stroke="#c0392b" stroke-width="1.8"/>
             <path d="M8 22 Q15 27 22 22 Q29 17 36 22" fill="none" stroke="#c0392b" stroke-width="1.8"/>
             <path d="M18 6 Q14 12 15 18 Q16 24 18 28 Q20 34 22 38" fill="none" stroke="rgba(255,100,60,0.7)" stroke-width="8" stroke-linecap="round" filter="url(#f)"/>
-            <defs>
-              <filter id="f"><feGaussianBlur stdDeviation="3"/></filter>
-            </defs>
+            <defs><filter id="f"><feGaussianBlur stdDeviation="3"/></filter></defs>
             <path d="M19 5 Q15 11 16 18 Q17 24 19 28 Q21 33 22 37" fill="none" stroke="#ff6b35" stroke-width="3.5" stroke-linecap="round"/>
           </svg>
           <span class="login-brand">StatFuel</span>
         </div>
 
-        <h1 class="login-title">Welcome back</h1>
-        <p class="login-sub">Sign in to your StatFuel account</p>
+        <!-- Tabs -->
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="tabSignIn">Sign In</button>
+          <button class="auth-tab" id="tabCreateAccount">Create Account</button>
+        </div>
 
-        <div id="loginError" class="login-error hidden"></div>
+        <!-- Sign In panel -->
+        <div id="panelSignIn">
+          <div id="loginError" class="login-error hidden"></div>
+          <form id="loginForm">
+            <div class="login-field">
+              <label for="loginEmail">Email</label>
+              <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required />
+            </div>
+            <div class="login-field">
+              <label for="loginPassword">Password</label>
+              <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required />
+            </div>
+            <button type="submit" class="login-btn">Sign In</button>
+          </form>
+        </div>
 
-        <form id="loginForm">
-          <div class="login-field">
-            <label for="loginEmail">Email</label>
-            <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required />
-          </div>
-          <div class="login-field">
-            <label for="loginPassword">Password</label>
-            <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required />
-          </div>
-          <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
-        </form>
+        <!-- Create Account panel -->
+        <div id="panelCreateAccount" style="display:none">
+          <div id="signupError" class="login-error hidden"></div>
+          <form id="signupForm">
+            <div class="login-field">
+              <label for="signupEmail">Email</label>
+              <input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="email" required />
+            </div>
+            <div class="login-field">
+              <label for="signupPassword">Password</label>
+              <input type="password" id="signupPassword" placeholder="Min. 6 characters" autocomplete="new-password" required />
+            </div>
+            <button type="submit" class="login-btn">Create Account</button>
+          </form>
+        </div>
 
         <div class="login-divider"><span>or</span></div>
-
         <button class="login-guest-btn" id="loginGuestBtn">Continue as Guest</button>
-
-        <p class="login-footer">Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
-      </div>
-    </div>
-
-    <!-- Signup Screen -->
-    <div id="signupScreen" class="hidden">
-      <div class="login-bg-glow"></div>
-      <div class="login-card">
-        <div class="login-logo">
-          <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="22" cy="22" r="22" fill="#0b1729"/>
-            <circle cx="22" cy="22" r="14" fill="none" stroke="#c0392b" stroke-width="2.2"/>
-            <line x1="22" y1="8" x2="22" y2="36" stroke="#c0392b" stroke-width="1.8"/>
-            <path d="M8 22 Q15 17 22 22 Q29 27 36 22" fill="none" stroke="#c0392b" stroke-width="1.8"/>
-            <path d="M8 22 Q15 27 22 22 Q29 17 36 22" fill="none" stroke="#c0392b" stroke-width="1.8"/>
-            <path d="M18 6 Q14 12 15 18 Q16 24 18 28 Q20 34 22 38" fill="none" stroke="rgba(255,100,60,0.7)" stroke-width="8" stroke-linecap="round" filter="url(#f2)"/>
-            <defs><filter id="f2"><feGaussianBlur stdDeviation="3"/></filter></defs>
-            <path d="M19 5 Q15 11 16 18 Q17 24 19 28 Q21 33 22 37" fill="none" stroke="#ff6b35" stroke-width="3.5" stroke-linecap="round"/>
-          </svg>
-          <span class="login-brand">StatFuel</span>
-        </div>
-
-        <h1 class="login-title">Create account</h1>
-        <p class="login-sub">Start exploring NBA analytics</p>
-
-        <div id="signupError" class="login-error hidden"></div>
-
-        <form id="signupForm">
-          <div class="login-field">
-            <label for="signupEmail">Email</label>
-            <input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="email" required />
-          </div>
-          <div class="login-field">
-            <label for="signupPassword">Password</label>
-            <input type="password" id="signupPassword" placeholder="Min. 6 characters" autocomplete="new-password" required />
-          </div>
-          <button type="submit" class="login-btn" id="signupBtn">Create Account</button>
-        </form>
-
-        <div class="login-divider"><span>or</span></div>
-
-        <button class="login-guest-btn" id="signupGuestBtn">Continue as Guest</button>
-
-        <p class="login-footer">Already have an account? <a href="#" id="showLogin">Sign in</a></p>
       </div>
     </div>
 
@@ -166,20 +141,50 @@
         </div>
 
         <ul class="nav-list" role="list">
-          <li><button class="nav-item active" data-section="dashboard">📊 Dashboard</button></li>
+          <li><button class="nav-item active" data-section="dashboard">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="1" y="9" width="3" height="6" rx="0.5"/><rect x="6.5" y="5" width="3" height="10" rx="0.5"/><rect x="12" y="2" width="3" height="13" rx="0.5"/></svg>
+            Dashboard
+          </button></li>
 
           <li class="nav-heading">PLAYER INTELLIGENCE</li>
-          <li><button class="nav-item" data-section="players">🏀 Players</button></li>
-          <li><button class="nav-item" data-section="prospects">⭐ Prospects</button></li>
-          <li><button class="nav-item" data-section="comparisons">⚖️ Comparisons</button></li>
-          <li><button class="nav-item" data-section="draft">📋 Draft Class</button></li>
-          <li><button class="nav-item" data-section="watchlist">🔖 Watchlist</button></li>
+          <li><button class="nav-item" data-section="players">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+            Players
+          </button></li>
+          <li><button class="nav-item" data-section="prospects">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6L8 9.7l-3.2 1.7.6-3.6L2.8 5.3l3.6-.5z"/></svg>
+            Prospects
+          </button></li>
+          <li><button class="nav-item" data-section="comparisons">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v12M4 14h8"/><path d="M2.5 5.5L1 9.5h3zM13.5 5.5L12 9.5h3z"/><line x1="2.5" y1="5.5" x2="13.5" y2="5.5"/></svg>
+            Comparisons
+          </button></li>
+          <li><button class="nav-item" data-section="draft">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="10" height="11" rx="1"/><path d="M6 3V2h4v1"/><line x1="5.5" y1="7" x2="10.5" y2="7"/><line x1="5.5" y1="10" x2="9" y2="10"/></svg>
+            Draft Class
+          </button></li>
+          <li><button class="nav-item" data-section="watchlist">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h8a1 1 0 011 1v11l-5-3-5 3V3a1 1 0 011-1z"/></svg>
+            Watchlist
+          </button></li>
 
           <li class="nav-heading">TEAM TOOLS</li>
-          <li><button class="nav-item" data-section="team-dashboard">🏟️ Team Dashboard</button></li>
-          <li><button class="nav-item" data-section="reports">📄 Reports</button></li>
-          <li><button class="nav-item" data-section="analytics">📈 Analytics Hub</button></li>
-          <li><button class="nav-item" data-section="lineup">🔀 Lineup Simulator</button></li>
+          <li><button class="nav-item" data-section="team-dashboard">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 15h14M2 15V7l6-5 6 5v8"/><path d="M6 15v-4h4v4"/></svg>
+            Team Dashboard
+          </button></li>
+          <li><button class="nav-item" data-section="reports">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6z"/><path d="M9 2v4h4"/><line x1="5" y1="9" x2="11" y2="9"/><line x1="5" y1="12" x2="8.5" y2="12"/></svg>
+            Reports
+          </button></li>
+          <li><button class="nav-item" data-section="analytics">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,12 6,7 9,10 14,4"/><polyline points="11,4 14,4 14,7"/></svg>
+            Analytics Hub
+          </button></li>
+          <li><button class="nav-item" data-section="lineup">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h2.5l7 6H14M2 11h2.5l7-6H14"/><polyline points="11,3 14,5 11,7"/><polyline points="11,9 14,11 11,13"/></svg>
+            Lineup Simulator
+          </button></li>
         </ul>
 
         <div class="sidebar-footer">
@@ -195,8 +200,15 @@
 
         <!-- Top Bar -->
         <div class="topbar">
-          <input id="globalSearch" type="search" placeholder="Search players and teams..." class="global-search" />
-          <div class="global-search-results hidden" id="globalSearchResults"></div>
+          <div class="topbar-search-wrap">
+            <svg class="topbar-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><line x1="13" y1="13" x2="18" y2="18"/></svg>
+            <input id="globalSearch" type="search" placeholder="Search players and teams..." class="global-search" />
+            <div class="global-search-results hidden" id="globalSearchResults"></div>
+          </div>
+          <div class="topbar-right">
+            <span class="topbar-user" id="topbarUser"></span>
+            <button class="topbar-logout" id="topbarLogout">Sign out</button>
+          </div>
         </div>
 
         <!-- Dashboard Section -->
@@ -481,44 +493,35 @@
           <div class="cmp-header">
             <div>
               <h2 class="cmp-title">Comparisons</h2>
-              <p class="cmp-sub">Search and compare NBA player stats and historical trends</p>
+              <p class="cmp-sub">Find and compare players across statistics, efficiency, and historical trends</p>
             </div>
-            <button class="cmp-add-btn" id="cmpAddBtn">+ Add Player</button>
-          </div>
-
-          <!-- Player selector bar -->
-          <div class="cmp-player-bar" id="cmpPlayerBar">
-            <div class="cmp-search-slot" id="cmpSlotA">
-              <div class="cmp-slot-inner">
-                <span class="cmp-slot-icon">+</span>
-                <span class="cmp-slot-label">Add Player A</span>
-              </div>
-              <input id="compareSearchA" type="search" placeholder="Search player..." class="cmp-search-input" autocomplete="off"/>
-              <div class="compare-dropdown" id="compareDropdownA"></div>
-            </div>
-            <div class="cmp-search-slot" id="cmpSlotB">
-              <div class="cmp-slot-inner">
-                <span class="cmp-slot-icon">+</span>
-                <span class="cmp-slot-label">Add Player B</span>
-              </div>
-              <input id="compareSearchB" type="search" placeholder="Search player..." class="cmp-search-input" autocomplete="off"/>
-              <div class="compare-dropdown" id="compareDropdownB"></div>
+            <div class="cmp-mode-selector">
+              <button class="cmp-mode-btn active" data-mode="current">Current Player</button>
+              <button class="cmp-mode-btn" data-mode="prospect">Prospect</button>
+              <button class="cmp-mode-btn" data-mode="career">Career Outcome</button>
             </div>
           </div>
 
-          <!-- Tab nav -->
+          <!-- Player selector bar (4 slots, rendered by JS) -->
+          <div class="cmp-player-bar" id="cmpPlayerBar"></div>
+
+          <!-- Tab nav (6 tabs) -->
           <div class="cmp-tabs" id="cmpTabs">
             <button class="cmp-tab active" data-tab="overview">Overview</button>
             <button class="cmp-tab" data-tab="advanced">Advanced Metrics</button>
-            <button class="cmp-tab" data-tab="trajectory">Career Trajectory</button>
+            <button class="cmp-tab" data-tab="scouting">Scouting Report</button>
+            <button class="cmp-tab" data-tab="trajectory">Player Trajectories</button>
+            <button class="cmp-tab" data-tab="statprofile">Stat Profile</button>
             <button class="cmp-tab" data-tab="similar">Similar Players</button>
           </div>
 
           <!-- Content -->
           <div class="comparison-content" id="comparisonContent">
             <div class="compare-placeholder">
-              <div class="compare-placeholder-icon">⚖️</div>
-              <div>Search for two players above to compare their stats.</div>
+              <div class="compare-placeholder-icon">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M16 4v24M8 28h16"/><path d="M4 10L2 18h6zM28 10l-2 8h6z"/><line x1="4" y1="10" x2="28" y2="10"/></svg>
+              </div>
+              <div>Search for players above to compare their stats and profiles.</div>
             </div>
           </div>
         </section>
@@ -585,12 +588,14 @@
         <section class="page hidden" id="page-team-dashboard">
           <div class="page-header">
             <div>
-              <h2>🏟️ Team Dashboard</h2>
+              <h2>Team Dashboard</h2>
               <p class="page-subtitle">Team-level performance and standings overview</p>
             </div>
           </div>
           <div class="coming-soon-page">
-            <div class="coming-soon-icon">🏟️</div>
+            <div class="coming-soon-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 22h22M3 22V10l9-7 9 7v12"/><path d="M9 22v-6h6v6"/></svg>
+            </div>
             <h3>Team Dashboard</h3>
             <p>Win/loss records, offensive &amp; defensive ratings, pace, and net rating breakdowns for every team — coming soon.</p>
             <div class="coming-soon-features">
@@ -606,12 +611,14 @@
         <section class="page hidden" id="page-reports">
           <div class="page-header">
             <div>
-              <h2>📄 Reports</h2>
+              <h2>Reports</h2>
               <p class="page-subtitle">Generated scouting and performance reports</p>
             </div>
           </div>
           <div class="coming-soon-page">
-            <div class="coming-soon-icon">📄</div>
+            <div class="coming-soon-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+            </div>
             <h3>Reports</h3>
             <p>Auto-generated player and team scouting reports with statistical context and trend analysis — coming soon.</p>
             <div class="coming-soon-features">
@@ -627,12 +634,14 @@
         <section class="page hidden" id="page-analytics">
           <div class="page-header">
             <div>
-              <h2>📈 Analytics Hub</h2>
+              <h2>Analytics Hub</h2>
               <p class="page-subtitle">Advanced metrics and custom stat breakdowns</p>
             </div>
           </div>
           <div class="coming-soon-page">
-            <div class="coming-soon-icon">📈</div>
+            <div class="coming-soon-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,17 9,11 13,15 21,6"/><polyline points="16,6 21,6 21,11"/></svg>
+            </div>
             <h3>Analytics Hub</h3>
             <p>Deep dives into advanced metrics — PER, BPM, VORP, True Shooting, usage trends, and custom filters across any season — coming soon.</p>
             <div class="coming-soon-features">
@@ -648,12 +657,14 @@
         <section class="page hidden" id="page-lineup">
           <div class="page-header">
             <div>
-              <h2>🔀 Lineup Simulator</h2>
+              <h2>Lineup Simulator</h2>
               <p class="page-subtitle">Build and evaluate lineup combinations</p>
             </div>
           </div>
           <div class="coming-soon-page">
-            <div class="coming-soon-icon">🔀</div>
+            <div class="coming-soon-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h4.5l11 10H21M2 17h4.5l11-10H21"/><polyline points="17,4 21,7 17,10"/><polyline points="17,14 21,17 17,20"/></svg>
+            </div>
             <h3>Lineup Simulator</h3>
             <p>Drag-and-drop lineup builder with projected net rating, spacing grade, and pace impact for any five-man unit — coming soon.</p>
             <div class="coming-soon-features">
@@ -668,7 +679,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260618-cmp3"></script>
+    <script src="app.js?v=20260618-ui1"></script>
     <script>
       // ── Auth gate ──────────────────────────────────────────────────────────
       const USERS_KEY = 'sf_users';
@@ -679,8 +690,7 @@
       }
       function saveUsers(u) { localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
       function showApp() {
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('signupScreen').style.display = 'none';
+        document.getElementById('authScreen').style.display = 'none';
 
         const loader   = document.getElementById('loadingScreen');
         const bar      = document.getElementById('loaderBar');
@@ -726,24 +736,18 @@
       // Always require sign in on load
       localStorage.removeItem(SESSION_KEY);
 
-      // Toggle between login / signup
-      document.getElementById('showSignup').addEventListener('click', e => {
-        e.preventDefault();
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('signupScreen').style.display = '';
-      });
-      document.getElementById('showLogin').addEventListener('click', e => {
-        e.preventDefault();
-        document.getElementById('signupScreen').style.display = 'none';
-        document.getElementById('loginScreen').style.display = '';
-      });
+      // Tab switching
+      function switchTab(active) {
+        document.getElementById('tabSignIn').classList.toggle('active', active === 'signin');
+        document.getElementById('tabCreateAccount').classList.toggle('active', active === 'create');
+        document.getElementById('panelSignIn').style.display = active === 'signin' ? '' : 'none';
+        document.getElementById('panelCreateAccount').style.display = active === 'create' ? '' : 'none';
+      }
+      document.getElementById('tabSignIn').addEventListener('click', () => switchTab('signin'));
+      document.getElementById('tabCreateAccount').addEventListener('click', () => switchTab('create'));
 
       // Guest
       document.getElementById('loginGuestBtn').addEventListener('click', () => {
-        localStorage.setItem(SESSION_KEY, 'guest');
-        showApp();
-      });
-      document.getElementById('signupGuestBtn').addEventListener('click', () => {
         localStorage.setItem(SESSION_KEY, 'guest');
         showApp();
       });
