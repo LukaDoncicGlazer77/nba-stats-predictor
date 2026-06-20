@@ -159,6 +159,10 @@
             <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v12M4 14h8"/><path d="M2.5 5.5L1 9.5h3zM13.5 5.5L12 9.5h3z"/><line x1="2.5" y1="5.5" x2="13.5" y2="5.5"/></svg>
             Comparisons
           </button></li>
+          <li><button class="nav-item" data-section="career-outcome">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 14V8M6 14V4M10 14V9M14 14V2"/><path d="M1 14h14"/></svg>
+            Career Outcome
+          </button></li>
           <li><button class="nav-item" data-section="draft">
             <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="10" height="11" rx="1"/><path d="M6 3V2h4v1"/><line x1="5.5" y1="7" x2="10.5" y2="7"/><line x1="5.5" y1="10" x2="9" y2="10"/></svg>
             Draft Class
@@ -577,7 +581,6 @@
             <div class="cmp-mode-selector">
               <button class="cmp-mode-btn active" data-mode="current">Current Player</button>
               <button class="cmp-mode-btn" data-mode="prospect">Prospect</button>
-              <button class="cmp-mode-btn" data-mode="career">Career Outcome</button>
             </div>
           </div>
 
@@ -601,6 +604,29 @@
                 <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M16 4v24M8 28h16"/><path d="M4 10L2 18h6zM28 10l-2 8h6z"/><line x1="4" y1="10" x2="28" y2="10"/></svg>
               </div>
               <div>Search for players above to compare their stats and profiles.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Career Outcome Section -->
+        <section class="page hidden" id="page-career-outcome">
+
+          <!-- Header -->
+          <div class="cmp-header">
+            <div>
+              <h2 class="cmp-title">Career Outcome</h2>
+              <p class="cmp-sub">Project a 2026 draft prospect's career outcome against historical picks at a similar slot and position</p>
+            </div>
+          </div>
+
+          <!-- Single prospect search slot -->
+          <div class="cmp-player-bar" id="careerOutcomeBar"></div>
+
+          <!-- Content -->
+          <div class="comparison-content" id="careerOutcomeContent">
+            <div class="compare-placeholder">
+              <div class="compare-placeholder-icon">⚖</div>
+              <div>Search for a draft prospect above to project their career outcome.</div>
             </div>
           </div>
         </section>
@@ -758,7 +784,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260620-slider1"></script>
+    <script src="app.js?v=20260620-careerpage1"></script>
     <script>
       // ── Auth gate ──────────────────────────────────────────────────────────
       const USERS_KEY = 'sf_users';

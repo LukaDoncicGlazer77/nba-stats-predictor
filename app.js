@@ -62,7 +62,7 @@ function latestSeason(player) {
 
 let currentSection = "dashboard";
 
-const MEMBERS_ONLY = new Set(["players","player-profile","watchlist","comparisons","team-dashboard","reports","analytics","lineup"]);
+const MEMBERS_ONLY = new Set(["players","player-profile","watchlist","comparisons","career-outcome","team-dashboard","reports","analytics","lineup"]);
 
 function isLoggedIn() {
   const s = localStorage.getItem('sf_session');
@@ -118,6 +118,11 @@ function navigate(section) {
   if (section === "draft" && !draftLoaded) loadDraft();
   if (section === "watchlist") renderWatchlist();
   if (section === "comparisons" && !playersLoaded) initPlayers();
+  if (section === "career-outcome") {
+    if (!prospectsLoaded) loadProspects().then(() => renderCareerOutcomeBar());
+    else renderCareerOutcomeBar();
+    renderCareerOutcomePage();
+  }
 }
 
 document.querySelectorAll(".nav-item").forEach((btn) => {
@@ -1668,12 +1673,11 @@ function cmpAvatar(player, size = 52) {
 function renderPlayerBar() {
   const bar = $("#cmpPlayerBar");
   if (!bar) return;
-  const slots = cmpMode === "career" ? comparePlayers.slice(0, 1) : comparePlayers;
+  const slots = comparePlayers;
   bar.innerHTML = slots.map((player, i) => {
     const color = cmpColor(i);
     if (!player) {
-      const label = cmpMode === "career" ? "Add Draft Prospect" :
-        cmpMode === "prospect" ? `Add Player/Prospect ${CMP_LABELS[i]}` : `Add Player ${CMP_LABELS[i]}`;
+      const label = cmpMode === "prospect" ? `Add Player/Prospect ${CMP_LABELS[i]}` : `Add Player ${CMP_LABELS[i]}`;
       return `<div class="cmp-search-slot" id="cmpSlot${i}" data-slot="${i}">
         <div class="cmp-slot-inner">
           <span class="cmp-slot-icon">+</span>
@@ -1744,9 +1748,7 @@ function setupCmpSearch(i) {
   if (!input || !dropdown) return;
   input.addEventListener("input", () => {
     const q = input.value.toLowerCase().trim();
-    const pool = cmpMode === "career" ? allProspects.map(wrapProspect)
-      : cmpMode === "prospect" ? [...players, ...allProspects.map(wrapProspect)]
-      : players;
+    const pool = cmpMode === "prospect" ? [...players, ...allProspects.map(wrapProspect)] : players;
     if (!q || !pool.length) { dropdown.classList.remove("open"); return; }
     const matches = pool.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
     dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${p.name}">${p.name} <span style="color:var(--muted);font-size:0.75em">· ${p.isProspect ? (p.team||"Prospect") : (latestSeason(p)?.team||"")}</span></div>`).join("");
@@ -1787,17 +1789,18 @@ document.addEventListener("click", e => {
     document.querySelectorAll(".cmp-mode-btn").forEach(b => b.classList.remove("active"));
     modeBtn.classList.add("active");
     cmpMode = modeBtn.dataset.mode;
-    if (cmpMode === "career") {
-      const slot0 = comparePlayers[0];
-      comparePlayers = [slot0 && slot0.isProspect ? slot0 : null, null, null, null];
-    }
-    const cmpTabs = $("#cmpTabs");
-    if (cmpTabs) cmpTabs.style.display = cmpMode === "career" ? "none" : "";
-    if (cmpMode !== "current" && !prospectsLoaded) {
+    if (cmpMode === "prospect" && !prospectsLoaded) {
       loadProspects().then(() => { renderPlayerBar(); renderComparison(); });
     }
     renderPlayerBar();
     renderComparison();
+  }
+  // Career Outcome page: remove the prospect slot
+  const careerRemoveBtn = e.target.closest(".career-remove-btn");
+  if (careerRemoveBtn) {
+    careerOutcomeProspect = null;
+    renderCareerOutcomeBar();
+    renderCareerOutcomePage();
   }
 });
 
@@ -1824,6 +1827,75 @@ function activePlayers() {
   return comparePlayers.map((p,i) => p ? {player:p, color:cmpColor(i), idx:i} : null).filter(Boolean);
 }
 
+// ── Career Outcome (standalone page, separate from Comparisons) ────────────
+let careerOutcomeProspect = null;
+
+function renderCareerOutcomeBar() {
+  const bar = $("#careerOutcomeBar");
+  if (!bar) return;
+  const color = cmpColor(0);
+  if (!careerOutcomeProspect) {
+    bar.innerHTML = `<div class="cmp-search-slot" id="careerSlot0">
+      <div class="cmp-slot-inner">
+        <span class="cmp-slot-icon">+</span>
+        <span class="cmp-slot-label">Add Draft Prospect</span>
+        <input id="careerSearch0" type="search" placeholder="Search by name..." class="cmp-search-input" autocomplete="off" spellcheck="false"/>
+      </div>
+      <div class="compare-dropdown" id="careerDrop0"></div>
+    </div>`;
+    setupCareerOutcomeSearch();
+    return;
+  }
+  const p = careerOutcomeProspect;
+  bar.innerHTML = `<div class="cmp-search-slot cmp-slot-filled" id="careerSlot0">
+    <div class="cmp-slot-color-bar" style="background:${color}"></div>
+    <div class="cmp-selected-inner">
+      ${cmpAvatar(p, 44)}
+      <div class="cmp-selected-info">
+        <div class="cmp-selected-name">${p.name}</div>
+        <div class="cmp-selected-meta">${p.position||"—"} · ${p.team||"—"} · ${p.status||"Prospect"}</div>
+        <div class="cmp-selected-meta">${p.height||"—"} · ${p.weight||"—"} · Mock Rank #${p.rank||"—"}</div>
+      </div>
+      <button class="cmp-remove-btn career-remove-btn">✕</button>
+    </div>
+  </div>`;
+}
+
+function setupCareerOutcomeSearch() {
+  const input = $("#careerSearch0");
+  const dropdown = $("#careerDrop0");
+  if (!input || !dropdown) return;
+  input.addEventListener("input", () => {
+    const q = input.value.toLowerCase().trim();
+    const pool = allProspects.map(wrapProspect);
+    if (!q || !pool.length) { dropdown.classList.remove("open"); return; }
+    const matches = pool.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
+    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${p.name}">${p.name} <span style="color:var(--muted);font-size:0.75em">· ${p.team||"Prospect"}</span></div>`).join("");
+    dropdown.classList.toggle("open", matches.length > 0);
+    dropdown.querySelectorAll(".compare-option").forEach(opt => {
+      opt.addEventListener("click", () => {
+        const found = pool.find(p => p.name === opt.dataset.name);
+        if (found) {
+          careerOutcomeProspect = found;
+          renderCareerOutcomeBar();
+          renderCareerOutcomePage();
+        }
+        dropdown.classList.remove("open");
+      });
+    });
+  });
+}
+
+function renderCareerOutcomePage() {
+  const container = $("#careerOutcomeContent");
+  if (!container) return;
+  if (!careerOutcomeProspect) {
+    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚖</div><div>Search for a draft prospect above to project their career outcome.</div></div>`;
+    return;
+  }
+  renderCareerOutcomeView(container, careerOutcomeProspect);
+}
+
 const fmtV = (v, key) => {
   if (v==null||v===undefined||v==="") return "—";
   if (key==="ts"||key==="usg") return (+v).toFixed(1)+"%";
@@ -1847,15 +1919,6 @@ function build4Table(rows, active) {
 function renderComparison() {
   const container = $("#comparisonContent");
   if (!container) return;
-  if (cmpMode === "career") {
-    const prospect = comparePlayers[0];
-    if (!prospect) {
-      container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚖</div><div>Search for a draft prospect above to project their career outcome.</div></div>`;
-      return;
-    }
-    renderCareerOutcomeView(container, prospect);
-    return;
-  }
   const active = activePlayers();
   if (active.length < 1) {
     container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚖</div><div>Search for players above to compare their stats and profiles.</div></div>`;
