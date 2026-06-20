@@ -10,7 +10,7 @@
     <meta property="og:title" content="StatFuel" />
     <meta property="og:description" content="Explore NBA player stats, career trends, draft prospects, and award history." />
     <meta property="og:type" content="website" />
-    <link rel="stylesheet" href="styles.css?v=20260619-comp9" />
+    <link rel="stylesheet" href="styles.css?v=20260619-comp10" />
   </head>
   <body>
 
@@ -432,6 +432,20 @@
 
           <!-- Projections pane -->
           <div class="profile-pane hidden" id="pane-projections">
+
+            <!-- Trajectory verdict banner -->
+            <div class="proj-verdict" id="projVerdict">
+              <div class="proj-verdict-icon" id="projVerdictIcon">→</div>
+              <div class="proj-verdict-body">
+                <div class="proj-verdict-label" id="projVerdictLabel">Computing trajectory&hellip;</div>
+                <div class="proj-verdict-sub" id="projVerdictSub"></div>
+              </div>
+              <div class="proj-verdict-conf">
+                <span class="proj-verdict-conf-num" id="projConfNum">—</span>
+                <span class="proj-verdict-conf-lbl">Model Confidence</span>
+              </div>
+            </div>
+
             <div class="profile-grid-2">
               <div class="pcard">
                 <div class="pcard-head">
@@ -440,30 +454,75 @@
                 </div>
                 <div class="control-grid pcard-controls">
                   <label>
-                    <span>Future seasons</span>
+                    <span class="proj-ctrl-label"><svg class="proj-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>Future seasons</span>
                     <input id="seasonRange" type="range" min="1" max="5" value="3" />
                     <strong id="seasonValue">3</strong>
                   </label>
                   <label>
-                    <span>Playing time Δ</span>
+                    <span class="proj-ctrl-label"><svg class="proj-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Playing time &Delta;</span>
                     <input id="minutesRange" type="range" min="-8" max="8" value="0" />
                     <strong id="minutesValue">0</strong>
                   </label>
                   <label>
-                    <span>Usage Δ</span>
+                    <span class="proj-ctrl-label"><svg class="proj-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18l6-7 4 4 8-9"/></svg>Usage &Delta;</span>
                     <input id="usageRange" type="range" min="-6" max="6" value="0" />
                     <strong id="usageValue">0</strong>
                   </label>
                   <label>
-                    <span>Durability Δ</span>
+                    <span class="proj-ctrl-label"><svg class="proj-ctrl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4.5L6 21l1.5-7.5L2 9h7z"/></svg>Durability &Delta;</span>
                     <input id="durabilityRange" type="range" min="-12" max="12" value="0" />
                     <strong id="durabilityValue">0</strong>
                   </label>
                 </div>
+                <p class="proj-builder-note">Drag to model a hypothetical role change. Stats recompute instantly from a minutes-weighted age curve fit to this player's last five seasons.</p>
               </div>
               <div class="pcard">
-                <h4>Projected Stats</h4>
-                <div id="projectionCards" class="proj-cards-grid"></div>
+                <div class="pcard-head">
+                  <h4>Projected Stat Breakdown</h4>
+                  <span class="pcard-sub" id="projFinalSeasonLabel"></span>
+                </div>
+                <div id="projectionCards" class="proj-breakdown-grid"></div>
+              </div>
+            </div>
+
+            <!-- Trajectory chart -->
+            <div class="pcard trend-card" style="margin-top:16px;">
+              <div class="pcard-head">
+                <h4>Projection Trajectory</h4>
+                <select id="projMetricSelect" class="pcard-select">
+                  <option value="pts">Points</option>
+                  <option value="reb">Rebounds</option>
+                  <option value="ast">Assists</option>
+                  <option value="min">Minutes</option>
+                  <option value="three">3-Pointers</option>
+                  <option value="stl">Steals</option>
+                  <option value="blk">Blocks</option>
+                  <option value="tov">Turnovers</option>
+                  <option value="net">BPM</option>
+                  <option value="ts">True Shooting</option>
+                  <option value="gp">Games Played</option>
+                </select>
+              </div>
+              <canvas id="projTrendChart" width="1400" height="380"></canvas>
+            </div>
+
+            <!-- Year-by-year table -->
+            <div class="pcard" style="margin-top:16px;">
+              <div class="pcard-head">
+                <h4>Year-by-Year Projection</h4>
+                <span class="pcard-sub">Future seasons only</span>
+              </div>
+              <div class="table-wrap">
+                <table class="dark-table proj-table">
+                  <thead>
+                    <tr>
+                      <th>Season</th><th>Age</th><th>GP</th><th>MIN</th>
+                      <th>PTS</th><th>REB</th><th>AST</th><th>3P</th>
+                      <th>STL</th><th>BLK</th><th>TOV</th><th>TS%</th><th>USG%</th>
+                    </tr>
+                  </thead>
+                  <tbody id="projectionRows"></tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -690,7 +749,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260619-comp9"></script>
+    <script src="app.js?v=20260619-comp10"></script>
     <script>
       // ── Auth gate ──────────────────────────────────────────────────────────
       const USERS_KEY = 'sf_users';

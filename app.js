@@ -351,6 +351,7 @@ let playersLoaded = false;
 const playerState = {
   player: null,
   metric: "pts",
+  projMetric: "pts",
   seasonsAhead: 3,
   minutesChange: 0,
   usageChange: 0,
@@ -611,7 +612,7 @@ function renderPlayerProfile() {
   const player = playerState.player;
   const projections = projectPlayer(player);
   renderProfile(player);
-  renderProjection(player, projections);
+  renderProjectionsPane(player, projections);
   renderSeasonTable(player);
   renderPredictions(player, projections);
   loadArchetypePanel(player);
@@ -1049,17 +1050,17 @@ async function renderPredictions(player, projections = []) {
   `;
 }
 
-function drawChart(player, projections = [], dark = false) {
-  const canvas = $("#trendChart");
+function drawChart(player, projections = [], dark = false, canvasId = "trendChart", metric = playerState.metric) {
+  const canvas = $(`#${canvasId}`);
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   const w = canvas.width, h = canvas.height;
   const pad = { top: 28, right: 28, bottom: 58, left: 52 };
-  const actual = player.seasons.map((s) => ({ label: s.season, value: s[playerState.metric], type: "actual" }));
-  const proj = projections.map((s) => ({ label: s.season, value: s[playerState.metric], type: "projected" }));
+  const actual = player.seasons.map((s) => ({ label: s.season, value: s[metric], type: "actual" }));
+  const proj = projections.map((s) => ({ label: s.season, value: s[metric], type: "projected" }));
   const all = actual.concat(proj);
   const vals = all.map((p) => p.value);
-  const minV = playerState.metric === "net" ? Math.min(...vals) - 3 : Math.max(0, Math.min(...vals) - 3);
+  const minV = metric === "net" ? Math.min(...vals) - 3 : Math.max(0, Math.min(...vals) - 3);
   const maxV = Math.max(...vals) + 3;
   const pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
   const gridColor = dark ? "rgba(255,255,255,0.07)" : "#e3e6e1";
@@ -1102,7 +1103,7 @@ function drawChart(player, projections = [], dark = false) {
     ctx.fillText(pt.label, 0, 0); ctx.restore();
   });
   ctx.fillStyle = titleColor; ctx.font = "700 14px system-ui";
-  ctx.fillText(`${metricLabels[playerState.metric]} trend`, pad.left, 20);
+  ctx.fillText(`${metricLabels[metric]} trend`, pad.left, 20);
 }
 
 function drawDevCurve(player, dark = false) {
@@ -1244,13 +1245,108 @@ function drawDevCurve(player, dark = false) {
   ctx.fillText("NBA avg", lx2 + 20, pad.top + 27);
 }
 
+const PROJ_BREAKDOWN_ICONS = {
+  pts: '<path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4.5L6 21l1.5-7.5L2 9h7z"/>',
+  reb: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 14h16"/>',
+  ast: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 11l7.6-4M8.2 13l7.6 4"/>',
+  three: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  stl: '<path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/>',
+  blk: '<path d="M4 4h16v16H4z"/><path d="M4 4l16 16"/>',
+  tov: '<path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v8h8"/>',
+  ts: '<path d="M3 17l5-5 4 4 8-9"/>',
+  usg: '<path d="M12 2v20M2 12h20"/>',
+  min: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+  gp: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>',
+  net: '<path d="M3 12h4l3 8 4-16 3 8h4"/>',
+};
+const PROJ_BREAKDOWN_STATS = [
+  ["pts", "PTS", false], ["reb", "REB", false], ["ast", "AST", false], ["three", "3PM", false],
+  ["stl", "STL", false], ["blk", "BLK", false], ["tov", "TOV", true], ["ts", "TS%", false],
+  ["usg", "USG%", false], ["min", "MIN", false], ["gp", "GP", false], ["net", "BPM", false],
+];
+
 function renderProjection(player, projections) {
   const final = projections[projections.length - 1];
-  $("#projectionCards").innerHTML = [
-    ["Projected PTS", final.pts, "pts"], ["Projected REB", final.reb, "reb"],
-    ["Projected AST", final.ast, "ast"], ["Projected 3P", final.three, "three"],
-    ["Projected MIN", final.min, "min"], ["Projected GP", final.gp, "gp"],
-  ].map(([label, val, key]) => `<div class="projection-card"><span>${label}</span><strong>${fmt(val, key)}</strong></div>`).join("");
+  const current = latestSeason(player);
+  $("#projFinalSeasonLabel").textContent = `vs. ${current.season} season`;
+  $("#projectionCards").innerHTML = PROJ_BREAKDOWN_STATS.map(([key, label, invert]) => {
+    const curV = current[key], projV = final[key];
+    const delta = (Number.isFinite(curV) && Number.isFinite(projV)) ? projV - curV : null;
+    let deltaClass = "flat", arrow = "→";
+    if (delta !== null && Math.abs(delta) > 0.05) {
+      const up = delta > 0;
+      const good = invert ? !up : up;
+      deltaClass = good ? "up" : "down";
+      arrow = up ? "▲" : "▼";
+    }
+    const deltaText = delta === null ? "—" : `${arrow} ${Math.abs(delta).toFixed(1)}`;
+    return `<div class="proj-breakdown-card">
+      <div class="proj-breakdown-top">
+        <svg class="proj-breakdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PROJ_BREAKDOWN_ICONS[key] || ""}</svg>
+        <span class="proj-breakdown-label">${label}</span>
+      </div>
+      <div class="proj-breakdown-val">${fmt(projV, key)}${(key==="ts"||key==="usg")?"%":""}</div>
+      <div class="proj-breakdown-delta ${deltaClass}">${deltaText} <span class="proj-breakdown-cur">from ${fmt(curV, key)}${(key==="ts"||key==="usg")?"%":""}</span></div>
+    </div>`;
+  }).join("");
+}
+
+function renderProjectionRows(player, projections) {
+  const tbody = $("#projectionRows");
+  if (!tbody) return;
+  tbody.innerHTML = projections.map((s) => `
+    <tr class="proj-row-future">
+      <td>${s.season} <span class="proj-future-badge">proj.</span></td>
+      <td>${s.age}</td><td>${fmt(s.gp,"gp")}</td><td>${fmt(s.min,"min")}</td>
+      <td>${fmt(s.pts,"pts")}</td><td>${fmt(s.reb,"reb")}</td><td>${fmt(s.ast,"ast")}</td>
+      <td>${fmt(s.three,"three")}</td><td>${fmt(s.stl,"stl")}</td><td>${fmt(s.blk,"blk")}</td>
+      <td>${fmt(s.tov,"tov")}</td><td>${fmt(s.ts,"ts")}</td><td>${fmt(s.usg,"usg")}</td>
+    </tr>`).join("");
+}
+
+function renderProjVerdict(player, projections) {
+  const recent = player.seasons.slice(-5);
+  if (recent.length < 2) {
+    $("#projVerdictLabel").textContent = "Not enough seasons to model a trajectory";
+    $("#projVerdictSub").textContent = "";
+    $("#projConfNum").textContent = "—";
+    return;
+  }
+  const ptsSlope = slope(recent, "pts");
+  const efficSlope = slope(recent, "ts") + slope(recent, "net") * 0.5;
+  const composite = ptsSlope * 0.6 + efficSlope * 4;
+  const banner = $("#projVerdict");
+  banner.classList.remove("ascending", "declining", "stable");
+  let icon, label, tone;
+  if (composite > 0.6) { icon = "↗"; label = "Ascending Trajectory"; tone = "ascending"; }
+  else if (composite < -0.6) { icon = "↘"; label = "Declining Trajectory"; tone = "declining"; }
+  else { icon = "→"; label = "Stable Trajectory"; tone = "stable"; }
+  banner.classList.add(tone);
+  $("#projVerdictIcon").textContent = icon;
+  $("#projVerdictLabel").textContent = label;
+  const final = projections[projections.length - 1];
+  const cur = latestSeason(player);
+  const ptsDelta = final.pts - cur.pts;
+  $("#projVerdictSub").textContent = `Modeled ${sign(ptsDelta.toFixed(1))} PTS over ${projections.length} season${projections.length > 1 ? "s" : ""}, based on the last ${recent.length} seasons' age curve and role.`;
+  // Confidence reflects sample size + how consistently pts moved in the
+  // trend's direction season-over-season -- not the raw size of the trend
+  // (a steep but consistent rise should score higher, not lower).
+  const diffs = [];
+  for (let i = 1; i < recent.length; i++) diffs.push(recent[i].pts - recent[i - 1].pts);
+  const sameSignCount = diffs.filter((d) => d === 0 || Math.sign(d) === Math.sign(ptsSlope)).length;
+  const consistency = diffs.length ? sameSignCount / diffs.length : 0.5;
+  const base = 55 + recent.length * 5;
+  const confidence = Math.max(35, Math.min(92, base * (0.6 + 0.4 * consistency)));
+  $("#projConfNum").textContent = `${Math.round(confidence)}%`;
+}
+
+function sign(v) { return v > 0 ? `+${v}` : `${v}`; }
+
+function renderProjectionsPane(player, projections) {
+  renderProjVerdict(player, projections);
+  renderProjection(player, projections);
+  renderProjectionRows(player, projections);
+  drawChart(player, projections, true, "projTrendChart", playerState.projMetric);
 }
 
 function renderSeasonTable(player) {
@@ -1294,13 +1390,20 @@ $("#metricSelect").addEventListener("change", (e) => {
   }
 });
 
+$("#projMetricSelect").addEventListener("change", (e) => {
+  playerState.projMetric = e.target.value;
+  if (playerState.player) {
+    drawChart(playerState.player, projectPlayer(playerState.player), true, "projTrendChart", playerState.projMetric);
+  }
+});
+
 [["seasonRange","seasonsAhead"],["minutesRange","minutesChange"],["usageRange","usageChange"],["durabilityRange","durabilityChange"]].forEach(([id, key]) => {
   $(`#${id}`).addEventListener("input", (e) => {
     playerState[key] = Number(e.target.value);
     syncControls();
     if (playerState.player) {
       const proj = projectPlayer(playerState.player);
-      renderProjection(playerState.player, proj);
+      renderProjectionsPane(playerState.player, proj);
       renderSeasonTable(playerState.player);
       drawChart(playerState.player, proj, true);
       drawDevCurve(playerState.player, true);
@@ -1316,7 +1419,7 @@ $("#resetControls").addEventListener("click", () => {
   syncControls();
   if (playerState.player) {
     const proj = projectPlayer(playerState.player);
-    renderProjection(playerState.player, proj);
+    renderProjectionsPane(playerState.player, proj);
     renderSeasonTable(playerState.player);
     drawChart(playerState.player, proj, true);
     drawDevCurve(playerState.player, true);
@@ -1350,6 +1453,9 @@ document.querySelectorAll(".profile-tab").forEach((tab) => {
       drawRadar(playerState.player);
       drawChart(playerState.player, projectPlayer(playerState.player), true);
       drawDevCurve(playerState.player, true);
+    }
+    if (tab.dataset.pane === "projections" && playerState.player) {
+      drawChart(playerState.player, projectPlayer(playerState.player), true, "projTrendChart", playerState.projMetric);
     }
   });
 });
