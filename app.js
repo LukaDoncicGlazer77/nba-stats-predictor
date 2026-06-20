@@ -1372,12 +1372,19 @@ function renderSeasonTable(player) {
   }).join("");
 }
 
+function updateRangeFill(input) {
+  if (!input) return;
+  const pct = ((input.value - input.min) / (input.max - input.min)) * 100;
+  input.style.setProperty("--range-pct", `${pct}%`);
+}
+
 function syncControls() {
   $("#seasonValue").textContent = playerState.seasonsAhead;
   const sign = (v) => v > 0 ? `+${v}` : v;
   $("#minutesValue").textContent = sign(playerState.minutesChange);
   $("#usageValue").textContent = sign(playerState.usageChange);
   $("#durabilityValue").textContent = sign(playerState.durabilityChange);
+  ["seasonRange","minutesRange","usageRange","durabilityRange"].forEach((id) => updateRangeFill($(`#${id}`)));
 }
 
 // ── Player grid + profile event wiring ─────────────────────────────────────
