@@ -3,6 +3,7 @@ import decimal
 import json
 import os
 import re
+import time
 import traceback
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -84,6 +85,62 @@ def safe_int_py(val):
         return None
 
 
+def safe_float_py(val):
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+_SEASONS_CACHE = {"data": None, "ts": 0}
+_SEASONS_CACHE_TTL = 600  # seconds
+
+
+def _seasons_cache_get():
+    if _SEASONS_CACHE["data"] is not None and (time.time() - _SEASONS_CACHE["ts"]) < _SEASONS_CACHE_TTL:
+        return _SEASONS_CACHE["data"]
+    return None
+
+
+def _seasons_cache_set(rows):
+    _SEASONS_CACHE["data"] = rows
+    _SEASONS_CACHE["ts"] = time.time()
+
+
+def _cast_season_row(row):
+    fg = safe_float_py(row.get("fg"))
+    usg = safe_float_py(row.get("usg_pct"))
+    return {
+        "player_name": row.get("player_name"),
+        "player_id": row.get("player_id"),
+        "team_abbreviation": row.get("team_abbreviation"),
+        "pos": row.get("pos"),
+        "age": safe_float_py(row.get("age")),
+        "gp": safe_int_py(row.get("gp")),
+        "min": safe_float_py(row.get("min")),
+        "pts": safe_float_py(row.get("pts")),
+        "reb": safe_float_py(row.get("reb")),
+        "ast": safe_float_py(row.get("ast")),
+        "three": safe_float_py(row.get("three")),
+        "stl": safe_float_py(row.get("stl")),
+        "blk": safe_float_py(row.get("blk")),
+        "tov": safe_float_py(row.get("tov")),
+        "fg": fg * 100 if fg is not None else None,
+        "three_pct": (lambda v: v * 100 if v is not None else None)(safe_float_py(row.get("three_pct"))),
+        "ft_pct": (lambda v: v * 100 if v is not None else None)(safe_float_py(row.get("ft_pct"))),
+        "net_rating": safe_float_py(row.get("net_rating")),
+        "usg_pct": usg / 100 if usg is not None else None,
+        "ts_pct": safe_float_py(row.get("ts_pct")),
+        "per": safe_float_py(row.get("per")),
+        "vorp": safe_float_py(row.get("vorp")),
+        "ws": safe_float_py(row.get("ws")),
+        "ows": safe_float_py(row.get("ows")),
+        "dws": safe_float_py(row.get("dws")),
+        "season": row.get("season"),
+        "season_start": safe_int_py(row.get("season")),
+    }
+
+
 def to_json(obj):
     """JSON serializer that handles Decimal and other PostgreSQL types."""
     if isinstance(obj, decimal.Decimal):
@@ -129,43 +186,53 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"ok": True, "database": "supabase"})
 
         if parsed.path == "/api/seasons":
+            cached = _seasons_cache_get()
+            if cached is not None:
+                return self.send_json_rows(cached)
             conn = connect()
             try:
+                # Cast in Python rather than via the SQL safe_float()/safe_int()
+                # helpers -- those are PL/pgSQL functions with an EXCEPTION
+                # handler, and Postgres opens a subtransaction per call, which
+                # made this ~530k-call query take 9+ seconds. Plain text
+                # columns + Python casting is functionally identical and
+                # orders of magnitude faster.
                 rows = q(conn, """
                     SELECT
                       player AS player_name,
                       player_id,
                       team AS team_abbreviation,
                       pos,
-                      safe_float(age) AS age,
-                      safe_int(g) AS gp,
-                      safe_float(mp_per_game) AS min,
-                      safe_float(pts_per_game) AS pts,
-                      safe_float(trb_per_game) AS reb,
-                      safe_float(ast_per_game) AS ast,
-                      safe_float(x3p_per_game) AS three,
-                      safe_float(stl_per_game) AS stl,
-                      safe_float(blk_per_game) AS blk,
-                      safe_float(tov_per_game) AS tov,
-                      safe_float(fg_percent) * 100 AS fg,
-                      safe_float(x3p_percent) * 100 AS three_pct,
-                      safe_float(ft_percent) * 100 AS ft_pct,
-                      safe_float(bpm) AS net_rating,
-                      safe_float(usg_percent) / 100 AS usg_pct,
-                      safe_float(ts_percent) AS ts_pct,
-                      safe_float(per) AS per,
-                      safe_float(vorp) AS vorp,
-                      safe_float(ws) AS ws,
-                      safe_float(ows) AS ows,
-                      safe_float(dws) AS dws,
-                      season,
-                      safe_int(season) AS season_start
+                      age,
+                      g AS gp,
+                      mp_per_game AS min,
+                      pts_per_game AS pts,
+                      trb_per_game AS reb,
+                      ast_per_game AS ast,
+                      x3p_per_game AS three,
+                      stl_per_game AS stl,
+                      blk_per_game AS blk,
+                      tov_per_game AS tov,
+                      fg_percent AS fg,
+                      x3p_percent AS three_pct,
+                      ft_percent AS ft_pct,
+                      bpm AS net_rating,
+                      usg_percent AS usg_pct,
+                      ts_percent AS ts_pct,
+                      per,
+                      vorp,
+                      ws,
+                      ows,
+                      dws,
+                      season
                     FROM archive_player_dashboard
                     ORDER BY player, season
                 """, ())
             finally:
                 conn.close()
-            return self.send_json_rows(rows)
+            result = [_cast_season_row(dict(r)) for r in rows]
+            _seasons_cache_set(result)
+            return self.send_json_rows(result)
 
         if parsed.path == "/api/players":
             search = (params.get("search", [""])[0] or "").strip()
