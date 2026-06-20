@@ -361,26 +361,149 @@ def _usage_label(level):
             "medium": "moderate-usage", "low": "low-usage"}[level]
 
 
-def explain_comp(target, cand, breakdown):
-    """Plain-language basketball explanation for a single comp result: role,
-    usage, creation type, and efficiency -- not just a similarity percentage."""
+def _seed(*parts):
+    """Stable (non-randomized, process-independent) hash for picking template
+    variants -- Python's built-in hash() of strings is salted per-process, which
+    would make explanation text change between requests for the same pair."""
+    h = 0
+    for s in parts:
+        for ch in str(s):
+            h = (h * 131 + ord(ch)) % 1000003
+    return h
+
+
+def _pick(options, *seed_parts):
+    return options[_seed(*seed_parts) % len(options)]
+
+
+def _scoring_lean_label(c_dict):
+    if c_dict["three_pt_pressure"] >= 60:
+        return "primarily beyond the arc"
+    if c_dict["interior_pressure"] >= 60:
+        return "primarily at the rim/free-throw line"
+    return "a balanced inside-outside mix"
+
+
+def _defense_lean_label(b_dict):
+    if b_dict["rim_protector"] >= 60:
+        return "rim protection"
+    if b_dict["versatile_defender"] >= 60:
+        return "versatile, ball-pressure defense"
+    return "a blended defensive role"
+
+
+def _role_clause(target, cand):
     t_role, c_role = target["dominant_engine"].replace("_", " "), cand["dominant_engine"].replace("_", " ")
+    t_usage, c_usage = _usage_label(target["D_usage_level"]), _usage_label(cand["D_usage_level"])
+    if t_role == c_role:
+        options = [
+            f"Both project primarily as a {t_role} ({t_usage} usage vs {c_usage} usage).",
+            f"{target['player']} and {cand['player']} share a {t_role} foundation -- {t_usage} usage vs {c_usage} usage.",
+            f"Same primary engine for both: {t_role}, with {target['player']} carrying {t_usage} usage against {cand['player']}'s {c_usage} usage.",
+        ]
+        return _pick(options, target["player"], cand["player"], "role")
+    options = [
+        f"{target['player']} reads as a {t_role}; {cand['player']} reads as a {c_role} -- different primary offensive roles.",
+        f"Different offensive identities: {target['player']} projects as a {t_role} while {cand['player']} leans {c_role}.",
+        f"The two diverge on offensive role -- {t_role} for {target['player']} vs {c_role} for {cand['player']}.",
+    ]
+    return _pick(options, target["player"], cand["player"], "role")
+
+
+def _efficiency_clause(target, cand, breakdown):
     t_eff_pr = target["efficiency_under_load_pr"] if target["efficiency_under_load_pr"] is not None else target["ts_pct_pr"]
     c_eff_pr = cand["efficiency_under_load_pr"] if cand["efficiency_under_load_pr"] is not None else cand["ts_pct_pr"]
-
-    parts = []
-    if t_role == c_role:
-        parts.append(
-            f"Both project primarily as a {t_role} ({_usage_label(target['D_usage_level'])} usage vs "
-            f"{_usage_label(cand['D_usage_level'])} usage)."
-        )
-    else:
-        parts.append(f"{target['player']} reads as a {t_role}; {cand['player']} reads as a {c_role} -- different primary offensive roles.")
-    parts.append(f"Scoring efficiency under offensive load: {_efficiency_label(t_eff_pr)} vs {_efficiency_label(c_eff_pr)}.")
+    t_label, c_label = _efficiency_label(t_eff_pr), _efficiency_label(c_eff_pr)
+    options = [
+        f"Scoring efficiency under offensive load: {t_label} vs {c_label}.",
+        f"Efficiency under load reads as {t_label} for {target['player']}, {c_label} for {cand['player']}.",
+        f"On converting that workload into points, {target['player']} grades as {t_label} and {cand['player']} as {c_label}.",
+    ]
+    clause = _pick(options, target["player"], cand["player"], "eff")
     if breakdown["efficiency_divergence"] > 25:
-        parts.append(f"Efficiency profiles diverge by {breakdown['efficiency_divergence']} percentile points despite similar roles/volume -- score is penalized for this, treat as a partial comp, not a true one.")
+        clause += (
+            f" Efficiency profiles diverge by {breakdown['efficiency_divergence']} percentile points despite "
+            f"similar roles/volume -- score is penalized for this, treat as a partial comp, not a true one."
+        )
     elif breakdown["efficiency_adjusted_stats_similarity"] - breakdown["playstyle_similarity"] > 25:
-        parts.append("Box-score volume looks similar, but the underlying creation/efficiency profile diverges -- treat this as a partial comp, not a true one.")
+        clause += " Box-score volume looks similar, but the underlying creation/efficiency profile diverges -- treat this as a partial comp, not a true one."
+    return clause
+
+
+def _scoring_profile_clause(target, cand):
+    t_lean, c_lean = _scoring_lean_label(target["C"]), _scoring_lean_label(cand["C"])
+    if t_lean == c_lean and t_lean != "a balanced inside-outside mix":
+        options = [
+            f"Both generate scoring pressure {t_lean}, the same shot-pressure profile.",
+            f"Shot-pressure profiles match -- {target['player']} and {cand['player']} both lean {t_lean}.",
+        ]
+        return _pick(options, target["player"], cand["player"], "scoring")
+    if t_lean != c_lean and "balanced" not in (t_lean, c_lean):
+        return f"Shot-pressure profiles diverge: {target['player']} leans {t_lean}, {cand['player']} {c_lean}."
+    return None
+
+
+def _defensive_role_clause(target, cand):
+    t_lean, c_lean = _defense_lean_label(target["B"]), _defense_lean_label(cand["B"])
+    if t_lean == c_lean and "blended" not in t_lean:
+        return f"Defensively, both lean toward {t_lean}."
+    if t_lean != c_lean and "blended" not in (t_lean, c_lean):
+        return f"Defensive roles differ: {t_lean} for {target['player']} vs {c_lean} for {cand['player']}."
+    return None
+
+
+def _physical_clause(target, cand):
+    if target["ht_in"] is None or cand["ht_in"] is None:
+        return None
+    h_diff = abs(target["ht_in"] - cand["ht_in"])
+    w_diff = abs((target["wt"] or 0) - (cand["wt"] or 0))
+    if h_diff <= 1 and w_diff <= 15:
+        return _pick([
+            "Near-identical physical profiles for the two.",
+            f"{target['player']} and {cand['player']} carry essentially the same frame.",
+        ], target["player"], cand["player"], "phys")
+    if h_diff >= 4:
+        taller = target["player"] if target["ht_in"] > cand["ht_in"] else cand["player"]
+        shorter = cand["player"] if taller == target["player"] else target["player"]
+        return f"Notably different frames -- {taller} is sized up significantly versus {shorter}."
+    return None
+
+
+def _era_clause(target, cand):
+    gap = abs(target["season"] - cand["season"])
+    if gap == 0:
+        return f"Same-season snapshot: both from {target['season']}."
+    if gap >= 20:
+        return f"Cross-era comp spanning {gap} seasons ({min(target['season'], cand['season'])} vs {max(target['season'], cand['season'])})."
+    if gap >= 10:
+        return f"A {gap}-season gap separates these two -- different eras of the league."
+    return None
+
+
+def explain_comp(target, cand, breakdown):
+    """Plain-language basketball explanation for a single comp result. Builds
+    from several independent signals (role, efficiency, shot profile, defensive
+    role, physical build, era gap) and only includes the ones that are actually
+    notable for this specific pair, so the explanation text varies pair-to-pair
+    rather than reading as a fixed template repeated for every comp."""
+    core = [_role_clause(target, cand), _efficiency_clause(target, cand, breakdown)]
+    optional = [
+        _scoring_profile_clause(target, cand),
+        _defensive_role_clause(target, cand),
+        _physical_clause(target, cand),
+        _era_clause(target, cand),
+    ]
+    optional = [c for c in optional if c]
+    # Cap how many optional clauses get appended so the explanation stays
+    # readable. Rotate the starting point by a stable per-pair seed (rather than
+    # always taking the list in scoring/defense/physical/era order) so which
+    # signals surface first varies across different comps, not just whether
+    # they're present.
+    if optional:
+        rot = _seed(target["player"], cand["player"], "rot") % len(optional)
+        optional = optional[rot:] + optional[:rot]
+    max_optional = _pick([1, 2], target["player"], cand["player"], "count")
+    parts = core + optional[:max_optional]
     return " ".join(parts)
 
 
