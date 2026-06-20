@@ -2621,6 +2621,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 /* Slot base */
 .cmp-search-slot {
   position: relative;
+  z-index: 10;
   background: var(--panel);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
@@ -2785,6 +2786,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   padding: 18px 20px;
   min-width: 0; /* allow shrinking inside grid tracks instead of overflowing */
 }
+.cmp-overview2 .cmp-pcard { padding: 26px 28px; }
 .cmp-pcard-title {
   font-size: 0.7rem;
   font-weight: 700;
@@ -2856,6 +2858,9 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.cmp-overview2 .cmp-table4 thead th { font-size: 0.78rem; padding: 5px 8px 9px; }
+.cmp-overview2 .cmp-table4 tbody td { font-size: 0.92rem; padding: 9px 8px; }
+.cmp-overview2 .cmp-table4 tbody td:first-child { font-size: 0.8rem; }
 .cmp-table4 tbody tr:last-child td { border-bottom: none; }
 .cmp-table4 tbody tr:hover td { background: rgba(255,255,255,0.02); }
 .cmp-table4 .t4-best { font-weight: 900; color: #fff !important; }

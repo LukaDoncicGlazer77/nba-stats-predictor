@@ -1920,7 +1920,7 @@ function renderOverviewTab(container, active) {
       <div class="cmp-pcard">
         <div class="cmp-pcard-title">Attribute Radar</div>
         <div class="cmp-radar-legend">${active.map(a=>`<span style="color:${a.color}">⬤ ${a.player.name.split(" ").pop()}</span>`).join("")}</div>
-        <canvas id="cmpRadar" width="240" height="240" style="display:block;margin:0 auto"></canvas>
+        <canvas id="cmpRadar" width="340" height="340" style="display:block;margin:0 auto"></canvas>
       </div>
       <div class="cmp-pcard">
         <div class="cmp-pcard-title">Key Statistics</div>
@@ -1945,8 +1945,8 @@ function drawSpider4(canvasId, active) {
     ctx.closePath();ctx.save();ctx.globalAlpha=0.15;ctx.fillStyle=color;ctx.fill();ctx.restore();
     ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
   });
-  ctx.fillStyle="rgba(220,232,255,0.65)";ctx.font="bold 10px system-ui";ctx.textAlign="center";
-  labels.forEach((lbl,i)=>{const a=angle(i);ctx.fillText(lbl,cx+Math.cos(a)*(r+16),cy+Math.sin(a)*(r+16)+4);});
+  ctx.fillStyle="rgba(220,232,255,0.65)";ctx.font="bold 12px system-ui";ctx.textAlign="center";
+  labels.forEach((lbl,i)=>{const a=angle(i);ctx.fillText(lbl,cx+Math.cos(a)*(r+20),cy+Math.sin(a)*(r+20)+4);});
 }
 
 // ── Advanced Metrics ──────────────────────────────────────────────────────────
