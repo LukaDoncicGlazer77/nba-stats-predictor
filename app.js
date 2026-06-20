@@ -526,7 +526,7 @@ function projectPlayer(player) {
   const last = latestSeason(player);
   const projections = [];
   const keys = ["pts","reb","ast","three","stl","blk","tov","net","ts","min","gp","usg"];
-  const firstYear = Number(last.season.slice(0, 4)) + 1;
+  const firstYear = Number(last.season.slice(0, 4));
 
   for (let year = 1; year <= playerState.seasonsAhead; year++) {
     const age = last.age + year;
@@ -945,7 +945,8 @@ async function renderPredictions(player, projections = []) {
 
   const fmt1 = (v, fallback="—") => v != null ? Number(v).toFixed(1) : fallback;
   const fmtPct = (v, fallback="—") => v != null ? (Number(v) * 100).toFixed(1) + "%" : fallback;
-  const nextSeasonLabel = xgPreds ? `${(parseInt(last.season)||2025)+1}-${String((parseInt(last.season)||2025)+2).slice(2)}` : "Next Season";
+  const nextSeasonStart = parseInt(last.season)||2025;
+  const nextSeasonLabel = xgPreds ? `${nextSeasonStart}-${String(nextSeasonStart+1).slice(2)}` : "Next Season";
 
   // Circular ring math — r=42, circumference≈263.9
   const ringR = 42, ringC = 2 * Math.PI * ringR;
