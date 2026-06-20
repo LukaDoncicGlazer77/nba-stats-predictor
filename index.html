@@ -10,7 +10,7 @@
     <meta property="og:title" content="StatFuel" />
     <meta property="og:description" content="Explore NBA player stats, career trends, draft prospects, and award history." />
     <meta property="og:type" content="website" />
-    <link rel="stylesheet" href="styles.css?v=20260620-premium1" />
+    <link rel="stylesheet" href="styles.css?v=20260620-pop1" />
   </head>
   <body>
 
@@ -409,6 +409,15 @@
               </div>
             </div>
 
+            <!-- College Stats (hidden until a match is found) -->
+            <div class="pcard hidden" id="collegeStatsCard" style="margin-top:24px;">
+              <div class="pcard-head">
+                <h4>College Stats</h4>
+                <span class="pcard-sub" id="collegeStatsSub"></span>
+              </div>
+              <div class="table-wrap" id="collegeStatsPanel"></div>
+            </div>
+
           </div>
 
           <!-- Stats pane -->
@@ -749,7 +758,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260620-ncaa1"></script>
+    <script src="app.js?v=20260620-ncaa2"></script>
     <script>
       // ── Auth gate ──────────────────────────────────────────────────────────
       const USERS_KEY = 'sf_users';

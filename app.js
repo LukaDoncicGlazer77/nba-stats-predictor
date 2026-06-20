@@ -616,6 +616,7 @@ function renderPlayerProfile() {
   renderSeasonTable(player);
   renderPredictions(player, projections);
   loadArchetypePanel(player);
+  loadCollegeStatsPanel(player);
   syncControls();
   drawRadar(player);
   drawChart(player, projections, true);
@@ -1917,19 +1918,18 @@ async function renderCareerOutcomeView(container, prospect) {
 // Best-effort: the NCAA stats table may not be populated yet (it's loaded
 // separately via load_ncaa_stats.py), so a miss here just means the section
 // doesn't render -- never an error state on top of the career-outcome view.
-async function attachCollegeStats(prospect) {
-  let rows;
+async function fetchCollegeStats(name) {
   try {
-    rows = await fetch(`/api/ncaa-stats?name=${encodeURIComponent(prospect.name)}`).then(r => r.json());
+    const rows = await fetch(`/api/ncaa-stats?name=${encodeURIComponent(name)}`).then(r => r.json());
+    return Array.isArray(rows) ? rows : [];
   } catch {
-    return;
+    return [];
   }
-  if (!Array.isArray(rows) || !rows.length) return;
-  const card = document.getElementById("careerOutcomeCard");
-  if (!card) return;
-  card.insertAdjacentHTML("beforeend", `
-    <div class="cmp-pcard-title" style="margin-top:18px">College Stats${rows[0].team ? ` — ${escapeHtml(rows[0].team)}` : ""}</div>
-    <table class="cmp-table4">
+}
+
+function buildCollegeStatsTable(rows, tableClass = "cmp-table4") {
+  return `
+    <table class="${tableClass}">
       <thead><tr><th>Season</th><th>Team</th><th>GP</th><th>PTS</th><th>REB</th><th>AST</th><th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th></tr></thead>
       <tbody>${rows.map(r => `<tr>
         <td>${r.season ?? "—"}</td>
@@ -1946,7 +1946,35 @@ async function attachCollegeStats(prospect) {
     </table>
     <p style="color:var(--muted);font-size:0.72rem;margin-top:12px">
       Box-score totals from stats.ncaa.org. Advanced rate stats (AST%/OREB%/DREB%/USG%) only appear when both team and opponent season totals were available for that team's page.
-    </p>`);
+    </p>`;
+}
+
+// Best-effort: the NCAA stats table may not be populated yet (it's loaded
+// separately via load_ncaa_stats.py), so a miss here just means the section
+// doesn't render -- never an error state on top of the career-outcome view.
+async function attachCollegeStats(prospect) {
+  const rows = await fetchCollegeStats(prospect.name);
+  if (!rows.length) return;
+  const card = document.getElementById("careerOutcomeCard");
+  if (!card) return;
+  card.insertAdjacentHTML("beforeend", `
+    <div class="cmp-pcard-title" style="margin-top:18px">College Stats${rows[0].team ? ` — ${escapeHtml(rows[0].team)}` : ""}</div>
+    ${buildCollegeStatsTable(rows)}`);
+}
+
+// Same data source, surfaced on every NBA player's profile (most have an
+// NCAA history) rather than only on 2026 draft prospects. Hidden entirely
+// when there's no match -- most current NBA vets won't have rows yet since
+// the scraper hasn't been run against full historical data.
+async function loadCollegeStatsPanel(player) {
+  const card = $("#collegeStatsCard");
+  if (!card) return;
+  card.classList.add("hidden");
+  const rows = await fetchCollegeStats(player.name);
+  if (!rows.length) return;
+  $("#collegeStatsSub").textContent = rows[0].team ? `${rows[0].team}` : "";
+  $("#collegeStatsPanel").innerHTML = buildCollegeStatsTable(rows, "dark-table");
+  card.classList.remove("hidden");
 }
 
 // ── Overview ──────────────────────────────────────────────────────────────────

@@ -55,11 +55,20 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(680px circle at 8% 0%, rgba(124,92,255,0.22), transparent 60%),
-    radial-gradient(620px circle at 92% 8%, rgba(34,211,238,0.16), transparent 60%),
-    radial-gradient(720px circle at 22% 95%, rgba(91,140,255,0.14), transparent 60%),
-    radial-gradient(560px circle at 80% 85%, rgba(249,115,22,0.10), transparent 60%),
+    radial-gradient(720px circle at 8% 0%, rgba(124,92,255,0.34), transparent 62%),
+    radial-gradient(660px circle at 95% 5%, rgba(34,211,238,0.26), transparent 62%),
+    radial-gradient(760px circle at 18% 98%, rgba(91,140,255,0.24), transparent 62%),
+    radial-gradient(600px circle at 85% 90%, rgba(249,115,22,0.18), transparent 62%),
+    radial-gradient(520px circle at 50% 45%, rgba(31,227,160,0.08), transparent 65%),
     var(--bg);
+}
+
+/* Gradient-text treatment for hero/headline numbers */
+.stat-pop {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2) 55%, var(--accent-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 button, input, select { font: inherit; }
@@ -462,8 +471,9 @@ button, input, select { font: inherit; }
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(124,140,255,0.3), transparent);
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3));
+  opacity: 0.85;
 }
 
 .stat-card.wide {
@@ -559,7 +569,13 @@ button, input, select { font: inherit; }
 .leaders-table tbody tr:nth-child(2) .rank { color: #d6dce6; }
 .leaders-table tbody tr:nth-child(3) .rank { color: #e0a36b; }
 
-.leaders-table .highlight { font-weight: 700; }
+.leaders-table .highlight {
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2) 55%, var(--accent-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 
 .mini-leaderboard {
   list-style: none;
@@ -683,9 +699,9 @@ button, input, select { font: inherit; }
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--blue), var(--sidebar-active));
-  opacity: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3));
+  opacity: 0.55;
   transition: opacity 0.18s;
 }
 
@@ -752,7 +768,10 @@ button, input, select { font: inherit; }
   display: block;
   font-size: 0.92rem;
   font-weight: 800;
-  color: var(--ink);
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2) 55%, var(--accent-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .player-card-stat span {
@@ -964,7 +983,7 @@ button, input, select { font: inherit; }
 
 .hero-stat:hover { background: rgba(124,140,255,0.08); }
 
-.hero-stat strong { display: block; font-size: 1.5rem; font-weight: 800; }
+.hero-stat strong { display: block; font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-1), var(--accent-2) 55%, var(--accent-3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero-stat span { color: rgba(220,232,255,0.5); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
 
 .overview-grid, .workbench {
@@ -1544,6 +1563,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   padding: 20px 28px 28px;
 }
 .profile-pane.hidden { display: none; }
+.pcard.hidden { display: none; }
 
 .profile-grid-2 {
   display: grid;
@@ -3089,7 +3109,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .cmp-pcard:hover,
 .radar-card:hover {
   transform: translateY(-3px);
-  box-shadow: var(--shadow-lift);
+  box-shadow: var(--shadow-lift), var(--glow-accent);
   border-color: rgba(255,255,255,0.14);
 }
 
