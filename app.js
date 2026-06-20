@@ -1698,7 +1698,7 @@ function renderPlayerBar() {
       const cached = archetypeSimCache[comparePlayers[0].playerId];
       if (cached) {
         const match = cached.find((s) => s.player === player.name);
-        if (match) simScore = Math.round(match.similarity);
+        if (match) simScore = match.similarity;
       } else {
         fetchArchetypeSimilar(comparePlayers[0]).then(() => renderPlayerBar());
       }
@@ -2123,14 +2123,13 @@ async function fetchSimilarTab(anchor) {
     if(similar&&similar.length){
       el.innerHTML=`<div class="cmp-comp-grid">${similar.slice(0,8).map(s=>{
         const narrative=s.explanation||"";
-        const simPct=Math.round(s.similarity);
+        const simPct=s.similarity;
         const subs=s.breakdown||{};
         const simColor=simPct>=80?"var(--green)":simPct>=60?"var(--sidebar-active)":"var(--muted)";
         const subBar=(label,val)=>{
           if(val==null)return"";
-          const pct=Math.round(val);
-          const c=pct>=80?"var(--green)":pct>=60?"var(--sidebar-active)":"var(--muted)";
-          return `<div class="cmp-sub-row"><span class="cmp-sub-lbl">${label}</span><div class="cmp-sub-track"><div class="cmp-sub-fill" style="width:${pct}%;background:${c}"></div></div><span class="cmp-sub-val" style="color:${c}">${pct}%</span></div>`;
+          const c=val>=80?"var(--green)":val>=60?"var(--sidebar-active)":"var(--muted)";
+          return `<div class="cmp-sub-row"><span class="cmp-sub-lbl">${label}</span><div class="cmp-sub-track"><div class="cmp-sub-fill" style="width:${Math.round(val)}%;background:${c}"></div></div><span class="cmp-sub-val" style="color:${c}">${val}%</span></div>`;
         };
         return `<div class="cmp-comp-card">
           <div class="cmp-comp-header">
