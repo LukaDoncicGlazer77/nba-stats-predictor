@@ -78,6 +78,17 @@ def q1(conn, sql, params=()):
     return cur.fetchone()
 
 
+def normalize_name_for_match(name) -> str:
+    """'Doe, John' -> 'john doe'; 'John Doe' -> 'john doe'. Must stay in sync
+    with the identically-named function in load_ncaa_stats.py, which builds
+    the name_key column this is matched against."""
+    name = str(name or "").strip()
+    if "," in name:
+        last, first = name.split(",", 1)
+        name = f"{first.strip()} {last.strip()}"
+    return re.sub(r"[^a-z ]", "", name.lower()).strip()
+
+
 def safe_int_py(val):
     try:
         return int(str(val).strip())
@@ -504,6 +515,35 @@ class Handler(SimpleHTTPRequestHandler):
             }
 
             return self.send_json({"prospect": prospect, "comps": comps, "summary": summary})
+
+        if parsed.path == "/api/ncaa-stats":
+            name = (params.get("name", [""])[0] or "").strip()
+            if not name:
+                return self.send_json({"error": "name required"}, status=400)
+            conn = connect()
+            try:
+                key = normalize_name_for_match(name)
+                try:
+                    rows = q(conn, """
+                        SELECT player_name, team, conference, division, position, class_year,
+                               height_in, weight_lb, season, academic_year, gp, gs, min,
+                               pts_per_game, reb_per_game, ast_per_game, stl_per_game, blk_per_game,
+                               tov_per_game, fg_pct, fg3_pct, ft_pct, ts_pct, efg_pct,
+                               ast_pct, oreb_pct, dreb_pct, usg_pct, data_quality_flag
+                        FROM archive_ncaa_player_stats
+                        WHERE name_key = ?
+                        ORDER BY academic_year
+                    """, (key,))
+                except psycopg2.Error:
+                    # Table may not exist yet if load_ncaa_stats.py hasn't been
+                    # run -- this is an optional, best-effort enrichment, not a
+                    # hard dependency, so degrade to an empty result rather
+                    # than a 500.
+                    conn.rollback()
+                    rows = []
+            finally:
+                conn.close()
+            return self.send_json_rows(rows)
 
         if parsed.path == "/api/allstars":
             conn = connect()

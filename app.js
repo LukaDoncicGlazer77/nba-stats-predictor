@@ -1883,7 +1883,7 @@ async function renderCareerOutcomeView(container, prospect) {
     return;
   }
   container.innerHTML = `
-    <div class="cmp-pcard" style="max-width:920px;margin:0 auto">
+    <div class="cmp-pcard" style="max-width:920px;margin:0 auto" id="careerOutcomeCard">
       <div class="cmp-pcard-title">Projected Career Outcome — ${prospect.name}</div>
       <p style="color:var(--muted);font-size:0.85rem;margin:4px 0 16px">
         Based on ${summary.comp_count} historical draft picks near projected slot #${prospect.rank}${prospect.position ? ` at a similar position (${prospect.position})` : ""}.
@@ -1911,6 +1911,42 @@ async function renderCareerOutcomeView(container, prospect) {
         Comps are matched by draft slot and position only (no measurables or scouting data for 2026 prospects) — treat as a rough historical baseline, not a scouting projection. Recently drafted comps reflect only 1–2 seasons of data.
       </p>
     </div>`;
+  attachCollegeStats(prospect);
+}
+
+// Best-effort: the NCAA stats table may not be populated yet (it's loaded
+// separately via load_ncaa_stats.py), so a miss here just means the section
+// doesn't render -- never an error state on top of the career-outcome view.
+async function attachCollegeStats(prospect) {
+  let rows;
+  try {
+    rows = await fetch(`/api/ncaa-stats?name=${encodeURIComponent(prospect.name)}`).then(r => r.json());
+  } catch {
+    return;
+  }
+  if (!Array.isArray(rows) || !rows.length) return;
+  const card = document.getElementById("careerOutcomeCard");
+  if (!card) return;
+  card.insertAdjacentHTML("beforeend", `
+    <div class="cmp-pcard-title" style="margin-top:18px">College Stats${rows[0].team ? ` — ${escapeHtml(rows[0].team)}` : ""}</div>
+    <table class="cmp-table4">
+      <thead><tr><th>Season</th><th>Team</th><th>GP</th><th>PTS</th><th>REB</th><th>AST</th><th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th></tr></thead>
+      <tbody>${rows.map(r => `<tr>
+        <td>${r.season ?? "—"}</td>
+        <td>${escapeHtml(r.team || "—")}</td>
+        <td>${r.gp ?? "—"}</td>
+        <td>${r.pts_per_game ?? "—"}</td>
+        <td>${r.reb_per_game ?? "—"}</td>
+        <td>${r.ast_per_game ?? "—"}</td>
+        <td>${r.fg_pct ?? "—"}</td>
+        <td>${r.fg3_pct ?? "—"}</td>
+        <td>${r.ft_pct ?? "—"}</td>
+        <td>${r.ts_pct ?? "—"}</td>
+      </tr>`).join("")}</tbody>
+    </table>
+    <p style="color:var(--muted);font-size:0.72rem;margin-top:12px">
+      Box-score totals from stats.ncaa.org. Advanced rate stats (AST%/OREB%/DREB%/USG%) only appear when both team and opponent season totals were available for that team's page.
+    </p>`);
 }
 
 // ── Overview ──────────────────────────────────────────────────────────────────
