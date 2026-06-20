@@ -1975,28 +1975,42 @@ function renderScoutingTab(container, active) {
       if((+last.stl||0)>=1.5)str.push(`Ball-hawk (${(+last.stl).toFixed(1)} SPG)`);
       if((+last.ts||0)>=60) str.push(`Efficient scorer (${(+last.ts).toFixed(1)} TS%)`);
       if((+last.net||0)>=3) str.push(`High impact (${(+last.net).toFixed(1)} BPM)`);
+      if((+last.usg||0)>=30)str.push(`High-usage offensive engine (${(+last.usg).toFixed(1)} USG%)`);
+      if((+last.three||0)>=2.5)str.push(`High-volume 3PT threat (${(+last.three).toFixed(1)} 3PM)`);
+      if((+last.obpm||0)>=4)str.push(`Plus offensive impact (${(+last.obpm).toFixed(1)} OBPM)`);
+      if((+last.dbpm||0)>=3)str.push(`Plus defensive impact (${(+last.dbpm).toFixed(1)} DBPM)`);
+      if((+last.vorp||0)>=5)str.push(`High season value (${(+last.vorp).toFixed(1)} VORP)`);
+      if((+last.ws||0)>=8)str.push(`Major win contributor (${(+last.ws).toFixed(1)} Win Shares)`);
+      if((+last.per||0)>=22)str.push(`Elite per-possession production (${(+last.per).toFixed(1)} PER)`);
+      if((+last.gp||0)>=75)str.push(`Highly durable (${last.gp} games played)`);
       if((+last.tov||0)>=3.5)wk.push(`Turnover-prone (${(+last.tov).toFixed(1)} TOV)`);
       if((+last.ts||0)<50&&last.ts)wk.push(`Below-avg efficiency (${(+last.ts).toFixed(1)} TS%)`);
       if((+last.net||0)<-1&&last.net)wk.push(`Negative impact (${(+last.net).toFixed(1)} BPM)`);
+      if((+last.obpm||0)<-1&&last.obpm)wk.push(`Limited offensive impact (${(+last.obpm).toFixed(1)} OBPM)`);
+      if((+last.dbpm||0)<-1&&last.dbpm)wk.push(`Defensive liability (${(+last.dbpm).toFixed(1)} DBPM)`);
+      if((+last.vorp||0)<1&&last.vorp!=null)wk.push(`Minimal season impact (${(+last.vorp).toFixed(1)} VORP)`);
+      if((+last.gp||0)>0&&(+last.gp||0)<50)wk.push(`Durability concern (${last.gp} games played)`);
+      if((+last.usg||0)<15&&last.usg)wk.push(`Limited offensive role (${(+last.usg).toFixed(1)} USG%)`);
+      if((+last.blk||0)<0.3&&(+last.reb||0)<4)wk.push(`Minimal rim/interior presence`);
       if(!str.length)str.push("Balanced contributor");
       if(!wk.length)wk.push("No major concerns identified");
     }
     return `<div class="cmp-scout-card" style="border-top:3px solid ${color}">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-        ${cmpAvatar(player,42)}
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+        ${cmpAvatar(player,52)}
         <div style="flex:1;min-width:0">
           <div class="cmp-scout-name">${player.name}</div>
           <div class="cmp-scout-archetype">${arch}</div>
         </div>
         <div style="text-align:center">
-          <div style="font-size:1.7rem;font-weight:900;color:${color};line-height:1">${score}</div>
-          <div style="font-size:0.6rem;color:var(--muted)">${tier}</div>
+          <div style="font-size:2.1rem;font-weight:900;color:${color};line-height:1">${score}</div>
+          <div style="font-size:0.68rem;color:var(--muted)">${tier}</div>
         </div>
       </div>
       <div class="cmp-scout-section">Strengths</div>
-      ${str.slice(0,3).map(s=>`<div class="cmp-scout-item" style="color:var(--green)">✓ ${s}</div>`).join("")}
+      ${str.slice(0,6).map(s=>`<div class="cmp-scout-item" style="color:var(--green)">✓ ${s}</div>`).join("")}
       <div class="cmp-scout-section">Areas to Improve</div>
-      ${wk.slice(0,2).map(w=>`<div class="cmp-scout-item" style="color:var(--muted)">↑ ${w}</div>`).join("")}
+      ${wk.slice(0,5).map(w=>`<div class="cmp-scout-item" style="color:var(--muted)">↑ ${w}</div>`).join("")}
     </div>`;
   }).join("");
   container.innerHTML=`<div class="cmp-scout-grid">${cards}</div>`;
