@@ -344,7 +344,9 @@ def _composite_similarity(a, b):
         "physical_similarity": round(100 * physical_sim, 1) if physical_sim is not None else None,
         "efficiency_divergence": round(100 * efficiency_divergence, 1),
     }
-    return round(100 * score, 1), breakdown
+    # Unrounded: callers sort on this so near-ties aren't collapsed to the same
+    # value before ranking (that was producing arbitrary-order ties in the top 5).
+    return 100 * score, breakdown
 
 
 def _efficiency_label(pr):
@@ -390,18 +392,20 @@ def same_stage_comps(target, pool, top_n=5):
             continue
         if not _age_band_ok(target, cand):
             continue
-        score, breakdown = _composite_similarity(target, cand)
+        raw_score, breakdown = _composite_similarity(target, cand)
         results.append({
-            "player": cand["player"], "season": cand["season"], "similarity": score,
+            "player": cand["player"], "season": cand["season"],
+            "similarity": round(raw_score, 1), "_raw_score": raw_score,
             "dominant_engine": cand["dominant_engine"], "breakdown": breakdown,
             "explanation": explain_comp(target, cand, breakdown),
         })
-    results.sort(key=lambda r: -r["similarity"])
+    results.sort(key=lambda r: -r["_raw_score"])
     seen, out = set(), []
     for r in results:
         if r["player"] in seen:
             continue
         seen.add(r["player"])
+        del r["_raw_score"]
         out.append(r)
         if len(out) == top_n:
             break
@@ -414,18 +418,20 @@ def projected_engine_comps(target, pool, top_n=5):
     for cand in pool:
         if cand["player_id"] == target["player_id"]:
             continue
-        score, breakdown = _composite_similarity(target, cand)
+        raw_score, breakdown = _composite_similarity(target, cand)
         results.append({
             "player": cand["player"], "season": cand["season"],
-            "engine_similarity": score, "dominant_engine": cand["dominant_engine"], "breakdown": breakdown,
+            "engine_similarity": round(raw_score, 1), "_raw_score": raw_score,
+            "dominant_engine": cand["dominant_engine"], "breakdown": breakdown,
             "explanation": explain_comp(target, cand, breakdown),
         })
-    results.sort(key=lambda r: -r["engine_similarity"])
+    results.sort(key=lambda r: -r["_raw_score"])
     seen, out = set(), []
     for r in results:
         if r["player"] in seen:
             continue
         seen.add(r["player"])
+        del r["_raw_score"]
         out.append(r)
         if len(out) == top_n:
             break
