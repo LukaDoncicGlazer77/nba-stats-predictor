@@ -2536,11 +2536,128 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .onboard-next:hover { background: #6b7dff; transform: translateX(-50%) translateY(-1px); }
 .onboard-next:active { transform: translateX(-50%) translateY(0); }
 
+/* Step 0: quick-fact badges */
+.onboard-badges {
+  display: flex;
+  gap: 28px;
+  margin-top: 36px;
+}
+.onboard-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.onboard-badge strong {
+  font-size: 1.7rem;
+  font-weight: 800;
+  color: var(--sidebar-active);
+}
+.onboard-badge span {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Step 1: mock stat row */
+.onboard-mock-stats {
+  display: flex;
+  gap: 1px;
+  margin-top: 32px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.onboard-mock-stat {
+  background: rgba(255,255,255,0.03);
+  padding: 16px 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.onboard-mock-val { font-size: 1.3rem; font-weight: 800; color: var(--ink); }
+.onboard-mock-lbl { font-size: 0.64rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+
+/* Step 2: mock comp similarity bar */
+.onboard-mock-comp {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 14px 20px;
+}
+.onboard-mock-comp-name { font-size: 0.82rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.onboard-mock-comp-bar {
+  width: 140px;
+  height: 8px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+.onboard-mock-comp-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #7c5cff, #5b8cff);
+}
+.onboard-mock-comp-pct { font-size: 0.78rem; font-weight: 800; color: var(--sidebar-active); }
+
+/* Step 3: mock career-tier probability bars */
+.onboard-mock-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 32px;
+  width: 100%;
+  max-width: 380px;
+}
+.onboard-mock-tier {
+  display: grid;
+  grid-template-columns: 70px 1fr 36px;
+  align-items: center;
+  gap: 10px;
+}
+.onboard-mock-tier span:first-child { font-size: 0.74rem; font-weight: 600; color: var(--muted); text-align: left; }
+.onboard-mock-tier span:last-child { font-size: 0.74rem; font-weight: 700; color: var(--ink); text-align: right; }
+.onboard-mock-tier-track {
+  height: 8px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+.onboard-mock-tier-fill { height: 100%; border-radius: 5px; }
+
+/* Step 4: feature recap chips */
+.onboard-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 32px;
+}
+.onboard-chip {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(220,232,255,0.8);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 7px 16px;
+}
+
 @media (max-width: 600px) {
   .onboard-icon { font-size: 3.6rem; margin-bottom: 20px; }
   .onboard-skip { top: 16px; right: 16px; }
   .onboard-dots { bottom: 96px; }
   .onboard-next { bottom: 40px; width: 86%; max-width: 320px; }
+  .onboard-badges { gap: 18px; }
+  .onboard-mock-stat { padding: 12px 14px; }
+  .onboard-mock-comp { flex-wrap: wrap; justify-content: center; }
+  .onboard-mock-comp-bar { width: 100px; }
 }
 
 .login-logo {

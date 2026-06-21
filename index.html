@@ -10,7 +10,7 @@
     <meta property="og:title" content="StatFuel" />
     <meta property="og:description" content="Explore NBA player stats, career trends, draft prospects, and award history." />
     <meta property="og:type" content="website" />
-    <link rel="stylesheet" href="styles.css?v=20260621-onboardfull1" />
+    <link rel="stylesheet" href="styles.css?v=20260621-onboarddetail1" />
   </head>
   <body>
 
@@ -26,24 +26,59 @@
           <div class="onboard-icon">🏀</div>
           <h2 class="onboard-title">Welcome to StatFuel</h2>
           <p class="onboard-text">Deep NBA stats, comps, and predictions — built for fans who want more than box scores.</p>
+          <div class="onboard-badges">
+            <div class="onboard-badge"><strong>78</strong><span>Seasons of data</span></div>
+            <div class="onboard-badge"><strong>30K+</strong><span>Players tracked</span></div>
+            <div class="onboard-badge"><strong>9</strong><span>Player archetypes</span></div>
+          </div>
         </div>
 
         <div class="onboard-step" data-step="1">
           <div class="onboard-icon">📊</div>
           <h2 class="onboard-title">Every player, every season</h2>
-          <p class="onboard-text">Full career stats and trend charts for every NBA player since 1946–47, plus archetype-based comps instead of raw stat-matching.</p>
+          <p class="onboard-text">Full career stats and trend charts for every NBA player since 1946–47 — official rate stats, no estimation, plus development curves benchmarked against the typical career arc at every age.</p>
+          <div class="onboard-mock-stats">
+            <div class="onboard-mock-stat"><span class="onboard-mock-val">27.4</span><span class="onboard-mock-lbl">PTS</span></div>
+            <div class="onboard-mock-stat"><span class="onboard-mock-val">8.1</span><span class="onboard-mock-lbl">REB</span></div>
+            <div class="onboard-mock-stat"><span class="onboard-mock-val">9.6</span><span class="onboard-mock-lbl">AST</span></div>
+            <div class="onboard-mock-stat"><span class="onboard-mock-val">58.2%</span><span class="onboard-mock-lbl">TS</span></div>
+          </div>
         </div>
 
         <div class="onboard-step" data-step="2">
-          <div class="onboard-icon">⚖</div>
-          <h2 class="onboard-title">Compare and project</h2>
-          <p class="onboard-text">Stack up to 4 players side by side, explore development curves, and project 2026 draft prospects against historical career outcomes.</p>
+          <div class="onboard-icon">🧬</div>
+          <h2 class="onboard-title">Beyond stat-matching</h2>
+          <p class="onboard-text">Every player is a multi-label blend of 9 archetypes — Heliocentric Engine, 3&amp;D Wing, Rim Protector, and more — so comps are weighted by role and offensive burden, not just who scored the same number of points.</p>
+          <div class="onboard-mock-comp">
+            <span class="onboard-mock-comp-name">Luka Dončić</span>
+            <div class="onboard-mock-comp-bar"><div class="onboard-mock-comp-fill" style="width:91%"></div></div>
+            <span class="onboard-mock-comp-pct">91%</span>
+            <span class="onboard-mock-comp-name">Prime Harden</span>
+          </div>
         </div>
 
         <div class="onboard-step" data-step="3">
+          <div class="onboard-icon">🎯</div>
+          <h2 class="onboard-title">Project the 2026 draft class</h2>
+          <p class="onboard-text">See where a prospect's mock-draft slot historically lands — career-outcome baselines from real picks at a similar position, plus a tier breakdown of likely career outcomes.</p>
+          <div class="onboard-mock-tiers">
+            <div class="onboard-mock-tier"><span>All-Star</span><div class="onboard-mock-tier-track"><div class="onboard-mock-tier-fill" style="width:22%;background:#facc15"></div></div><span>22%</span></div>
+            <div class="onboard-mock-tier"><span>Starter</span><div class="onboard-mock-tier-track"><div class="onboard-mock-tier-fill" style="width:41%;background:#7c8cff"></div></div><span>41%</span></div>
+            <div class="onboard-mock-tier"><span>Rotation</span><div class="onboard-mock-tier-track"><div class="onboard-mock-tier-fill" style="width:28%;background:#1fe3a0"></div></div><span>28%</span></div>
+            <div class="onboard-mock-tier"><span>Bust</span><div class="onboard-mock-tier-track"><div class="onboard-mock-tier-fill" style="width:9%;background:#ff4560"></div></div><span>9%</span></div>
+          </div>
+        </div>
+
+        <div class="onboard-step" data-step="4">
           <div class="onboard-icon">🚀</div>
           <h2 class="onboard-title">Ready to dive in?</h2>
-          <p class="onboard-text">Create a free account to save players to your watchlist, or sign in if you already have one.</p>
+          <p class="onboard-text">Create a free account to save players to your watchlist and pick up where you left off, or sign in if you already have one.</p>
+          <div class="onboard-chips">
+            <span class="onboard-chip">🔖 Watchlist</span>
+            <span class="onboard-chip">⚖ Compare 4 players</span>
+            <span class="onboard-chip">📈 Trend charts</span>
+            <span class="onboard-chip">🏆 Draft Projection</span>
+          </div>
         </div>
 
         <div class="onboard-dots" id="onboardDots">
@@ -51,6 +86,7 @@
           <span class="onboard-dot" data-dot="1"></span>
           <span class="onboard-dot" data-dot="2"></span>
           <span class="onboard-dot" data-dot="3"></span>
+          <span class="onboard-dot" data-dot="4"></span>
         </div>
 
         <button class="onboard-next" id="onboardNext">Next</button>
