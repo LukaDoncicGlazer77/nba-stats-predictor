@@ -56,8 +56,7 @@ SALARY_CAPS_M = {
     2020: 109.14, 2021: 112.414, 2022: 123.655, 2023: 136.021, 2024: 140.588,
     2025: 155.00, 2026: 170.00,
 }
-DATABASE_URL = os.environ.get("DATABASE_URL") or \
-    "postgresql://postgres:LukaDoncic77@db.ovgnihzycxdjzouurpfz.supabase.co:5432/postgres"
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 
 def connect():
