@@ -2342,7 +2342,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .cmp-overview4, .cmp-overview2 { grid-template-columns: 1fr; }
   .cmp-player-bar { grid-template-columns: repeat(2, 1fr); }
   .pred-grid { grid-template-columns: 1fr; }
-  .co-stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .co-hero-stats { grid-template-columns: repeat(2, 1fr); }
 
   .profile-topnav { flex-wrap: wrap; padding: 10px 16px; gap: 8px; }
   .profile-tab-group { flex: 1 1 100%; order: 3; overflow-x: auto; justify-content: flex-start; }
@@ -2356,7 +2356,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .player-avatar-hero { width: 76px; height: 76px; font-size: 1.5rem; }
   .profile-hero-main { gap: 14px; }
   .cmp-player-bar { grid-template-columns: 1fr; }
-  .co-stat-grid { grid-template-columns: 1fr; }
+  .co-hero-stats { grid-template-columns: 1fr; }
   .profile-hero-statrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -2419,87 +2419,97 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   box-shadow: 0 24px 80px rgba(0,0,0,0.6);
 }
 
-/* ── Onboarding (first-visit welcome) ── */
+/* ── Onboarding (first-visit welcome) — full-screen page, not a modal ── */
 #onboardingScreen {
   position: fixed;
   inset: 0;
   z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
+  width: 100vw;
+  height: 100vh;
+  background: var(--bg);
+  overflow: hidden;
 }
 
 .onboard-card {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 440px;
-  background: var(--panel);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--card-border);
-  border-radius: 18px;
-  padding: 48px 40px 36px;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  padding: 32px 24px;
+  box-sizing: border-box;
 }
 
 .onboard-skip {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 28px;
+  right: 32px;
   background: none;
-  border: none;
+  border: 1px solid rgba(255,255,255,0.12);
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 6px;
-  transition: color 0.15s, background 0.15s;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
-.onboard-skip:hover { color: var(--ink); background: rgba(255,255,255,0.05); }
+.onboard-skip:hover { color: var(--ink); background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.25); }
 
 .onboard-step { display: none; }
-.onboard-step.active { display: block; animation: onboardFade 0.3s ease; }
+.onboard-step.active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 600px;
+  animation: onboardFade 0.35s ease;
+}
 
 @keyframes onboardFade {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .onboard-icon {
-  font-size: 2.6rem;
-  margin-bottom: 16px;
+  font-size: 5rem;
+  margin-bottom: 28px;
   line-height: 1;
+  filter: drop-shadow(0 8px 30px rgba(124,92,255,0.35));
 }
 
 .onboard-title {
-  font-size: 1.4rem;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
   font-weight: 800;
   color: var(--ink);
-  margin: 0 0 12px;
+  margin: 0 0 18px;
+  letter-spacing: -0.01em;
 }
 
 .onboard-text {
-  font-size: 0.9rem;
+  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
   color: var(--muted);
-  line-height: 1.55;
-  margin: 0 0 28px;
-  min-height: 66px;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 520px;
 }
 
 .onboard-dots {
+  position: absolute;
+  bottom: 110px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   justify-content: center;
-  gap: 8px;
-  margin-bottom: 22px;
+  gap: 10px;
 }
 
 .onboard-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: rgba(255,255,255,0.15);
   cursor: pointer;
@@ -2508,22 +2518,29 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .onboard-dot.active { background: var(--sidebar-active); transform: scale(1.3); }
 
 .onboard-next {
-  width: 100%;
-  height: 46px;
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 50px;
   border: none;
   border-radius: 10px;
   background: var(--sidebar-active);
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s, transform 0.1s;
 }
-.onboard-next:hover { background: #6b7dff; transform: translateY(-1px); }
-.onboard-next:active { transform: translateY(0); }
+.onboard-next:hover { background: #6b7dff; transform: translateX(-50%) translateY(-1px); }
+.onboard-next:active { transform: translateX(-50%) translateY(0); }
 
-@media (max-width: 480px) {
-  .onboard-card { padding: 40px 24px 28px; max-width: 92vw; }
+@media (max-width: 600px) {
+  .onboard-icon { font-size: 3.6rem; margin-bottom: 20px; }
+  .onboard-skip { top: 16px; right: 16px; }
+  .onboard-dots { bottom: 96px; }
+  .onboard-next { bottom: 40px; width: 86%; max-width: 320px; }
 }
 
 .login-logo {
