@@ -1057,11 +1057,28 @@ async function renderPredictions(player, projections = []) {
   `;
 }
 
+// Canvas charts use a fixed width/height attribute (e.g. 1400x380) but are
+// displayed at `width:100%` in CSS, which can be much narrower than 1400px —
+// the browser then scales the whole drawing (including text) down to fit,
+// making labels unreadably small on anything but a very wide viewport. This
+// resizes the backing buffer to match the actual on-screen size (scaled by
+// devicePixelRatio for crispness) so fonts are drawn at their real px size.
+function sizeCanvasToDisplay(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const aspect = (canvas.getAttribute("height") || canvas.height) / (canvas.getAttribute("width") || canvas.width);
+  const cssWidth = canvas.clientWidth || canvas.parentElement.clientWidth || 700;
+  const cssHeight = Math.round(cssWidth * aspect);
+  canvas.width = Math.round(cssWidth * dpr);
+  canvas.height = Math.round(cssHeight * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: cssWidth, h: cssHeight };
+}
+
 function drawChart(player, projections = [], dark = false, canvasId = "trendChart", metric = playerState.metric) {
   const canvas = $(`#${canvasId}`);
   if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width, h = canvas.height;
+  const { ctx, w, h } = sizeCanvasToDisplay(canvas);
   const pad = { top: 28, right: 28, bottom: 58, left: 52 };
   const actual = player.seasons.map((s) => ({ label: s.season, value: s[metric], type: "actual" }));
   const proj = projections.map((s) => ({ label: s.season, value: s[metric], type: "projected" }));
@@ -1116,8 +1133,7 @@ function drawChart(player, projections = [], dark = false, canvasId = "trendChar
 function drawDevCurve(player, dark = false) {
   const canvas = $("#devCurveChart");
   if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width, h = canvas.height;
+  const { ctx, w, h } = sizeCanvasToDisplay(canvas);
   const pad = { top: 36, right: 110, bottom: 42, left: 52 };
   const metric = playerState.metric;
 
