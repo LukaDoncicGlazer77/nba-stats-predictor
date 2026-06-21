@@ -2284,16 +2284,75 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .stat-card.wide { grid-column: span 2; }
 }
 
+/* Mobile nav drawer toggle button — hidden on desktop, shown via the
+   @media block below. Lives in the topbar. */
+.mobile-nav-toggle {
+  display: none;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  color: var(--ink);
+  cursor: pointer;
+}
+.mobile-nav-toggle svg { width: 18px; height: 18px; }
+
+.mobile-nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 99;
+}
+.mobile-nav-backdrop.open { display: block; }
+
 @media (max-width: 800px) {
   :root { --sidebar-w: 0px; }
-  .sidebar { display: none; }
   .main-content { margin-left: 0; }
+  .mobile-nav-toggle { display: flex; }
+  .topbar { padding: 10px 16px; }
+
+  /* Sidebar becomes an off-canvas drawer instead of disappearing entirely —
+     without this there was no way to navigate the app at all on mobile. */
+  .sidebar {
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .page { padding: 18px 16px; }
+  .page-header { flex-wrap: wrap; }
   .players-shell { grid-template-columns: 1fr; }
   .comparison-selectors { grid-template-columns: 1fr; }
   .vs-badge { margin: 0 auto; }
   .compare-cards { grid-template-columns: 1fr; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .stat-card.wide { grid-column: span 1; }
+
+  .cmp-overview4, .cmp-overview2 { grid-template-columns: 1fr; }
+  .cmp-player-bar { grid-template-columns: repeat(2, 1fr); }
+  .pred-grid { grid-template-columns: 1fr; }
+  .co-stat-grid { grid-template-columns: repeat(2, 1fr); }
+
+  .profile-topnav { flex-wrap: wrap; padding: 10px 16px; gap: 8px; }
+  .profile-tab-group { flex: 1 1 100%; order: 3; overflow-x: auto; justify-content: flex-start; }
+  .profile-hero-statrow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .page { padding: 14px 12px; }
+  .topbar-search-wrap { max-width: none; }
+  .topbar-user { display: none; }
+  .player-avatar-hero { width: 76px; height: 76px; font-size: 1.5rem; }
+  .profile-hero-main { gap: 14px; }
+  .cmp-player-bar { grid-template-columns: 1fr; }
+  .co-stat-grid { grid-template-columns: 1fr; }
+  .profile-hero-statrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ── Auth Screen ────────────────────────────────────────────────────────── */

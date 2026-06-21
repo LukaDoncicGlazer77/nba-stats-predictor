@@ -10,7 +10,7 @@
     <meta property="og:title" content="StatFuel" />
     <meta property="og:description" content="Explore NBA player stats, career trends, draft prospects, and award history." />
     <meta property="og:type" content="website" />
-    <link rel="stylesheet" href="styles.css?v=20260621-careeroutcome1" />
+    <link rel="stylesheet" href="styles.css?v=20260621-mobilefix1" />
   </head>
   <body>
 
@@ -107,7 +107,7 @@
     <div class="app-shell" id="appShell" style="display:none">
 
       <!-- Sidebar Navigation -->
-      <nav class="sidebar" aria-label="Main navigation">
+      <nav class="sidebar" id="sidebar" aria-label="Main navigation">
         <div class="brand">
           <div class="brand-logo">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 64" width="42" height="48" aria-hidden="true">
@@ -205,11 +205,17 @@
         </div>
       </nav>
 
+      <!-- Mobile nav drawer backdrop -->
+      <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
+
       <!-- Main Content -->
       <main class="main-content">
 
         <!-- Top Bar -->
         <div class="topbar">
+          <button class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Open menu">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="2.5" y1="5.5" x2="17.5" y2="5.5"/><line x1="2.5" y1="10" x2="17.5" y2="10"/><line x1="2.5" y1="14.5" x2="17.5" y2="14.5"/></svg>
+          </button>
           <div class="topbar-search-wrap">
             <svg class="topbar-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><line x1="13" y1="13" x2="18" y2="18"/></svg>
             <input id="globalSearch" type="search" placeholder="Search players and teams..." class="global-search" />
@@ -790,7 +796,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260621-careeroutcome1"></script>
+    <script src="app.js?v=20260621-mobilefix1"></script>
     <script>
       // ── Auth gate ──────────────────────────────────────────────────────────
       const USERS_KEY = 'sf_users';

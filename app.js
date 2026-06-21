@@ -123,11 +123,27 @@ function navigate(section) {
     else renderCareerOutcomeBar();
     renderCareerOutcomePage();
   }
+  closeMobileNav();
 }
 
 document.querySelectorAll(".nav-item").forEach((btn) => {
   btn.addEventListener("click", () => navigate(btn.dataset.section));
 });
+
+// ── Mobile nav drawer ───────────────────────────────────────────────────────
+// The sidebar is the only navigation in the app; on narrow viewports it's an
+// off-canvas drawer toggled by a hamburger button instead of being hidden
+// outright (which used to leave mobile users with no way to navigate at all).
+function openMobileNav() {
+  $("#sidebar")?.classList.add("open");
+  $("#mobileNavBackdrop")?.classList.add("open");
+}
+function closeMobileNav() {
+  $("#sidebar")?.classList.remove("open");
+  $("#mobileNavBackdrop")?.classList.remove("open");
+}
+$("#mobileNavToggle")?.addEventListener("click", openMobileNav);
+$("#mobileNavBackdrop")?.addEventListener("click", closeMobileNav);
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
