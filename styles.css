@@ -355,6 +355,11 @@ button, input, select { font: inherit; }
 
 .global-search-results.hidden { display: none; }
 
+/* Generic hidden-state class — several elements (e.g. login/signup error
+   boxes) rely on .hidden alone with no other scoping class, so the more
+   specific .foo.hidden rules above don't cover them. */
+.hidden { display: none; }
+
 .search-result-item {
   display: flex;
   align-items: center;
@@ -2412,6 +2417,113 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   border-radius: 18px;
   padding: 40px 36px;
   box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+}
+
+/* ── Onboarding (first-visit welcome) ── */
+#onboardingScreen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.onboard-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  background: var(--panel);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  padding: 48px 40px 36px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  text-align: center;
+}
+
+.onboard-skip {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.onboard-skip:hover { color: var(--ink); background: rgba(255,255,255,0.05); }
+
+.onboard-step { display: none; }
+.onboard-step.active { display: block; animation: onboardFade 0.3s ease; }
+
+@keyframes onboardFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.onboard-icon {
+  font-size: 2.6rem;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.onboard-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 12px;
+}
+
+.onboard-text {
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 28px;
+  min-height: 66px;
+}
+
+.onboard-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.onboard-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.onboard-dot.active { background: var(--sidebar-active); transform: scale(1.3); }
+
+.onboard-next {
+  width: 100%;
+  height: 46px;
+  border: none;
+  border-radius: 10px;
+  background: var(--sidebar-active);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.onboard-next:hover { background: #6b7dff; transform: translateY(-1px); }
+.onboard-next:active { transform: translateY(0); }
+
+@media (max-width: 480px) {
+  .onboard-card { padding: 40px 24px 28px; max-width: 92vw; }
 }
 
 .login-logo {
