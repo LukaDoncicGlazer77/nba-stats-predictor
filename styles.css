@@ -33,8 +33,12 @@
 
 * { box-sizing: border-box; }
 
-html { background: var(--bg); }
+html { background: var(--bg); overflow-x: hidden; }
 
+/* Safety net: any single element that's accidentally wider than the
+   viewport (a fixed-width grid, a long unwrapped table, etc.) used to make
+   the whole page scroll sideways on mobile. This contains that at the
+   document level instead of relying on every component getting it right. */
 body {
   margin: 0;
   color: var(--ink);
@@ -45,6 +49,7 @@ body {
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   position: relative;
+  overflow-x: hidden;
 }
 
 /* Premium dark backdrop: flat near-black base + one soft muted glow, no colorful blobs */
@@ -2421,11 +2426,13 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 
 /* ── Onboarding (first-visit welcome) — full-screen page, not a modal ── */
 #onboardingScreen {
+  /* position:fixed + inset:0 already pins this to the visual viewport;
+     100vw/100vh double up on that and on mobile Safari 100vw can be wider
+     than the visible viewport (it ignores the scrollbar/UI chrome), which
+     is what was causing the page to scroll sideways. */
   position: fixed;
   inset: 0;
   z-index: 10000;
-  width: 100vw;
-  height: 100vh;
   background: var(--bg);
   overflow: hidden;
 }
