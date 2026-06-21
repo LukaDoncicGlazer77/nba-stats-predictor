@@ -1870,8 +1870,12 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 
 .b-conf {
-  flex: 1 1 0;
-  min-width: 0;
+  /* flex:1 1 0 + min-width:0 let this shrink to almost nothing on narrow
+     screens instead of letting .b-wrap's overflow-x:auto take over, which
+     crushed/overlapped the round columns. Give it a real floor so it
+     scrolls horizontally instead. */
+  flex: 0 0 auto;
+  min-width: 300px;
 }
 
 .b-conf-label {
@@ -1894,7 +1898,8 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 96px;
   padding: 0 6px;
   gap: 10px;
 }
