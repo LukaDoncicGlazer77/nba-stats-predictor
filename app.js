@@ -2014,18 +2014,20 @@ async function renderCareerOutcomeView(container, prospect) {
       </div>
 
       <div class="cmp-pcard-title co-comps-title">Closest Historical Draft Comps</div>
-      <table class="cmp-table4 co-comp-table">
-        <thead><tr><th>Player</th><th>Pick</th><th>Yr</th><th>PTS</th><th>REB</th><th>AST</th><th>Seasons</th></tr></thead>
-        <tbody>${comps.map(c => `<tr>
-          <td class="co-comp-name-cell">${co_avatar(c)}<span>${c.player}</span>${c.position_match ? `<span class="co-match-badge" title="Same position bucket">Pos match</span>` : ""}</td>
-          <td>#${c.overall_pick}</td>
-          <td>${c.draft_season}</td>
-          <td>${c.career_pts ?? "—"}</td>
-          <td>${c.career_reb ?? "—"}</td>
-          <td>${c.career_ast ?? "—"}</td>
-          <td>${c.seasons_played ?? "—"}</td>
-        </tr>`).join("")}</tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="cmp-table4 co-comp-table">
+          <thead><tr><th>Player</th><th>Pick</th><th>Yr</th><th>PTS</th><th>REB</th><th>AST</th><th>Seasons</th></tr></thead>
+          <tbody>${comps.map(c => `<tr>
+            <td class="co-comp-name-cell">${co_avatar(c)}<span>${c.player}</span>${c.position_match ? `<span class="co-match-badge" title="Same position bucket">Pos match</span>` : ""}</td>
+            <td>#${c.overall_pick}</td>
+            <td>${c.draft_season}</td>
+            <td>${c.career_pts ?? "—"}</td>
+            <td>${c.career_reb ?? "—"}</td>
+            <td>${c.career_ast ?? "—"}</td>
+            <td>${c.seasons_played ?? "—"}</td>
+          </tr>`).join("")}</tbody>
+        </table>
+      </div>
       <p class="co-footnote">
         Comps are matched by draft slot and position only (no measurables or scouting data for 2026 prospects) — treat as a rough historical baseline, not a scouting projection. Recently drafted comps reflect only 1–2 seasons of data.
       </p>
