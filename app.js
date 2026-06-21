@@ -1969,23 +1969,39 @@ async function renderCareerOutcomeView(container, prospect) {
     container.innerHTML = `<div class="compare-placeholder"><div>No comparable historical draft picks found for ${prospect.name}.</div></div>`;
     return;
   }
+  const co_icon = (key) => `<svg class="co-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PROJ_BREAKDOWN_ICONS[key] || ""}</svg>`;
+  const co_avatar = (c) => {
+    const ini = c.player.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+    return `<div class="co-comp-avatar" style="background:${stableColor(c.player)}">
+      <img src="/api/player-photo/${c.player_id}" onerror="this.style.display='none'" />
+      <span>${ini}</span>
+    </div>`;
+  };
+
   container.innerHTML = `
-    <div class="cmp-pcard" style="max-width:920px;margin:0 auto" id="careerOutcomeCard">
-      <div class="cmp-pcard-title">Projected Career Outcome — ${prospect.name}</div>
-      <p style="color:var(--muted);font-size:0.85rem;margin:4px 0 16px">
-        Based on ${summary.comp_count} historical draft picks near projected slot #${prospect.rank}${prospect.position ? ` at a similar position (${prospect.position})` : ""}.
-      </p>
-      <div class="cmp-overview4" style="grid-template-columns:repeat(4,1fr);gap:12px">
-        <div class="cmp-pcard"><div class="cmp-pcard-title">Avg Career PTS</div><div style="font-size:1.6rem;font-weight:800">${summary.avg_career_pts ?? "—"}</div></div>
-        <div class="cmp-pcard"><div class="cmp-pcard-title">Avg Career REB</div><div style="font-size:1.6rem;font-weight:800">${summary.avg_career_reb ?? "—"}</div></div>
-        <div class="cmp-pcard"><div class="cmp-pcard-title">Avg Career AST</div><div style="font-size:1.6rem;font-weight:800">${summary.avg_career_ast ?? "—"}</div></div>
-        <div class="cmp-pcard"><div class="cmp-pcard-title">Avg Seasons Played</div><div style="font-size:1.6rem;font-weight:800">${summary.avg_seasons_played ?? "—"}</div></div>
+    <div class="cmp-pcard co-card" style="max-width:960px;margin:0 auto" id="careerOutcomeCard">
+      <div class="co-card-head">
+        ${cmpAvatar(prospect, 52)}
+        <div>
+          <div class="cmp-pcard-title" style="margin-bottom:4px">Projected Career Outcome — ${prospect.name}</div>
+          <p class="co-sub">
+            Based on ${summary.comp_count} historical draft picks near projected slot #${prospect.rank}${prospect.position ? ` at a similar position (${prospect.position})` : ""}.
+          </p>
+        </div>
       </div>
-      <div class="cmp-pcard-title" style="margin-top:18px">Closest Historical Draft Comps</div>
-      <table class="cmp-table4">
-        <thead><tr><th>Player</th><th>Pick</th><th>Draft Yr</th><th>Career PTS</th><th>Career REB</th><th>Career AST</th><th>Seasons</th></tr></thead>
+
+      <div class="co-stat-grid">
+        <div class="co-stat-tile">${co_icon("pts")}<div class="co-stat-value">${summary.avg_career_pts ?? "—"}</div><div class="co-stat-label">Avg Career PTS</div></div>
+        <div class="co-stat-tile">${co_icon("reb")}<div class="co-stat-value">${summary.avg_career_reb ?? "—"}</div><div class="co-stat-label">Avg Career REB</div></div>
+        <div class="co-stat-tile">${co_icon("ast")}<div class="co-stat-value">${summary.avg_career_ast ?? "—"}</div><div class="co-stat-label">Avg Career AST</div></div>
+        <div class="co-stat-tile">${co_icon("gp")}<div class="co-stat-value">${summary.avg_seasons_played ?? "—"}</div><div class="co-stat-label">Avg Seasons Played</div></div>
+      </div>
+
+      <div class="cmp-pcard-title co-comps-title">Closest Historical Draft Comps</div>
+      <table class="cmp-table4 co-comp-table">
+        <thead><tr><th>Player</th><th>Pick</th><th>Yr</th><th>PTS</th><th>REB</th><th>AST</th><th>Seasons</th></tr></thead>
         <tbody>${comps.map(c => `<tr>
-          <td>${c.player}</td>
+          <td class="co-comp-name-cell">${co_avatar(c)}<span>${c.player}</span>${c.position_match ? `<span class="co-match-badge" title="Same position bucket">Pos match</span>` : ""}</td>
           <td>#${c.overall_pick}</td>
           <td>${c.draft_season}</td>
           <td>${c.career_pts ?? "—"}</td>
@@ -1994,7 +2010,7 @@ async function renderCareerOutcomeView(container, prospect) {
           <td>${c.seasons_played ?? "—"}</td>
         </tr>`).join("")}</tbody>
       </table>
-      <p style="color:var(--muted);font-size:0.72rem;margin-top:12px">
+      <p class="co-footnote">
         Comps are matched by draft slot and position only (no measurables or scouting data for 2026 prospects) — treat as a rough historical baseline, not a scouting projection. Recently drafted comps reflect only 1–2 seasons of data.
       </p>
     </div>`;

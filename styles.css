@@ -2987,6 +2987,127 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .cmp-table4 tbody tr:hover td { background-color: rgba(255,255,255,0.02); }
 .cmp-table4 .t4-best { font-weight: 900; color: #fff !important; }
 
+/* ── Career Outcome ── */
+.co-card-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.co-sub {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0;
+  max-width: 560px;
+}
+
+.co-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.co-stat-tile {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  padding: 18px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.co-stat-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--sidebar-active);
+  margin-bottom: 2px;
+}
+
+.co-stat-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.co-stat-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.co-comps-title { margin-top: 4px; }
+
+.co-comp-table { table-layout: auto; }
+.co-comp-table thead th,
+.co-comp-table tbody td { text-align: right; }
+.co-comp-table thead th:first-child,
+.co-comp-table tbody td:first-child { text-align: left; }
+
+.co-comp-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  color: rgba(220,232,255,0.85) !important;
+}
+
+.co-comp-avatar {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.co-comp-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.co-match-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--green);
+  background: rgba(0,212,138,0.12);
+  border: 1px solid rgba(0,212,138,0.25);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.co-footnote {
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .co-stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* Advanced metrics header */
 .cmp-adv-header {
   display: flex;
