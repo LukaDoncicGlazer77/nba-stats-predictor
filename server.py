@@ -284,6 +284,17 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/health":
             return self.send_json({"ok": True, "database": "supabase"})
 
+        if parsed.path == "/api/admin/user-count":
+            admin_key = os.environ.get("ADMIN_KEY")
+            if not admin_key or params.get("key", [""])[0] != admin_key:
+                return self.send_json({"error": "Not found"}, status=404)
+            conn = connect()
+            try:
+                row = q1(conn, "SELECT COUNT(*) FROM archive_users")
+            finally:
+                conn.close()
+            return self.send_json({"user_count": row[0]})
+
         if parsed.path == "/api/seasons":
             cached = _seasons_cache_get()
             if cached is not None:
