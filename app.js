@@ -1879,11 +1879,13 @@ function renderCareerOutcomeBar() {
   if (!bar) return;
   const color = cmpColor(0);
   if (!careerOutcomeProspect) {
-    bar.innerHTML = `<div class="cmp-search-slot" id="careerSlot0">
+    bar.innerHTML = `<div class="cmp-search-slot co-search-slot" id="careerSlot0">
       <div class="cmp-slot-inner">
-        <span class="cmp-slot-icon">+</span>
-        <span class="cmp-slot-label">Add Draft Prospect</span>
-        <input id="careerSearch0" type="search" placeholder="Search by name..." class="cmp-search-input" autocomplete="off" spellcheck="false"/>
+        <span class="co-slot-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        </span>
+        <span class="cmp-slot-label">Search for a 2026 draft prospect to project their career outcome</span>
+        <input id="careerSearch0" type="search" placeholder="Search by name..." class="cmp-search-input co-search-input" autocomplete="off" spellcheck="false"/>
       </div>
       <div class="compare-dropdown" id="careerDrop0"></div>
     </div>`;
@@ -1891,10 +1893,10 @@ function renderCareerOutcomeBar() {
     return;
   }
   const p = careerOutcomeProspect;
-  bar.innerHTML = `<div class="cmp-search-slot cmp-slot-filled" id="careerSlot0">
+  bar.innerHTML = `<div class="cmp-search-slot cmp-slot-filled co-search-slot co-search-slot-filled" id="careerSlot0">
     <div class="cmp-slot-color-bar" style="background:${color}"></div>
     <div class="cmp-selected-inner">
-      ${cmpAvatar(p, 44)}
+      ${cmpAvatar(p, 48)}
       <div class="cmp-selected-info">
         <div class="cmp-selected-name">${p.name}</div>
         <div class="cmp-selected-meta">${p.position||"—"} · ${p.team||"—"} · ${p.status||"Prospect"}</div>

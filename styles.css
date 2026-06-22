@@ -3442,6 +3442,57 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .cmp-table4 .t4-best { font-weight: 900; color: #fff !important; }
 
 /* ── Career Outcome ── */
+.co-search-bar {
+  grid-template-columns: 1fr;
+  max-width: 620px;
+  margin: 0 auto 24px;
+}
+
+.co-search-slot {
+  min-height: 0;
+  border-radius: 16px;
+  border-width: 1.5px;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.co-search-slot:not(.co-search-slot-filled) { padding: 8px 0; }
+.co-search-slot:not(.co-search-slot-filled):focus-within,
+.co-search-slot:not(.co-search-slot-filled):hover {
+  border-color: rgba(124,140,255,0.4);
+  box-shadow: 0 0 0 1px rgba(124,140,255,0.12), 0 12px 28px -10px rgba(124,92,255,0.35);
+}
+
+.co-slot-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: #fff;
+  box-shadow: 0 0 18px -3px rgba(124,92,255,0.55);
+}
+.co-slot-icon-badge svg { width: 18px; height: 18px; }
+
+.co-search-bar .cmp-slot-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(220,232,255,0.65);
+  text-align: center;
+  max-width: 380px;
+}
+
+.co-search-input {
+  max-width: 320px;
+  padding: 9px 14px;
+  font-size: 0.85rem;
+  border-radius: 9px;
+}
+
+.co-search-slot-filled .cmp-selected-inner { padding: 16px 18px; }
+.co-search-slot-filled .cmp-selected-name { font-size: 1rem; }
+.co-search-slot-filled .cmp-selected-meta { font-size: 0.74rem; }
+
 .co-card { padding: 0 !important; overflow: hidden; }
 
 .co-hero {
