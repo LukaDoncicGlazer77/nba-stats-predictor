@@ -2442,6 +2442,65 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   overflow: hidden;
 }
 
+/* Ambient layered backdrop: drifting color orbs + a faint dot grid, instead
+   of a flat color, for a more premium/"advanced product" feel. */
+.onboard-bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+
+.onboard-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.32;
+  will-change: transform;
+}
+.onboard-orb-1 {
+  width: 560px; height: 560px;
+  top: -180px; left: -120px;
+  background: radial-gradient(circle, #7c5cff, transparent 70%);
+  animation: onboardDrift1 22s ease-in-out infinite;
+}
+.onboard-orb-2 {
+  width: 480px; height: 480px;
+  bottom: -160px; right: -100px;
+  background: radial-gradient(circle, #22d3ee, transparent 70%);
+  animation: onboardDrift2 26s ease-in-out infinite;
+}
+.onboard-orb-3 {
+  width: 380px; height: 380px;
+  top: 40%; left: 60%;
+  background: radial-gradient(circle, #ff6b9d, transparent 70%);
+  opacity: 0.18;
+  animation: onboardDrift3 30s ease-in-out infinite;
+}
+@keyframes onboardDrift1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(60px, 40px); } }
+@keyframes onboardDrift2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-50px, -30px); } }
+@keyframes onboardDrift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-40px, 50px) scale(1.1); } }
+
+.onboard-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(0,0,0,0.9), transparent 80%);
+}
+
+/* Thin progress bar fixed to the very top of the screen */
+.onboard-progress {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  z-index: 2;
+}
+.onboard-progress-fill {
+  height: 100%;
+  width: 20%;
+  background: var(--accent-grad);
+  box-shadow: 0 0 12px rgba(124,92,255,0.6);
+  transition: width 0.4s ease;
+}
+
 .onboard-card {
   position: relative;
   z-index: 1;
@@ -2460,6 +2519,9 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   position: absolute;
   top: 28px;
   right: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: none;
   border: 1px solid rgba(255,255,255,0.12);
   color: var(--muted);
@@ -2470,6 +2532,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   border-radius: 8px;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
+.onboard-skip svg { width: 13px; height: 13px; }
 .onboard-skip:hover { color: var(--ink); background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.25); }
 
 .onboard-step { display: none; }
@@ -2478,20 +2541,42 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   flex-direction: column;
   align-items: center;
   max-width: 600px;
-  animation: onboardFade 0.35s ease;
+  animation: onboardFade 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes onboardFade {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.onboard-icon {
-  font-size: 5rem;
-  margin-bottom: 28px;
-  line-height: 1;
-  filter: drop-shadow(0 8px 30px rgba(124,92,255,0.35));
+.onboard-icon-badge {
+  --badge-grad: var(--accent-grad);
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 28px;
+  display: grid;
+  place-items: center;
+  background: var(--badge-grad);
+  margin-bottom: 32px;
+  box-shadow: 0 16px 40px -10px rgba(124,92,255,0.5), inset 0 1px 0 rgba(255,255,255,0.25);
 }
+.onboard-icon-badge::after {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 36px;
+  background: var(--badge-grad);
+  opacity: 0.35;
+  filter: blur(22px);
+  z-index: -1;
+  animation: onboardPulse 2.6s ease-in-out infinite;
+}
+@keyframes onboardPulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.96); }
+  50% { opacity: 0.45; transform: scale(1.06); }
+}
+.onboard-icon-badge svg { width: 46px; height: 46px; color: #fff; }
 
 .onboard-title {
   font-size: clamp(1.8rem, 4vw, 2.8rem);
@@ -2499,6 +2584,12 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   color: var(--ink);
   margin: 0 0 18px;
   letter-spacing: -0.01em;
+}
+.onboard-title-accent {
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .onboard-text {
@@ -2525,9 +2616,13 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   border-radius: 50%;
   background: rgba(255,255,255,0.15);
   cursor: pointer;
-  transition: background 0.2s, transform 0.2s;
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
 }
-.onboard-dot.active { background: var(--sidebar-active); transform: scale(1.3); }
+.onboard-dot.active {
+  background: var(--sidebar-active);
+  transform: scale(1.3);
+  box-shadow: 0 0 10px rgba(124,140,255,0.8);
+}
 
 .onboard-next {
   position: absolute;
@@ -2535,35 +2630,63 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   left: 50%;
   transform: translateX(-50%);
   width: 220px;
-  height: 50px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: none;
-  border-radius: 10px;
-  background: var(--sidebar-active);
+  border-radius: 12px;
+  background: var(--accent-grad);
   color: #fff;
   font-size: 0.98rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  box-shadow: 0 12px 32px -8px rgba(124,92,255,0.55);
+  transition: transform 0.15s, box-shadow 0.15s;
 }
-.onboard-next:hover { background: #6b7dff; transform: translateX(-50%) translateY(-1px); }
+.onboard-next svg { width: 15px; height: 15px; transition: transform 0.2s; }
+.onboard-next:hover { transform: translateX(-50%) translateY(-2px); box-shadow: 0 16px 38px -8px rgba(124,92,255,0.7); }
+.onboard-next:hover svg { transform: translateX(3px); }
 .onboard-next:active { transform: translateX(-50%) translateY(0); }
+
+/* Shared glass treatment for the mock illustration elements below each
+   step's copy, matching the cards used throughout the rest of the app. */
+.onboard-badges,
+.onboard-mock-stats,
+.onboard-mock-comp,
+.onboard-mock-tiers,
+.onboard-chips {
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
 
 /* Step 0: quick-fact badges */
 .onboard-badges {
   display: flex;
-  gap: 28px;
+  gap: 0;
   margin-top: 36px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  overflow: hidden;
 }
 .onboard-badge {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  padding: 16px 30px;
+  border-right: 1px solid rgba(255,255,255,0.07);
 }
+.onboard-badge:last-child { border-right: none; }
 .onboard-badge strong {
   font-size: 1.7rem;
   font-weight: 800;
-  color: var(--sidebar-active);
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 .onboard-badge span {
   font-size: 0.72rem;
@@ -2577,12 +2700,14 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   display: flex;
   gap: 1px;
   margin-top: 32px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
   overflow: hidden;
+  box-shadow: 0 12px 30px -10px rgba(0,0,0,0.5);
 }
 .onboard-mock-stat {
-  background: rgba(255,255,255,0.03);
+  background: rgba(10,14,26,0.55);
   padding: 16px 26px;
   display: flex;
   flex-direction: column;
@@ -2598,10 +2723,11 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   align-items: center;
   gap: 12px;
   margin-top: 32px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 12px;
-  padding: 14px 20px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 16px 22px;
+  box-shadow: 0 12px 30px -10px rgba(0,0,0,0.5);
 }
 .onboard-mock-comp-name { font-size: 0.82rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .onboard-mock-comp-bar {
@@ -2614,7 +2740,8 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .onboard-mock-comp-fill {
   height: 100%;
   border-radius: 5px;
-  background: linear-gradient(90deg, #7c5cff, #5b8cff);
+  background: var(--accent-grad);
+  box-shadow: 0 0 10px rgba(124,92,255,0.6);
 }
 .onboard-mock-comp-pct { font-size: 0.78rem; font-weight: 800; color: var(--sidebar-active); }
 
@@ -2622,10 +2749,15 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .onboard-mock-tiers {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   margin-top: 32px;
   width: 100%;
   max-width: 380px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 12px 30px -10px rgba(0,0,0,0.5);
 }
 .onboard-mock-tier {
   display: grid;
@@ -2654,19 +2786,24 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .onboard-chip {
   font-size: 0.78rem;
   font-weight: 600;
-  color: rgba(220,232,255,0.8);
+  color: rgba(220,232,255,0.85);
   background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 20px;
   padding: 7px 16px;
+  transition: border-color 0.15s, background 0.15s;
 }
+.onboard-chip:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.22); }
 
 @media (max-width: 600px) {
-  .onboard-icon { font-size: 3.6rem; margin-bottom: 20px; }
+  .onboard-orb { filter: blur(50px); }
+  .onboard-icon-badge { width: 80px; height: 80px; border-radius: 22px; margin-bottom: 22px; }
+  .onboard-icon-badge svg { width: 36px; height: 36px; }
   .onboard-skip { top: 16px; right: 16px; }
   .onboard-dots { bottom: 96px; }
   .onboard-next { bottom: 40px; width: 86%; max-width: 320px; }
-  .onboard-badges { gap: 18px; }
+  .onboard-badges { gap: 0; }
+  .onboard-badge { padding: 14px 18px; }
   .onboard-mock-stat { padding: 12px 14px; }
   .onboard-mock-comp { flex-wrap: wrap; justify-content: center; }
   .onboard-mock-comp-bar { width: 100px; }
