@@ -1793,7 +1793,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 
 #skillRadar { max-width: 100%; height: auto; display: block; }
-#trendChart, #devCurveChart { width: 100%; height: auto; display: block; }
+#trendChart, #devCurveChart, #projTrendChart { width: 100%; height: auto; display: block; }
 
 /* Dark table */
 .dark-table {
