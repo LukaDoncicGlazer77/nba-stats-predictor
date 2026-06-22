@@ -62,7 +62,7 @@ function latestSeason(player) {
 
 let currentSection = "dashboard";
 
-const MEMBERS_ONLY = new Set(["players","player-profile","watchlist","comparisons","career-outcome","team-dashboard","reports","analytics","lineup"]);
+const MEMBERS_ONLY = new Set(["players","player-profile","watchlist","comparisons","career-outcome","draft-projection","team-dashboard","reports","analytics","lineup"]);
 
 function isLoggedIn() {
   const s = localStorage.getItem('sf_session');
@@ -122,6 +122,11 @@ function navigate(section) {
     if (!prospectsLoaded) loadProspects().then(() => renderCareerOutcomeBar());
     else renderCareerOutcomeBar();
     renderCareerOutcomePage();
+  }
+  if (section === "draft-projection") {
+    if (!prospectsLoaded) loadProspects().then(() => renderDraftProjectionBar());
+    else renderDraftProjectionBar();
+    renderDraftProjectionPage();
   }
   closeMobileNav();
 }
@@ -1834,6 +1839,13 @@ document.addEventListener("click", e => {
     renderCareerOutcomeBar();
     renderCareerOutcomePage();
   }
+  // Draft Projection page: remove the prospect slot
+  const draftProjRemoveBtn = e.target.closest(".draft-proj-remove-btn");
+  if (draftProjRemoveBtn) {
+    draftProjectionProspect = null;
+    renderDraftProjectionBar();
+    renderDraftProjectionPage();
+  }
 });
 
 function wrapProspect(p) {
@@ -1994,31 +2006,39 @@ async function renderCareerOutcomeView(container, prospect) {
     </div>`;
   };
 
+  const co_section_icon = (svg) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg>`;
+
   container.innerHTML = `
     <div class="cmp-pcard co-card" style="max-width:960px;margin:0 auto" id="careerOutcomeCard">
-      <div class="co-card-head">
-        ${cmpAvatar(prospect, 52)}
-        <div>
-          <div class="cmp-pcard-title" style="margin-bottom:4px">Projected Career Outcome — ${prospect.name}</div>
-          <p class="co-sub">
-            Based on ${summary.comp_count} historical draft picks near projected slot #${prospect.rank}${prospect.position ? ` at a similar position (${prospect.position})` : ""}.
-          </p>
+      <div class="co-hero">
+        <div class="co-hero-top">
+          <div class="co-hero-avatar-wrap">${cmpAvatar(prospect, 76)}</div>
+          <div>
+            <p class="co-hero-eyebrow">Projected Career Outcome</p>
+            <h3 class="co-hero-name">${prospect.name}</h3>
+            <p class="co-sub">
+              Based on ${summary.comp_count} historical draft picks near projected slot #${prospect.rank}${prospect.position ? ` at a similar position (${prospect.position})` : ""}.
+            </p>
+          </div>
+        </div>
+
+        <div class="co-hero-stats">
+          <div class="co-stat-tile">${co_icon("pts")}<div class="co-stat-value">${summary.avg_career_pts ?? "—"}</div><div class="co-stat-label">Avg Career PTS</div></div>
+          <div class="co-stat-tile">${co_icon("reb")}<div class="co-stat-value">${summary.avg_career_reb ?? "—"}</div><div class="co-stat-label">Avg Career REB</div></div>
+          <div class="co-stat-tile">${co_icon("ast")}<div class="co-stat-value">${summary.avg_career_ast ?? "—"}</div><div class="co-stat-label">Avg Career AST</div></div>
+          <div class="co-stat-tile">${co_icon("gp")}<div class="co-stat-value">${summary.avg_seasons_played ?? "—"}</div><div class="co-stat-label">Avg Seasons Played</div></div>
         </div>
       </div>
 
-      <div class="co-stat-grid">
-        <div class="co-stat-tile">${co_icon("pts")}<div class="co-stat-value">${summary.avg_career_pts ?? "—"}</div><div class="co-stat-label">Avg Career PTS</div></div>
-        <div class="co-stat-tile">${co_icon("reb")}<div class="co-stat-value">${summary.avg_career_reb ?? "—"}</div><div class="co-stat-label">Avg Career REB</div></div>
-        <div class="co-stat-tile">${co_icon("ast")}<div class="co-stat-value">${summary.avg_career_ast ?? "—"}</div><div class="co-stat-label">Avg Career AST</div></div>
-        <div class="co-stat-tile">${co_icon("gp")}<div class="co-stat-value">${summary.avg_seasons_played ?? "—"}</div><div class="co-stat-label">Avg Seasons Played</div></div>
-      </div>
-
-      <div class="cmp-pcard-title co-comps-title">Closest Historical Draft Comps</div>
-      <div class="table-wrap">
+      <div class="co-body">
+        <div class="co-section-head">
+          ${co_section_icon('<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 11l7.6-4M8.2 13l7.6 4"/>')}
+          <span>Closest Historical Draft Comps</span>
+        </div>
         <table class="cmp-table4 co-comp-table">
           <thead><tr><th>Player</th><th>Pick</th><th>Yr</th><th>PTS</th><th>REB</th><th>AST</th><th>Seasons</th></tr></thead>
-          <tbody>${comps.map(c => `<tr>
-            <td class="co-comp-name-cell">${co_avatar(c)}<span>${c.player}</span>${c.position_match ? `<span class="co-match-badge" title="Same position bucket">Pos match</span>` : ""}</td>
+          <tbody>${comps.map((c, i) => `<tr>
+            <td class="co-comp-name-cell"><span class="co-comp-rank">${i + 1}</span>${co_avatar(c)}<span>${c.player}</span>${c.position_match ? `<span class="co-match-badge" title="Same position bucket">Pos match</span>` : ""}</td>
             <td>#${c.overall_pick}</td>
             <td>${c.draft_season}</td>
             <td>${c.career_pts ?? "—"}</td>
@@ -2027,10 +2047,11 @@ async function renderCareerOutcomeView(container, prospect) {
             <td>${c.seasons_played ?? "—"}</td>
           </tr>`).join("")}</tbody>
         </table>
+        <p class="co-footnote">
+          Comps are matched by draft slot and position only (no measurables or scouting data for 2026 prospects) — treat as a rough historical baseline, not a scouting projection. Recently drafted comps reflect only 1–2 seasons of data.
+        </p>
+        <div id="coCollegeSection"></div>
       </div>
-      <p class="co-footnote">
-        Comps are matched by draft slot and position only (no measurables or scouting data for 2026 prospects) — treat as a rough historical baseline, not a scouting projection. Recently drafted comps reflect only 1–2 seasons of data.
-      </p>
     </div>`;
   attachCollegeStats(prospect);
 }
@@ -2075,11 +2096,193 @@ function buildCollegeStatsTable(rows, tableClass = "cmp-table4") {
 async function attachCollegeStats(prospect) {
   const rows = await fetchCollegeStats(prospect.name);
   if (!rows.length) return;
-  const card = document.getElementById("careerOutcomeCard");
-  if (!card) return;
-  card.insertAdjacentHTML("beforeend", `
-    <div class="cmp-pcard-title" style="margin-top:18px">College Stats${rows[0].team ? ` — ${escapeHtml(rows[0].team)}` : ""}</div>
-    ${buildCollegeStatsTable(rows)}`);
+  const section = document.getElementById("coCollegeSection");
+  if (!section) return;
+  section.innerHTML = `
+    <div class="co-section-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+      <span>College Stats${rows[0].team ? ` — ${escapeHtml(rows[0].team)}` : ""}</span>
+    </div>
+    ${buildCollegeStatsTable(rows)}`;
+}
+
+// ── Draft Projection (hybrid ML + comp engine + archetype model) ───────────
+let draftProjectionProspect = null;
+
+function renderDraftProjectionBar() {
+  const bar = $("#draftProjectionBar");
+  if (!bar) return;
+  const color = cmpColor(0);
+  if (!draftProjectionProspect) {
+    bar.innerHTML = `<div class="cmp-search-slot" id="draftProjSlot0">
+      <div class="cmp-slot-inner">
+        <span class="cmp-slot-icon">+</span>
+        <span class="cmp-slot-label">Add Draft Prospect</span>
+        <input id="draftProjSearch0" type="search" placeholder="Search by name..." class="cmp-search-input" autocomplete="off" spellcheck="false"/>
+      </div>
+      <div class="compare-dropdown" id="draftProjDrop0"></div>
+    </div>`;
+    setupDraftProjectionSearch();
+    return;
+  }
+  const p = draftProjectionProspect;
+  bar.innerHTML = `<div class="cmp-search-slot cmp-slot-filled" id="draftProjSlot0">
+    <div class="cmp-slot-color-bar" style="background:${color}"></div>
+    <div class="cmp-selected-inner">
+      ${cmpAvatar(p, 44)}
+      <div class="cmp-selected-info">
+        <div class="cmp-selected-name">${p.name}</div>
+        <div class="cmp-selected-meta">${p.position||"—"} · ${p.team||"—"} · ${p.status||"Prospect"}</div>
+        <div class="cmp-selected-meta">${p.height||"—"} · ${p.weight||"—"} · Mock Rank #${p.rank||"—"}</div>
+      </div>
+      <button class="cmp-remove-btn draft-proj-remove-btn">✕</button>
+    </div>
+  </div>`;
+}
+
+function setupDraftProjectionSearch() {
+  const input = $("#draftProjSearch0");
+  const dropdown = $("#draftProjDrop0");
+  if (!input || !dropdown) return;
+  input.addEventListener("input", () => {
+    const q = input.value.toLowerCase().trim();
+    const pool = allProspects.map(wrapProspect);
+    if (!q || !pool.length) { dropdown.classList.remove("open"); return; }
+    const matches = pool.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
+    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${p.name}">${p.name} <span style="color:var(--muted);font-size:0.75em">· ${p.team||"Prospect"}</span></div>`).join("");
+    dropdown.classList.toggle("open", matches.length > 0);
+    dropdown.querySelectorAll(".compare-option").forEach(opt => {
+      opt.addEventListener("click", () => {
+        const found = pool.find(p => p.name === opt.dataset.name);
+        if (found) {
+          draftProjectionProspect = found;
+          renderDraftProjectionBar();
+          renderDraftProjectionPage();
+        }
+        dropdown.classList.remove("open");
+      });
+    });
+  });
+}
+
+function renderDraftProjectionPage() {
+  const container = $("#draftProjectionContent");
+  if (!container) return;
+  if (!draftProjectionProspect) {
+    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">◎</div><div>Search for a draft prospect above to generate a career-tier projection.</div></div>`;
+    return;
+  }
+  renderDraftProjectionView(container, draftProjectionProspect);
+}
+
+const TIER_BAR_COLOR = {
+  "Bust": "#e25c5c", "End-of-Bench Player": "#e08a4e", "Rotation Player": "#e0c14e",
+  "Starter": "#8fd15a", "High-Level Starter": "#4ecbb0", "All-Star": "#4eb8e0",
+  "All-NBA": "#7e6ee0", "Superstar": "#c061e0",
+};
+
+function buildOutcomeProbabilityBars(probabilities) {
+  return Object.entries(probabilities).map(([tier, prob]) => {
+    const pct = Math.round(prob * 1000) / 10;
+    const color = TIER_BAR_COLOR[tier] || "var(--accent)";
+    return `<div class="dp-prob-row">
+      <div class="dp-prob-label">${tier}</div>
+      <div class="dp-prob-track"><div class="dp-prob-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="dp-prob-pct">${pct}%</div>
+    </div>`;
+  }).join("");
+}
+
+function buildArchetypeMixBars(mix) {
+  if (!mix) {
+    return `<p style="color:var(--muted);font-size:0.85rem">No college archetype profile available yet -- requires college statistical data that hasn't been loaded.</p>`;
+  }
+  const entries = Object.entries(mix).sort((a, b) => b[1] - a[1]);
+  return entries.map(([name, pct]) => `
+    <div class="dp-prob-row">
+      <div class="dp-prob-label">${name}</div>
+      <div class="dp-prob-track"><div class="dp-prob-fill" style="width:${pct}%;background:var(--accent)"></div></div>
+      <div class="dp-prob-pct">${pct.toFixed(1)}%</div>
+    </div>`).join("");
+}
+
+function buildExplainabilityLists(explainability) {
+  const section = (title, items) => {
+    if (!items || !items.length) return "";
+    return `<div class="dp-explain-block">
+      <div class="dp-explain-title">${title}</div>
+      <ul class="dp-explain-list">${items.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+    </div>`;
+  };
+  const out = [
+    section("Strengths", explainability.strengths),
+    section("Weaknesses", explainability.weaknesses),
+    section("Development Indicators", explainability.development_indicators),
+    section("Risk Indicators", explainability.risk_indicators),
+  ].join("");
+  return out || `<p style="color:var(--muted);font-size:0.85rem">No notable signals crossed a reporting threshold for this prospect.</p>`;
+}
+
+function buildComparablesTable(comparables) {
+  return `<table class="cmp-table4">
+    <thead><tr><th>Player</th><th>Pick</th><th>Year</th><th>College</th><th>Similarity</th><th>Archetype Match</th><th>Actual Outcome</th></tr></thead>
+    <tbody>${comparables.map(c => `<tr title="${escapeHtml(c.explanation || "")}">
+      <td>${escapeHtml(c.player)}</td>
+      <td>${c.overall_pick != null ? "#" + Math.round(c.overall_pick) : "—"}</td>
+      <td>${c.draft_season ?? "—"}</td>
+      <td>${escapeHtml(c.college || "—")}</td>
+      <td>${c.similarity}%</td>
+      <td>${c.archetype_match != null ? c.archetype_match + "%" : "—"}</td>
+      <td>${escapeHtml(c.actual_outcome)}</td>
+    </tr>`).join("")}</tbody>
+  </table>
+  <p style="color:var(--muted);font-size:0.72rem;margin-top:12px">Hover a row for the plain-language comp explanation.</p>`;
+}
+
+async function renderDraftProjectionView(container, prospect) {
+  container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⏳</div><div>Generating career-tier projection for ${prospect.name}...</div></div>`;
+  let data;
+  try {
+    data = await fetch(`/api/draft-projection?name=${encodeURIComponent(prospect.name)}`).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+  } catch (e) {
+    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚠</div><div>Couldn't load a draft projection for ${prospect.name}.</div></div>`;
+    return;
+  }
+
+  const dq = data.data_quality;
+  const banner = dq.college_data_available ? "" : `
+    <div class="dp-banner">
+      ${escapeHtml(dq.confidence_note)}
+    </div>`;
+  const mlBanner = dq.ml_model_loaded ? "" : `
+    <div class="dp-banner">
+      The ML layer hasn't been trained yet -- these probabilities currently come from the historical comp engine alone.
+    </div>`;
+
+  container.innerHTML = `
+    <div class="cmp-pcard" style="max-width:1040px;margin:0 auto" id="draftProjCard">
+      <div class="cmp-pcard-title">Career-Tier Projection — ${prospect.name}</div>
+      ${banner}${mlBanner}
+
+      <div class="cmp-overview4" style="grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px">
+        <div class="cmp-pcard"><div class="cmp-pcard-title">Floor</div><div style="font-size:1.3rem;font-weight:800">${escapeHtml(data.floor_outcome)}</div></div>
+        <div class="cmp-pcard"><div class="cmp-pcard-title">Expected</div><div style="font-size:1.3rem;font-weight:800;color:var(--accent)">${escapeHtml(data.expected_outcome)}</div></div>
+        <div class="cmp-pcard"><div class="cmp-pcard-title">Ceiling</div><div style="font-size:1.3rem;font-weight:800">${escapeHtml(data.ceiling_outcome)}</div></div>
+      </div>
+
+      <div class="cmp-pcard-title" style="margin-top:20px">Outcome Probabilities</div>
+      <div class="dp-prob-list">${buildOutcomeProbabilityBars(data.outcome_probabilities)}</div>
+
+      <div class="cmp-pcard-title" style="margin-top:20px">College Archetype Profile</div>
+      <div class="dp-prob-list">${buildArchetypeMixBars(data.archetype.mix)}</div>
+
+      <div class="cmp-pcard-title" style="margin-top:20px">Top Historical Comparables</div>
+      ${data.comparables.length ? buildComparablesTable(data.comparables) : `<p style="color:var(--muted);font-size:0.85rem">No comparable historical draft picks found.</p>`}
+
+      <div class="cmp-pcard-title" style="margin-top:20px">Scouting Notes</div>
+      ${buildExplainabilityLists(data.explainability)}
+    </div>`;
 }
 
 // Same data source, surfaced on every NBA player's profile (most have an
