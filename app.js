@@ -2010,6 +2010,36 @@ async function renderCareerOutcomeView(container, prospect) {
 
   const co_section_icon = (svg) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg>`;
 
+  // Min/max spread across the comp set, computed client-side from data already
+  // fetched -- gives each headline number a sense of range, not just an average.
+  const co_range = (key) => {
+    const vals = comps.map(c => parseFloat(c[key])).filter(v => Number.isFinite(v));
+    if (!vals.length) return null;
+    return { min: Math.min(...vals), max: Math.max(...vals) };
+  };
+  const co_range_track = (avg, range) => {
+    if (!range || range.max === range.min) return "";
+    const pct = Math.max(0, Math.min(100, ((avg - range.min) / (range.max - range.min)) * 100));
+    return `<div class="co-stat-range"><div class="co-stat-range-track"><div class="co-stat-range-dot" style="left:${pct}%"></div></div><div class="co-stat-range-lbl">${fmtV(range.min)}–${fmtV(range.max)} range</div></div>`;
+  };
+  const co_stat_tile = (key, iconKey, label, avg) => {
+    const range = co_range(key);
+    return `<div class="co-stat-tile">${co_icon(iconKey)}<div class="co-stat-value">${avg ?? "—"}</div><div class="co-stat-label">${label}</div>${range ? co_range_track(avg ?? range.min, range) : ""}</div>`;
+  };
+
+  // In-cell bars scaled to the max value in that column across the comp set --
+  // a quick visual scan of who's the outlier, not just a wall of numbers.
+  const co_col_max = (key) => Math.max(1, ...comps.map(c => parseFloat(c[key]) || 0));
+  const co_bar_cell = (val, key, colorVar) => {
+    const max = co_col_max(key);
+    const v = parseFloat(val);
+    const pct = Number.isFinite(v) ? Math.max(4, (v / max) * 100) : 0;
+    return `<td class="co-bar-cell">
+      <div class="co-bar-track"><div class="co-bar-fill" style="width:${pct}%;background:${colorVar}"></div></div>
+      <span>${val ?? "—"}</span>
+    </td>`;
+  };
+
   container.innerHTML = `
     <div class="cmp-pcard co-card" style="max-width:960px;margin:0 auto" id="careerOutcomeCard">
       <div class="co-hero">
@@ -2025,10 +2055,10 @@ async function renderCareerOutcomeView(container, prospect) {
         </div>
 
         <div class="co-hero-stats">
-          <div class="co-stat-tile">${co_icon("pts")}<div class="co-stat-value">${summary.avg_career_pts ?? "—"}</div><div class="co-stat-label">Avg Career PTS</div></div>
-          <div class="co-stat-tile">${co_icon("reb")}<div class="co-stat-value">${summary.avg_career_reb ?? "—"}</div><div class="co-stat-label">Avg Career REB</div></div>
-          <div class="co-stat-tile">${co_icon("ast")}<div class="co-stat-value">${summary.avg_career_ast ?? "—"}</div><div class="co-stat-label">Avg Career AST</div></div>
-          <div class="co-stat-tile">${co_icon("gp")}<div class="co-stat-value">${summary.avg_seasons_played ?? "—"}</div><div class="co-stat-label">Avg Seasons Played</div></div>
+          ${co_stat_tile("career_pts", "pts", "Avg Career PTS", summary.avg_career_pts)}
+          ${co_stat_tile("career_reb", "reb", "Avg Career REB", summary.avg_career_reb)}
+          ${co_stat_tile("career_ast", "ast", "Avg Career AST", summary.avg_career_ast)}
+          ${co_stat_tile("seasons_played", "gp", "Avg Seasons Played", summary.avg_seasons_played)}
         </div>
       </div>
 
@@ -2040,12 +2070,12 @@ async function renderCareerOutcomeView(container, prospect) {
         <table class="cmp-table4 co-comp-table">
           <thead><tr><th>Player</th><th>Pick</th><th>Yr</th><th>PTS</th><th>REB</th><th>AST</th><th>Seasons</th></tr></thead>
           <tbody>${comps.map((c, i) => `<tr>
-            <td class="co-comp-name-cell"><span class="co-comp-rank">${i + 1}</span>${co_avatar(c)}<span>${c.player}</span>${c.position_match ? `<span class="co-match-badge" title="Same position bucket">Pos match</span>` : ""}</td>
+            <td class="co-comp-name-cell"><span class="co-comp-rank">${i + 1}</span>${co_avatar(c)}<span>${c.player}</span>${c.position_match ? `<span class="co-match-badge" title="Same position bucket"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>Pos match</span>` : ""}</td>
             <td>#${c.overall_pick}</td>
             <td>${c.draft_season}</td>
-            <td>${c.career_pts ?? "—"}</td>
-            <td>${c.career_reb ?? "—"}</td>
-            <td>${c.career_ast ?? "—"}</td>
+            ${co_bar_cell(c.career_pts, "career_pts", "var(--accent-1)")}
+            ${co_bar_cell(c.career_reb, "career_reb", "var(--blue)")}
+            ${co_bar_cell(c.career_ast, "career_ast", "var(--accent-3)")}
             <td>${c.seasons_played ?? "—"}</td>
           </tr>`).join("")}</tbody>
         </table>

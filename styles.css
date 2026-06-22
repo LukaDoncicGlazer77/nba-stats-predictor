@@ -3687,11 +3687,65 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   color: var(--muted);
 }
 
-.co-comp-table { table-layout: auto; }
+.co-stat-range { width: 100%; margin-top: 8px; }
+.co-stat-range-track {
+  position: relative;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.08);
+}
+.co-stat-range-dot {
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255,255,255,0.6);
+  transform: translate(-50%, -50%);
+}
+.co-stat-range-lbl {
+  margin-top: 5px;
+  font-size: 0.6rem;
+  color: rgba(220,232,255,0.35);
+  letter-spacing: 0.02em;
+}
+
+.co-comp-table { table-layout: auto; font-variant-numeric: tabular-nums; }
 .co-comp-table thead th,
 .co-comp-table tbody td { text-align: right; }
 .co-comp-table thead th:first-child,
 .co-comp-table tbody td:first-child { text-align: left; }
+
+.co-comp-table tbody tr {
+  position: relative;
+  transition: background 0.15s;
+}
+.co-comp-table tbody tr:hover { background: rgba(124,140,255,0.045); }
+
+.co-bar-cell {
+  position: relative;
+  min-width: 56px;
+}
+.co-bar-cell span { position: relative; z-index: 1; }
+.co-bar-track {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.05);
+  overflow: hidden;
+}
+.co-bar-fill {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  opacity: 0.55;
+}
 
 .co-comp-name-cell {
   display: flex;
@@ -3728,6 +3782,9 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 
 .co-match-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -3736,8 +3793,10 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   background: rgba(0,212,138,0.12);
   border: 1px solid rgba(0,212,138,0.25);
   border-radius: 6px;
-  padding: 2px 6px;
+  padding: 2px 6px 2px 5px;
+  flex-shrink: 0;
 }
+.co-match-badge svg { width: 9px; height: 9px; flex-shrink: 0; }
 
 .co-footnote {
   color: var(--muted);
