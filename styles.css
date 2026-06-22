@@ -140,7 +140,7 @@ button, input, select { font: inherit; }
 }
 
 .brand-fuel {
-  background: linear-gradient(135deg, #f97316, #facc15);
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2) 55%, var(--accent-3));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -2819,7 +2819,6 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .login-brand {
   font-size: 1.4rem;
   font-weight: 900;
-  color: var(--ink);
   letter-spacing: -0.02em;
 }
 
@@ -2991,7 +2990,6 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .loader-brand {
   font-size: 2rem;
   font-weight: 900;
-  color: var(--ink);
   letter-spacing: -0.02em;
 }
 
