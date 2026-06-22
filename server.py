@@ -51,6 +51,24 @@ def _load_stats_model():
         print(f"Could not load stats model: {e}")
     return _stats_model
 
+# ── Draft career projection historical pool (built once, kept for process
+# lifetime -- rebuilding takes real time since it scans every drafted
+# player; only changes when build_career_labels.py / load_ncaa_stats.py are
+# re-run, which means restarting the server, matching the model-loading
+# pattern above rather than the time-based _SEASONS_CACHE below) ───────────
+_draft_projection_pool = None
+def _get_draft_projection_pool():
+    global _draft_projection_pool
+    if _draft_projection_pool is None:
+        import draft_projection.comp_engine as comp_engine
+        conn = connect()
+        try:
+            _draft_projection_pool = comp_engine.build_historical_pool(conn, q, current_season=2026)
+        finally:
+            conn.close()
+        print(f"Draft projection historical pool built: {len(_draft_projection_pool)} players.")
+    return _draft_projection_pool
+
 SALARY_CAPS_M = {
     2015: 70.00, 2016: 94.143, 2017: 99.093, 2018: 101.869, 2019: 109.14,
     2020: 109.14, 2021: 112.414, 2022: 123.655, 2023: 136.021, 2024: 140.588,
@@ -514,6 +532,47 @@ class Handler(SimpleHTTPRequestHandler):
             }
 
             return self.send_json({"prospect": prospect, "comps": comps, "summary": summary})
+
+        if parsed.path == "/api/draft-projection":
+            name = (params.get("name", [""])[0] or "").strip()
+            if not name:
+                return self.send_json({"error": "name required"}, status=400)
+            college = (params.get("college", [""])[0] or "").strip() or None
+            age_param = (params.get("age_at_draft", [""])[0] or "").strip()
+            pick_param = (params.get("overall_pick", [""])[0] or "").strip()
+            age_at_draft = safe_float_py(age_param) if age_param else None
+            overall_pick = safe_float_py(pick_param) if pick_param else None
+
+            conn = connect()
+            try:
+                if age_at_draft is None or overall_pick is None or college is None:
+                    prospect_rows = q(conn, """
+                        SELECT rank, age, school FROM archive_draft_prospects_2026 WHERE name = ?
+                    """, (name,))
+                    if prospect_rows:
+                        p = dict(prospect_rows[0])
+                        if college is None:
+                            college = p.get("school")
+                        if age_at_draft is None:
+                            age_at_draft = safe_float_py(p.get("age"))
+                        if overall_pick is None:
+                            # Pre-draft prospects have no real pick yet -- their
+                            # consensus mock rank is the best available proxy,
+                            # and draft_slot_tier is coarse enough (top-5 /
+                            # lottery / first-round / second-round-or-UDFA) that
+                            # a mock-rank approximation doesn't overstate
+                            # precision.
+                            overall_pick = safe_float_py(p.get("rank"))
+
+                import draft_projection.service as draft_service
+                pool = _get_draft_projection_pool()
+                result = draft_service.build_draft_projection(
+                    conn, q, pool, player_name=name, college=college,
+                    age_at_draft=age_at_draft, overall_pick=overall_pick,
+                )
+            finally:
+                conn.close()
+            return self.send_json(result)
 
         if parsed.path == "/api/ncaa-stats":
             name = (params.get("name", [""])[0] or "").strip()

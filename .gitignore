@@ -6,3 +6,6 @@ nba.db-shm
 nba.db-wal
 *.bak
 *.bak3
+career_projection_model_ablation_no_missing_flags.pkl
+career_projection_model_experiment_classweighted.pkl
+.venv/
