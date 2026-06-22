@@ -961,13 +961,8 @@
       })();
 
       // ── Auth gate ──────────────────────────────────────────────────────────
-      const USERS_KEY = 'sf_users';
       const SESSION_KEY = 'sf_session';
 
-      function getUsers() {
-        try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch { return {}; }
-      }
-      function saveUsers(u) { localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
       function showApp() {
         document.getElementById('authScreen').style.display = 'none';
 
@@ -1032,33 +1027,54 @@
       });
 
       // Sign in
-      document.getElementById('loginForm').addEventListener('submit', e => {
+      document.getElementById('loginForm').addEventListener('submit', async e => {
         e.preventDefault();
         clearError('loginError');
         const email = document.getElementById('loginEmail').value.trim().toLowerCase();
         const pass  = document.getElementById('loginPassword').value;
-        const users = getUsers();
-        if (!users[email] || users[email] !== pass) {
-          showError('loginError', 'Incorrect email or password.');
-          return;
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: pass }),
+          });
+          const data = await res.json();
+          if (!res.ok) { showError('loginError', data.error || 'Incorrect email or password.'); return; }
+          localStorage.setItem(SESSION_KEY, data.email);
+          showApp();
+        } catch {
+          showError('loginError', 'Could not reach the server. Try again.');
+        } finally {
+          btn.disabled = false;
         }
-        localStorage.setItem(SESSION_KEY, email);
-        showApp();
       });
 
       // Sign up
-      document.getElementById('signupForm').addEventListener('submit', e => {
+      document.getElementById('signupForm').addEventListener('submit', async e => {
         e.preventDefault();
         clearError('signupError');
         const email = document.getElementById('signupEmail').value.trim().toLowerCase();
         const pass  = document.getElementById('signupPassword').value;
         if (pass.length < 6) { showError('signupError', 'Password must be at least 6 characters.'); return; }
-        const users = getUsers();
-        if (users[email]) { showError('signupError', 'An account with this email already exists.'); return; }
-        users[email] = pass;
-        saveUsers(users);
-        localStorage.setItem(SESSION_KEY, email);
-        showApp();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+          const res = await fetch('/api/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: pass }),
+          });
+          const data = await res.json();
+          if (!res.ok) { showError('signupError', data.error || 'Could not create account.'); return; }
+          localStorage.setItem(SESSION_KEY, data.email);
+          showApp();
+        } catch {
+          showError('signupError', 'Could not reach the server. Try again.');
+        } finally {
+          btn.disabled = false;
+        }
       });
     </script>
   </body>

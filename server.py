@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 import decimal
+import hashlib
+import hmac
 import json
 import os
 import re
+import secrets
 import time
 import traceback
 import urllib.request
@@ -16,6 +19,19 @@ import psycopg2.extras
 import archetype_engine
 
 ROOT = Path(__file__).resolve().parent
+
+PBKDF2_ITERATIONS = 200_000
+
+
+def hash_password(password: str, salt: bytes = None) -> tuple[str, str]:
+    salt = salt or secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PBKDF2_ITERATIONS)
+    return digest.hex(), salt.hex()
+
+
+def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), PBKDF2_ITERATIONS)
+    return hmac.compare_digest(digest.hex(), hash_hex)
 
 # ── Salary model (loaded once at startup) ──────────────────────────────────
 _salary_model = None
@@ -195,6 +211,61 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_POST(self):
+        try:
+            self._handle_post()
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                self.send_json({"error": str(e)}, status=500)
+            except Exception:
+                pass
+
+    def _handle_post(self):
+        parsed = urlparse(self.path)
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b""
+        try:
+            body = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            return self.send_json({"error": "Invalid JSON body"}, status=400)
+
+        if parsed.path == "/api/signup":
+            email = (body.get("email") or "").strip().lower()
+            password = body.get("password") or ""
+            if not email or "@" not in email:
+                return self.send_json({"error": "Valid email required"}, status=400)
+            if len(password) < 6:
+                return self.send_json({"error": "Password must be at least 6 characters"}, status=400)
+            conn = connect()
+            try:
+                if q1(conn, "SELECT 1 FROM archive_users WHERE email = ?", (email,)):
+                    return self.send_json({"error": "An account with this email already exists"}, status=409)
+                pw_hash, salt = hash_password(password)
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO archive_users (email, password_hash, password_salt) VALUES (%s, %s, %s)",
+                    (email, pw_hash, salt),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+            return self.send_json({"ok": True, "email": email})
+
+        if parsed.path == "/api/login":
+            email = (body.get("email") or "").strip().lower()
+            password = body.get("password") or ""
+            conn = connect()
+            try:
+                row = q1(conn, "SELECT password_hash, password_salt FROM archive_users WHERE email = ?", (email,))
+            finally:
+                conn.close()
+            if not row or not verify_password(password, row[1], row[0]):
+                return self.send_json({"error": "Incorrect email or password"}, status=401)
+            return self.send_json({"ok": True, "email": email})
+
+        return self.send_json({"error": "Not found"}, status=404)
 
     def do_GET(self):
         try:
@@ -867,7 +938,25 @@ class Handler(SimpleHTTPRequestHandler):
         pass
 
 
+def ensure_users_table():
+    conn = connect()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS archive_users (
+                email TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                password_salt TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def main():
+    ensure_users_table()
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")
