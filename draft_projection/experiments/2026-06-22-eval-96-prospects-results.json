@@ -1,0 +1,3938 @@
+[
+  {
+    "player": "Ed Peterson",
+    "draft_season": 1948,
+    "overall_pick": NaN,
+    "college": "Cornell",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.458,
+    "confidence_true": 0.458,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Chris Gatling",
+        "tier": "All-Star",
+        "similarity": 99.5
+      },
+      {
+        "player": "Charlie Hardnett",
+        "tier": "Bust",
+        "similarity": 99.3
+      },
+      {
+        "player": "Paul Nolen",
+        "tier": "Bust",
+        "similarity": 98.7
+      },
+      {
+        "player": "Scott Lloyd",
+        "tier": "Rotation Player",
+        "similarity": 98.7
+      },
+      {
+        "player": "Mac Otten",
+        "tier": "Bust",
+        "similarity": 98.2
+      }
+    ]
+  },
+  {
+    "player": "Steve Hood",
+    "draft_season": 1991,
+    "overall_pick": 42.0,
+    "college": "James Madison University",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 1.0,
+    "confidence_true": 1.0,
+    "n_missing_features": 26,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Gabriele Procida",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Khalifa Diop",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Ismael Kamagate",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Matteo Spagnolo",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Yannick Nzosa",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Otto Kriegshauser",
+    "draft_season": 1954,
+    "overall_pick": 50.0,
+    "college": "Washington University in Saint Louis",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 1.0,
+    "confidence_true": 1.0,
+    "n_missing_features": 26,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Gabriele Procida",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Khalifa Diop",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Ismael Kamagate",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Matteo Spagnolo",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Yannick Nzosa",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Steve Beck",
+    "draft_season": 1987,
+    "overall_pick": 76.0,
+    "college": "Arizona State",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 1.0,
+    "confidence_true": 1.0,
+    "n_missing_features": 26,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Gabriele Procida",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Khalifa Diop",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Ismael Kamagate",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Matteo Spagnolo",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Yannick Nzosa",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "John Lee",
+    "draft_season": 1958,
+    "overall_pick": 20.0,
+    "college": "Yale",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.999,
+    "confidence_true": 0.999,
+    "n_missing_features": 26,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Nikola Milutinov",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Livio Jean-Charles",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Petteri Koponen",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Fr\u00e9d\u00e9ric Weis",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Serge Zwikker",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Vince Kempton",
+    "draft_season": 1961,
+    "overall_pick": 107.0,
+    "college": "Saint Joseph's",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 1.0,
+    "confidence_true": 1.0,
+    "n_missing_features": 26,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Gabriele Procida",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Khalifa Diop",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Ismael Kamagate",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Matteo Spagnolo",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Yannick Nzosa",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Derrick Byars",
+    "draft_season": 2007,
+    "overall_pick": 42.0,
+    "college": "Vanderbilt",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.704,
+    "confidence_true": 0.704,
+    "n_missing_features": 8,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Keith Bogans",
+        "tier": "Starter",
+        "similarity": 95.0
+      },
+      {
+        "player": "D.J. Strawberry",
+        "tier": "Bust",
+        "similarity": 91.7
+      },
+      {
+        "player": "Tamar Slay",
+        "tier": "Bust",
+        "similarity": 91.2
+      },
+      {
+        "player": "Dijon Thompson",
+        "tier": "Bust",
+        "similarity": 89.7
+      },
+      {
+        "player": "Josh Richardson",
+        "tier": "Starter",
+        "similarity": 89.2
+      }
+    ]
+  },
+  {
+    "player": "Sani Be\u010dirovi\u010d",
+    "draft_season": 2003,
+    "overall_pick": 46.0,
+    "college": "NA",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 1.0,
+    "confidence_true": 1.0,
+    "n_missing_features": 26,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Gabriele Procida",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Khalifa Diop",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Ismael Kamagate",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Matteo Spagnolo",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Yannick Nzosa",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Don Eby",
+    "draft_season": 1953,
+    "overall_pick": NaN,
+    "college": "USC",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.999,
+    "confidence_true": 0.999,
+    "n_missing_features": 26,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Nikola Milutinov",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Livio Jean-Charles",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Petteri Koponen",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Fr\u00e9d\u00e9ric Weis",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Serge Zwikker",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "John Schroeder",
+    "draft_season": 1967,
+    "overall_pick": 140.0,
+    "college": "Ohio University",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 1.0,
+    "confidence_true": 1.0,
+    "n_missing_features": 26,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Gabriele Procida",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Khalifa Diop",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Ismael Kamagate",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Matteo Spagnolo",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Yannick Nzosa",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Jim Brown",
+    "draft_season": 1957,
+    "overall_pick": 68.0,
+    "college": "Syracuse",
+    "true_tier": "bust",
+    "pred_tier": "bust",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 1.0,
+    "confidence_true": 1.0,
+    "n_missing_features": 26,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Gabriele Procida",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Khalifa Diop",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Ismael Kamagate",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Matteo Spagnolo",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Yannick Nzosa",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Jack Turner",
+    "draft_season": 1961,
+    "overall_pick": 10.0,
+    "college": "Louisville",
+    "true_tier": "bust",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.356,
+    "confidence_true": 0.115,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Ed Conlin",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Tom Van Arsdale",
+        "tier": "All-Star",
+        "similarity": 100.0
+      },
+      {
+        "player": "John Havlicek",
+        "tier": "Superstar",
+        "similarity": 99.9
+      },
+      {
+        "player": "Keith Edmonson",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Mike Woodson",
+        "tier": "High-Level Starter",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Sonny Weems",
+    "draft_season": 2008,
+    "overall_pick": 39.0,
+    "college": "Arkansas",
+    "true_tier": "end_of_bench",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.516,
+    "confidence_true": 0.023,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Trenton Hassell",
+        "tier": "Starter",
+        "similarity": 92.0
+      },
+      {
+        "player": "Vincent Yarbrough",
+        "tier": "Bust",
+        "similarity": 91.1
+      },
+      {
+        "player": "Josh Richardson",
+        "tier": "Starter",
+        "similarity": 90.8
+      },
+      {
+        "player": "Dijon Thompson",
+        "tier": "Bust",
+        "similarity": 89.7
+      },
+      {
+        "player": "Maurice Jeffers",
+        "tier": "Bust",
+        "similarity": 89.7
+      }
+    ]
+  },
+  {
+    "player": "Harold Miner",
+    "draft_season": 1992,
+    "overall_pick": 12.0,
+    "college": "USC",
+    "true_tier": "end_of_bench",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.289,
+    "confidence_true": 0.017,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Adrian Dantley",
+        "tier": "All-NBA",
+        "similarity": 100.0
+      },
+      {
+        "player": "Jack Twyman",
+        "tier": "All-NBA",
+        "similarity": 99.5
+      },
+      {
+        "player": "Micka\u00ebl Pi\u00e9trus",
+        "tier": "Rotation Player",
+        "similarity": 99.3
+      },
+      {
+        "player": "Nick Anderson",
+        "tier": "High-Level Starter",
+        "similarity": 99.3
+      },
+      {
+        "player": "Ron Mercer",
+        "tier": "Starter",
+        "similarity": 98.2
+      }
+    ]
+  },
+  {
+    "player": "Edmond Sumner",
+    "draft_season": 2017,
+    "overall_pick": 52.0,
+    "college": "Xavier",
+    "true_tier": "end_of_bench",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.516,
+    "confidence_true": 0.137,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Mo Williams",
+        "tier": "All-Star",
+        "similarity": 87.0
+      },
+      {
+        "player": "Tre Jones",
+        "tier": "High-Level Starter",
+        "similarity": 86.9
+      },
+      {
+        "player": "Ramon Sessions",
+        "tier": "Rotation Player",
+        "similarity": 86.7
+      },
+      {
+        "player": "Nickeil Alexander-Walker",
+        "tier": "Rotation Player",
+        "similarity": 86.3
+      },
+      {
+        "player": "Armon Johnson",
+        "tier": "Bust",
+        "similarity": 86.3
+      }
+    ]
+  },
+  {
+    "player": "Brook Steppe",
+    "draft_season": 1982,
+    "overall_pick": 17.0,
+    "college": "Georgia Tech",
+    "true_tier": "end_of_bench",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.414,
+    "confidence_true": 0.105,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Kevin Lynch",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Bryan Warrick",
+        "tier": "End-of-Bench Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Lucious Harris",
+        "tier": "Rotation Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "Dave Jamerson",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Byron Irvin",
+        "tier": "Bust",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Solomon Jones",
+    "draft_season": 2006,
+    "overall_pick": 33.0,
+    "college": "South Florida",
+    "true_tier": "end_of_bench",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.667,
+    "confidence_true": 0.067,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Bruce Kuczenski",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Bob Miller",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Steve Malovic",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Jonas Jerebko",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Nemanja Bjelica",
+        "tier": "Rotation Player",
+        "similarity": 99.9
+      }
+    ]
+  },
+  {
+    "player": "Renaldo Balkman",
+    "draft_season": 2006,
+    "overall_pick": 20.0,
+    "college": "South Carolina",
+    "true_tier": "end_of_bench",
+    "pred_tier": "high_level_starter",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.381,
+    "confidence_true": 0.238,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "OG Anunoby",
+        "tier": "Starter",
+        "similarity": 87.0
+      },
+      {
+        "player": "James Johnson",
+        "tier": "High-Level Starter",
+        "similarity": 80.5
+      },
+      {
+        "player": "Julian Wright",
+        "tier": "End-of-Bench Player",
+        "similarity": 79.0
+      },
+      {
+        "player": "Jake LaRavia",
+        "tier": "Rotation Player",
+        "similarity": 78.9
+      },
+      {
+        "player": "Chuma Okeke",
+        "tier": "End-of-Bench Player",
+        "similarity": 78.1
+      }
+    ]
+  },
+  {
+    "player": "Walker Russell",
+    "draft_season": 1982,
+    "overall_pick": 78.0,
+    "college": "Western Michigan",
+    "true_tier": "end_of_bench",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.607,
+    "confidence_true": 0.051,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Jeff Martin",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Dave Henderson",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Dra\u017een Petrovi\u0107",
+        "tier": "All-NBA",
+        "similarity": 100.0
+      },
+      {
+        "player": "Barry Stevens",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Kevin McKenna",
+        "tier": "End-of-Bench Player",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Archie Dees",
+    "draft_season": 1958,
+    "overall_pick": 2.0,
+    "college": "Indiana",
+    "true_tier": "end_of_bench",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.314,
+    "confidence_true": 0.016,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Bob Pettit",
+        "tier": "Superstar",
+        "similarity": 99.5
+      },
+      {
+        "player": "Pervis Ellison",
+        "tier": "Starter",
+        "similarity": 99.3
+      },
+      {
+        "player": "Jim Brewer",
+        "tier": "Rotation Player",
+        "similarity": 99.3
+      },
+      {
+        "player": "Dave Meyers",
+        "tier": "Rotation Player",
+        "similarity": 99.1
+      },
+      {
+        "player": "Dick Ricketts",
+        "tier": "Bust",
+        "similarity": 98.7
+      }
+    ]
+  },
+  {
+    "player": "Jim Holstein",
+    "draft_season": 1952,
+    "overall_pick": NaN,
+    "college": "Cincinnati",
+    "true_tier": "end_of_bench",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.593,
+    "confidence_true": 0.01,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "John Morton",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Brad Davis",
+        "tier": "High-Level Starter",
+        "similarity": 100.0
+      },
+      {
+        "player": "Tom Ingelsby",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Earnie Killum",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Rod Strickland",
+        "tier": "All-NBA",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Bob Portman",
+    "draft_season": 1969,
+    "overall_pick": 7.0,
+    "college": "Creighton",
+    "true_tier": "end_of_bench",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.414,
+    "confidence_true": 0.029,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Gene Short",
+        "tier": "Bust",
+        "similarity": 99.5
+      },
+      {
+        "player": "John Rudometkin",
+        "tier": "Bust",
+        "similarity": 99.3
+      },
+      {
+        "player": "Dave Budd",
+        "tier": "Rotation Player",
+        "similarity": 99.3
+      },
+      {
+        "player": "Tom Sanders",
+        "tier": "Rotation Player",
+        "similarity": 98.7
+      },
+      {
+        "player": "Jim McMillian",
+        "tier": "Rotation Player",
+        "similarity": 98.1
+      }
+    ]
+  },
+  {
+    "player": "Von Wafer",
+    "draft_season": 2005,
+    "overall_pick": 39.0,
+    "college": "Florida State",
+    "true_tier": "end_of_bench",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.573,
+    "confidence_true": 0.016,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Allen Crabbe",
+        "tier": "Rotation Player",
+        "similarity": 90.2
+      },
+      {
+        "player": "Daniel Gibson",
+        "tier": "Rotation Player",
+        "similarity": 89.6
+      },
+      {
+        "player": "Shannon Brown",
+        "tier": "Rotation Player",
+        "similarity": 89.1
+      },
+      {
+        "player": "Jahmi'us Ramsey",
+        "tier": "Bust",
+        "similarity": 89.1
+      },
+      {
+        "player": "Aaron Wiggins",
+        "tier": "Rotation Player",
+        "similarity": 88.5
+      }
+    ]
+  },
+  {
+    "player": "Elmore Spencer",
+    "draft_season": 1992,
+    "overall_pick": 25.0,
+    "college": "UNLV",
+    "true_tier": "end_of_bench",
+    "pred_tier": "starter",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.403,
+    "confidence_true": 0.105,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Jason Collier",
+        "tier": "End-of-Bench Player",
+        "similarity": 99.1
+      },
+      {
+        "player": "Kelvin Cato",
+        "tier": "Starter",
+        "similarity": 97.6
+      },
+      {
+        "player": "Uwe Blab",
+        "tier": "End-of-Bench Player",
+        "similarity": 96.8
+      },
+      {
+        "player": "Loren Meyer",
+        "tier": "Bust",
+        "similarity": 96.8
+      },
+      {
+        "player": "Blair Rasmussen",
+        "tier": "Starter",
+        "similarity": 96.7
+      }
+    ]
+  },
+  {
+    "player": "Moses Moody",
+    "draft_season": 2021,
+    "overall_pick": 14.0,
+    "college": "Arkansas",
+    "true_tier": "rotation",
+    "pred_tier": "rotation",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.418,
+    "confidence_true": 0.418,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Bennedict Mathurin",
+        "tier": "Rotation Player",
+        "similarity": 92.4
+      },
+      {
+        "player": "Andrew Wiggins",
+        "tier": "All-Star",
+        "similarity": 89.9
+      },
+      {
+        "player": "Jeremy Lamb",
+        "tier": "Rotation Player",
+        "similarity": 89.7
+      },
+      {
+        "player": "Romeo Langford",
+        "tier": "End-of-Bench Player",
+        "similarity": 89.5
+      },
+      {
+        "player": "Keldon Johnson",
+        "tier": "High-Level Starter",
+        "similarity": 89.3
+      }
+    ]
+  },
+  {
+    "player": "Ron Franz",
+    "draft_season": 1967,
+    "overall_pick": 33.0,
+    "college": "Kansas",
+    "true_tier": "rotation",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.74,
+    "confidence_true": 0.139,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Todd Mitchell",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Anthony Frederick",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Phil Hicks",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Bob Bedell",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Larry Staverman",
+        "tier": "End-of-Bench Player",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Foots Walker",
+    "draft_season": 1974,
+    "overall_pick": 38.0,
+    "college": "West Georgia",
+    "true_tier": "rotation",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.742,
+    "confidence_true": 0.16,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Chris Corchiani",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Kenny Higgs",
+        "tier": "Bust",
+        "similarity": 99.9
+      },
+      {
+        "player": "Othell Wilson",
+        "tier": "Bust",
+        "similarity": 99.7
+      },
+      {
+        "player": "Frankie King",
+        "tier": "Bust",
+        "similarity": 99.5
+      },
+      {
+        "player": "Duane Cooper",
+        "tier": "Bust",
+        "similarity": 99.5
+      }
+    ]
+  },
+  {
+    "player": "Landry Fields",
+    "draft_season": 2010,
+    "overall_pick": 39.0,
+    "college": "Stanford",
+    "true_tier": "rotation",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.928,
+    "confidence_true": 0.028,
+    "n_missing_features": 3,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Dominique Jones",
+        "tier": "Bust",
+        "similarity": 86.3
+      },
+      {
+        "player": "Kevin Hervey",
+        "tier": "Bust",
+        "similarity": 85.2
+      },
+      {
+        "player": "Marcus Thornton",
+        "tier": "Rotation Player",
+        "similarity": 85.2
+      },
+      {
+        "player": "Willie Green",
+        "tier": "Starter",
+        "similarity": 84.9
+      },
+      {
+        "player": "Orlando Johnson",
+        "tier": "Bust",
+        "similarity": 84.2
+      }
+    ]
+  },
+  {
+    "player": "Jaden Ivey",
+    "draft_season": 2022,
+    "overall_pick": 5.0,
+    "college": "Purdue",
+    "true_tier": "rotation",
+    "pred_tier": "rotation",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.559,
+    "confidence_true": 0.559,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Baron Davis",
+        "tier": "All-NBA",
+        "similarity": 91.7
+      },
+      {
+        "player": "Jason Kidd",
+        "tier": "Superstar",
+        "similarity": 91.0
+      },
+      {
+        "player": "David Thompson",
+        "tier": "Superstar",
+        "similarity": 91.0
+      },
+      {
+        "player": "Chauncey Billups",
+        "tier": "Superstar",
+        "similarity": 90.9
+      },
+      {
+        "player": "Glen Selbo",
+        "tier": "Bust",
+        "similarity": 90.9
+      }
+    ]
+  },
+  {
+    "player": "Dave Wohl",
+    "draft_season": 1971,
+    "overall_pick": 46.0,
+    "college": "Penn",
+    "true_tier": "rotation",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.692,
+    "confidence_true": 0.168,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Tom Garrick",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Tommie Green",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Mike Bratz",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Gary Melchionni",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Larry Finch",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Ray Lumpp",
+    "draft_season": 1948,
+    "overall_pick": NaN,
+    "college": "NYU",
+    "true_tier": "rotation",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.638,
+    "confidence_true": 0.183,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Ted McClain",
+        "tier": "All-Star",
+        "similarity": 100.0
+      },
+      {
+        "player": "Gerry Calabrese",
+        "tier": "Bust",
+        "similarity": 99.9
+      },
+      {
+        "player": "Johnny Macknowski",
+        "tier": "Bust",
+        "similarity": 99.5
+      },
+      {
+        "player": "Gene Rhodes",
+        "tier": "Bust",
+        "similarity": 99.4
+      },
+      {
+        "player": "Jimmy Darden",
+        "tier": "Bust",
+        "similarity": 99.4
+      }
+    ]
+  },
+  {
+    "player": "Ed Manning",
+    "draft_season": 1967,
+    "overall_pick": 80.0,
+    "college": "Jackson State University",
+    "true_tier": "rotation",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.805,
+    "confidence_true": 0.134,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Winston Bennett",
+        "tier": "High-Level Starter",
+        "similarity": 100.0
+      },
+      {
+        "player": "Ronnie Valentine",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Mark Crow",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Fred Saunders",
+        "tier": "End-of-Bench Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Herbert Jones",
+        "tier": "Starter",
+        "similarity": 99.9
+      }
+    ]
+  },
+  {
+    "player": "Kevin Grevey",
+    "draft_season": 1975,
+    "overall_pick": 18.0,
+    "college": "Kentucky",
+    "true_tier": "rotation",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.395,
+    "confidence_true": 0.286,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Fred LaCour",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Aaron McKie",
+        "tier": "Starter",
+        "similarity": 100.0
+      },
+      {
+        "player": "Howard Carter",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Charles Bradley",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Jack Givens",
+        "tier": "Bust",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Michael Ruffin",
+    "draft_season": 1999,
+    "overall_pick": 32.0,
+    "college": "Tulsa",
+    "true_tier": "rotation",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.595,
+    "confidence_true": 0.171,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Walter Sharpe",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Luis Scola",
+        "tier": "High-Level Starter",
+        "similarity": 99.7
+      },
+      {
+        "player": "Joe Kopicki",
+        "tier": "Bust",
+        "similarity": 99.7
+      },
+      {
+        "player": "Torraye Braggs",
+        "tier": "Bust",
+        "similarity": 99.5
+      },
+      {
+        "player": "Junior Burrough",
+        "tier": "Bust",
+        "similarity": 99.4
+      }
+    ]
+  },
+  {
+    "player": "Guerschon Yabusele",
+    "draft_season": 2016,
+    "overall_pick": 16.0,
+    "college": "NA",
+    "true_tier": "rotation",
+    "pred_tier": "rotation",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.293,
+    "confidence_true": 0.293,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Nikola Vu\u010devi\u0107",
+        "tier": "All-Star",
+        "similarity": 98.0
+      },
+      {
+        "player": "Boris Diaw",
+        "tier": "Starter",
+        "similarity": 97.6
+      },
+      {
+        "player": "Victor Alexander",
+        "tier": "Starter",
+        "similarity": 95.4
+      },
+      {
+        "player": "Lonnie Shelton",
+        "tier": "All-Star",
+        "similarity": 94.5
+      },
+      {
+        "player": "Wayne Embry",
+        "tier": "All-Star",
+        "similarity": 94.5
+      }
+    ]
+  },
+  {
+    "player": "Aaron Gray",
+    "draft_season": 2007,
+    "overall_pick": 49.0,
+    "college": "Pitt",
+    "true_tier": "rotation",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.743,
+    "confidence_true": 0.032,
+    "n_missing_features": 9,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Sasha Kaun",
+        "tier": "Bust",
+        "similarity": 85.3
+      },
+      {
+        "player": "Richard Hendrix",
+        "tier": "Bust",
+        "similarity": 80.1
+      },
+      {
+        "player": "Corsley Edwards",
+        "tier": "Bust",
+        "similarity": 80.0
+      },
+      {
+        "player": "Jason Thompson",
+        "tier": "High-Level Starter",
+        "similarity": 79.5
+      },
+      {
+        "player": "Brendan Haywood",
+        "tier": "Starter",
+        "similarity": 78.9
+      }
+    ]
+  },
+  {
+    "player": "Ayo Dosunmu",
+    "draft_season": 2021,
+    "overall_pick": 38.0,
+    "college": "Illinois",
+    "true_tier": "starter",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.557,
+    "confidence_true": 0.072,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Dillon Brooks",
+        "tier": "Starter",
+        "similarity": 88.6
+      },
+      {
+        "player": "Lamar Patterson",
+        "tier": "Bust",
+        "similarity": 88.5
+      },
+      {
+        "player": "Dominique Jones",
+        "tier": "Bust",
+        "similarity": 88.0
+      },
+      {
+        "player": "Elliot Williams",
+        "tier": "Bust",
+        "similarity": 88.0
+      },
+      {
+        "player": "Klay Thompson",
+        "tier": "All-NBA",
+        "similarity": 87.7
+      }
+    ]
+  },
+  {
+    "player": "Wayne Cooper",
+    "draft_season": 1978,
+    "overall_pick": 40.0,
+    "college": "New Orleans",
+    "true_tier": "starter",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.568,
+    "confidence_true": 0.043,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Greg Stokes",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Eddie Lee Wilkins",
+        "tier": "End-of-Bench Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Brad Branson",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Jerome Whitehead",
+        "tier": "Starter",
+        "similarity": 100.0
+      },
+      {
+        "player": "Joe Pace",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Jared Dudley",
+    "draft_season": 2007,
+    "overall_pick": 22.0,
+    "college": "Boston College",
+    "true_tier": "starter",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.538,
+    "confidence_true": 0.055,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Antoine Wright",
+        "tier": "Rotation Player",
+        "similarity": 89.6
+      },
+      {
+        "player": "Nick Young",
+        "tier": "Starter",
+        "similarity": 88.0
+      },
+      {
+        "player": "Matt Bonner",
+        "tier": "Rotation Player",
+        "similarity": 87.9
+      },
+      {
+        "player": "Jake LaRavia",
+        "tier": "Rotation Player",
+        "similarity": 86.5
+      },
+      {
+        "player": "Reyshawn Terry",
+        "tier": "Bust",
+        "similarity": 86.3
+      }
+    ]
+  },
+  {
+    "player": "Earl Cureton",
+    "draft_season": 1979,
+    "overall_pick": 58.0,
+    "college": "Detroit Mercy",
+    "true_tier": "starter",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.477,
+    "confidence_true": 0.042,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Antonio Davis",
+        "tier": "All-Star",
+        "similarity": 99.8
+      },
+      {
+        "player": "Gary Plummer",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Hank McDowell",
+        "tier": "End-of-Bench Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "Charles Jones",
+        "tier": "High-Level Starter",
+        "similarity": 99.8
+      },
+      {
+        "player": "Paul Griffin",
+        "tier": "Rotation Player",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Gordan Giri\u010dek",
+    "draft_season": 1999,
+    "overall_pick": 40.0,
+    "college": "NA",
+    "true_tier": "starter",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.521,
+    "confidence_true": 0.121,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Paul Thompson",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Mike Sanders",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "John Schweitz",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Manu Gin\u00f3bili",
+        "tier": "All-NBA",
+        "similarity": 99.8
+      },
+      {
+        "player": "Lewis Lloyd",
+        "tier": "Starter",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Jon Koncak",
+    "draft_season": 1985,
+    "overall_pick": 5.0,
+    "college": "SMU",
+    "true_tier": "starter",
+    "pred_tier": "starter",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.257,
+    "confidence_true": 0.257,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Elmore Smith",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Bob Lanier",
+        "tier": "All-Star",
+        "similarity": 99.5
+      },
+      {
+        "player": "Bill Cartwright",
+        "tier": "All-Star",
+        "similarity": 99.3
+      },
+      {
+        "player": "Raef LaFrentz",
+        "tier": "High-Level Starter",
+        "similarity": 98.7
+      },
+      {
+        "player": "David Robinson",
+        "tier": "Superstar",
+        "similarity": 97.6
+      }
+    ]
+  },
+  {
+    "player": "Brandon Knight",
+    "draft_season": 2011,
+    "overall_pick": 8.0,
+    "college": "Kentucky",
+    "true_tier": "starter",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.427,
+    "confidence_true": 0.102,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Coby White",
+        "tier": "High-Level Starter",
+        "similarity": 89.9
+      },
+      {
+        "player": "Kira Lewis Jr.",
+        "tier": "End-of-Bench Player",
+        "similarity": 88.1
+      },
+      {
+        "player": "Collin Sexton",
+        "tier": "Starter",
+        "similarity": 86.8
+      },
+      {
+        "player": "Austin Rivers",
+        "tier": "Rotation Player",
+        "similarity": 86.4
+      },
+      {
+        "player": "Jaden Ivey",
+        "tier": "Rotation Player",
+        "similarity": 85.9
+      }
+    ]
+  },
+  {
+    "player": "Chandler Parsons",
+    "draft_season": 2011,
+    "overall_pick": 38.0,
+    "college": "Florida",
+    "true_tier": "starter",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.489,
+    "confidence_true": 0.148,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Matt Barnes",
+        "tier": "Starter",
+        "similarity": 86.9
+      },
+      {
+        "player": "Isaiah Mobley",
+        "tier": "Bust",
+        "similarity": 86.1
+      },
+      {
+        "player": "Stanley Robinson",
+        "tier": "Bust",
+        "similarity": 84.2
+      },
+      {
+        "player": "Sammy Mejia",
+        "tier": "Bust",
+        "similarity": 82.8
+      },
+      {
+        "player": "Solomon Hill",
+        "tier": "Rotation Player",
+        "similarity": 82.7
+      }
+    ]
+  },
+  {
+    "player": "Herbert Jones",
+    "draft_season": 2021,
+    "overall_pick": 35.0,
+    "college": "Alabama",
+    "true_tier": "starter",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.808,
+    "confidence_true": 0.01,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Johnny Jones",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Winston Bennett",
+        "tier": "High-Level Starter",
+        "similarity": 99.9
+      },
+      {
+        "player": "Ronnie Valentine",
+        "tier": "Bust",
+        "similarity": 99.9
+      },
+      {
+        "player": "Mark Crow",
+        "tier": "Bust",
+        "similarity": 99.9
+      },
+      {
+        "player": "Fred Saunders",
+        "tier": "End-of-Bench Player",
+        "similarity": 99.9
+      }
+    ]
+  },
+  {
+    "player": "Marc Iavaroni",
+    "draft_season": 1978,
+    "overall_pick": 55.0,
+    "college": "Virginia",
+    "true_tier": "starter",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.74,
+    "confidence_true": 0.016,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Scott Meents",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Solomon Jones",
+        "tier": "End-of-Bench Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "Bruce Kuczenski",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Dale Wilkinson",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Bob Miller",
+        "tier": "Bust",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Calbert Cheaney",
+    "draft_season": 1993,
+    "overall_pick": 6.0,
+    "college": "Indiana",
+    "true_tier": "starter",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.335,
+    "confidence_true": 0.183,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Lionel Simmons",
+        "tier": "Starter",
+        "similarity": 100.0
+      },
+      {
+        "player": "Julius Erving",
+        "tier": "Superstar",
+        "similarity": 100.0
+      },
+      {
+        "player": "Mike O'Koren",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Chet Walker",
+        "tier": "All-Star",
+        "similarity": 99.9
+      },
+      {
+        "player": "Chris Mullin",
+        "tier": "All-NBA",
+        "similarity": 99.7
+      }
+    ]
+  },
+  {
+    "player": "Jalen Green",
+    "draft_season": 2021,
+    "overall_pick": 2.0,
+    "college": "NA",
+    "true_tier": "starter",
+    "pred_tier": "superstar",
+    "correct": false,
+    "ordinal_error": 4,
+    "confidence_max": 0.223,
+    "confidence_true": 0.159,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Ricky Rubio",
+        "tier": "Starter",
+        "similarity": 98.0
+      },
+      {
+        "player": "Stephon Marbury",
+        "tier": "All-NBA",
+        "similarity": 97.9
+      },
+      {
+        "player": "LaMelo Ball",
+        "tier": "All-Star",
+        "similarity": 95.7
+      },
+      {
+        "player": "Shaun Livingston",
+        "tier": "Rotation Player",
+        "similarity": 95.7
+      },
+      {
+        "player": "Dante Exum",
+        "tier": "Rotation Player",
+        "similarity": 93.4
+      }
+    ]
+  },
+  {
+    "player": "Bismack Biyombo",
+    "draft_season": 2011,
+    "overall_pick": 7.0,
+    "college": "NA",
+    "true_tier": "high_level_starter",
+    "pred_tier": "superstar",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.213,
+    "confidence_true": 0.119,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Amar'e Stoudemire",
+        "tier": "All-NBA",
+        "similarity": 94.6
+      },
+      {
+        "player": "John Williams",
+        "tier": "Rotation Player",
+        "similarity": 94.0
+      },
+      {
+        "player": "Nen\u00ea",
+        "tier": "High-Level Starter",
+        "similarity": 93.2
+      },
+      {
+        "player": "Robert Swift",
+        "tier": "Bust",
+        "similarity": 92.6
+      },
+      {
+        "player": "Andris Biedri\u0146\u0161",
+        "tier": "High-Level Starter",
+        "similarity": 91.8
+      }
+    ]
+  },
+  {
+    "player": "Marvin Williams",
+    "draft_season": 2005,
+    "overall_pick": 2.0,
+    "college": "UNC",
+    "true_tier": "high_level_starter",
+    "pred_tier": "high_level_starter",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.353,
+    "confidence_true": 0.353,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Chris Bosh",
+        "tier": "All-NBA",
+        "similarity": 83.3
+      },
+      {
+        "player": "Jonathan Isaac",
+        "tier": "Rotation Player",
+        "similarity": 83.2
+      },
+      {
+        "player": "Gordon Hayward",
+        "tier": "All-Star",
+        "similarity": 83.0
+      },
+      {
+        "player": "Jayson Tatum",
+        "tier": "Superstar",
+        "similarity": 82.6
+      },
+      {
+        "player": "Michael Kidd-Gilchrist",
+        "tier": "High-Level Starter",
+        "similarity": 81.7
+      }
+    ]
+  },
+  {
+    "player": "Doug Christie",
+    "draft_season": 1992,
+    "overall_pick": 17.0,
+    "college": "Pepperdine",
+    "true_tier": "high_level_starter",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 4,
+    "confidence_max": 0.344,
+    "confidence_true": 0.021,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Maurice Martin",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Bob Gross",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Jeff Lamp",
+        "tier": "Rotation Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "Kevin Loder",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Tracy Jackson",
+        "tier": "Bust",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Danny Schayes",
+    "draft_season": 1981,
+    "overall_pick": 13.0,
+    "college": "Syracuse",
+    "true_tier": "high_level_starter",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.281,
+    "confidence_true": 0.233,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Craig Raymond",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Vin Baker",
+        "tier": "All-NBA",
+        "similarity": 99.9
+      },
+      {
+        "player": "Dale Davis",
+        "tier": "All-Star",
+        "similarity": 99.8
+      },
+      {
+        "player": "Stacey King",
+        "tier": "Rotation Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "John Salley",
+        "tier": "High-Level Starter",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Jay Humphries",
+    "draft_season": 1984,
+    "overall_pick": 13.0,
+    "college": "Colorado",
+    "true_tier": "high_level_starter",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.311,
+    "confidence_true": 0.096,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Lancaster Gordon",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Leon Wood",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Lionel Hollins",
+        "tier": "All-Star",
+        "similarity": 100.0
+      },
+      {
+        "player": "Jim Cleamons",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "John Vallely",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Charles Smith",
+    "draft_season": 1988,
+    "overall_pick": 3.0,
+    "college": "Pitt",
+    "true_tier": "high_level_starter",
+    "pred_tier": "all_nba",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.308,
+    "confidence_true": 0.098,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Derrick Coleman",
+        "tier": "All-NBA",
+        "similarity": 100.0
+      },
+      {
+        "player": "Mychal Thompson",
+        "tier": "Starter",
+        "similarity": 99.9
+      },
+      {
+        "player": "Armen Gilliam",
+        "tier": "High-Level Starter",
+        "similarity": 99.5
+      },
+      {
+        "player": "Christian Laettner",
+        "tier": "All-Star",
+        "similarity": 99.3
+      },
+      {
+        "player": "Sam Perkins",
+        "tier": "High-Level Starter",
+        "similarity": 99.3
+      }
+    ]
+  },
+  {
+    "player": "Gheorghe Mure\u0219an",
+    "draft_season": 1993,
+    "overall_pick": 30.0,
+    "college": "NA",
+    "true_tier": "high_level_starter",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.243,
+    "confidence_true": 0.214,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Priest Lauderdale",
+        "tier": "Bust",
+        "similarity": 90.2
+      },
+      {
+        "player": "Arvydas Sabonis",
+        "tier": "High-Level Starter",
+        "similarity": 89.5
+      },
+      {
+        "player": "Greg Ostertag",
+        "tier": "High-Level Starter",
+        "similarity": 87.0
+      },
+      {
+        "player": "Jake Tsakalidis",
+        "tier": "Rotation Player",
+        "similarity": 86.2
+      },
+      {
+        "player": "Yao Ming",
+        "tier": "All-NBA",
+        "similarity": 85.6
+      }
+    ]
+  },
+  {
+    "player": "Ben Gordon",
+    "draft_season": 2004,
+    "overall_pick": 3.0,
+    "college": "UConn",
+    "true_tier": "high_level_starter",
+    "pred_tier": "starter",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.371,
+    "confidence_true": 0.039,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Chauncey Billups",
+        "tier": "Superstar",
+        "similarity": 90.8
+      },
+      {
+        "player": "Glen Selbo",
+        "tier": "Bust",
+        "similarity": 90.7
+      },
+      {
+        "player": "Jason Kidd",
+        "tier": "Superstar",
+        "similarity": 90.5
+      },
+      {
+        "player": "David Thompson",
+        "tier": "Superstar",
+        "similarity": 90.5
+      },
+      {
+        "player": "Ray Allen",
+        "tier": "All-NBA",
+        "similarity": 90.1
+      }
+    ]
+  },
+  {
+    "player": "Ron Harper",
+    "draft_season": 1986,
+    "overall_pick": 8.0,
+    "college": "Miami University",
+    "true_tier": "high_level_starter",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.289,
+    "confidence_true": 0.156,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Todd Day",
+        "tier": "Starter",
+        "similarity": 99.9
+      },
+      {
+        "player": "Rolando Blackman",
+        "tier": "All-Star",
+        "similarity": 99.8
+      },
+      {
+        "player": "Albert King",
+        "tier": "Starter",
+        "similarity": 99.8
+      },
+      {
+        "player": "Mark Macon",
+        "tier": "Rotation Player",
+        "similarity": 99.5
+      },
+      {
+        "player": "Reggie Miller",
+        "tier": "All-NBA",
+        "similarity": 99.5
+      }
+    ]
+  },
+  {
+    "player": "Jerome Williams",
+    "draft_season": 1996,
+    "overall_pick": 26.0,
+    "college": "Georgetown",
+    "true_tier": "high_level_starter",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 4,
+    "confidence_max": 0.508,
+    "confidence_true": 0.022,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Dallas Comegys",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Doug Kistler",
+        "tier": "Bust",
+        "similarity": 99.9
+      },
+      {
+        "player": "Dave Magley",
+        "tier": "Bust",
+        "similarity": 99.4
+      },
+      {
+        "player": "Bo Ellis",
+        "tier": "Bust",
+        "similarity": 99.3
+      },
+      {
+        "player": "Nikita Wilson",
+        "tier": "Bust",
+        "similarity": 99.2
+      }
+    ]
+  },
+  {
+    "player": "Malcolm Brogdon",
+    "draft_season": 2016,
+    "overall_pick": 36.0,
+    "college": "Virginia",
+    "true_tier": "high_level_starter",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.48,
+    "confidence_true": 0.002,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Sam Merrill",
+        "tier": "Rotation Player",
+        "similarity": 93.5
+      },
+      {
+        "player": "Jordan McRae",
+        "tier": "End-of-Bench Player",
+        "similarity": 88.7
+      },
+      {
+        "player": "E'Twaun Moore",
+        "tier": "Rotation Player",
+        "similarity": 84.6
+      },
+      {
+        "player": "C.J. Wilcox",
+        "tier": "Bust",
+        "similarity": 84.2
+      },
+      {
+        "player": "Adam Haluska",
+        "tier": "Bust",
+        "similarity": 84.1
+      }
+    ]
+  },
+  {
+    "player": "Hassan Whiteside",
+    "draft_season": 2010,
+    "overall_pick": 33.0,
+    "college": "Marshall",
+    "true_tier": "high_level_starter",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 4,
+    "confidence_max": 0.82,
+    "confidence_true": 0.053,
+    "n_missing_features": 3,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Jarvis Varnado",
+        "tier": "Bust",
+        "similarity": 71.0
+      },
+      {
+        "player": "Larry Sanders",
+        "tier": "Rotation Player",
+        "similarity": 66.7
+      },
+      {
+        "player": "Daniel Oturu",
+        "tier": "Bust",
+        "similarity": 66.4
+      },
+      {
+        "player": "Keith Benson",
+        "tier": "Bust",
+        "similarity": 66.2
+      },
+      {
+        "player": "Cole Aldrich",
+        "tier": "End-of-Bench Player",
+        "similarity": 66.1
+      }
+    ]
+  },
+  {
+    "player": "Don Ohl",
+    "draft_season": 1958,
+    "overall_pick": 37.0,
+    "college": "Illinois",
+    "true_tier": "all_star",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 5,
+    "confidence_max": 0.711,
+    "confidence_true": 0.043,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Eric Snow",
+        "tier": "Starter",
+        "similarity": 100.0
+      },
+      {
+        "player": "Chris Smith",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Doug Overton",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Dane Suttle",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Jim McElroy",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Chris Kaman",
+    "draft_season": 2003,
+    "overall_pick": 6.0,
+    "college": "Central Michigan University",
+    "true_tier": "all_star",
+    "pred_tier": "end_of_bench",
+    "correct": false,
+    "ordinal_error": 4,
+    "confidence_max": 0.583,
+    "confidence_true": 0.002,
+    "n_missing_features": 7,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Ike Diogu",
+        "tier": "End-of-Bench Player",
+        "similarity": 78.9
+      },
+      {
+        "player": "Alexander Johnson",
+        "tier": "Bust",
+        "similarity": 71.5
+      },
+      {
+        "player": "Jason Thompson",
+        "tier": "High-Level Starter",
+        "similarity": 70.9
+      },
+      {
+        "player": "Paul Davis",
+        "tier": "Bust",
+        "similarity": 68.8
+      },
+      {
+        "player": "Markieff Morris",
+        "tier": "Starter",
+        "similarity": 68.6
+      }
+    ]
+  },
+  {
+    "player": "Fred Brown",
+    "draft_season": 1971,
+    "overall_pick": 6.0,
+    "college": "Iowa",
+    "true_tier": "all_star",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 5,
+    "confidence_max": 0.343,
+    "confidence_true": 0.097,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Brad Holland",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Mike Davis",
+        "tier": "Rotation Player",
+        "similarity": 99.9
+      },
+      {
+        "player": "Andrew Toney",
+        "tier": "All-Star",
+        "similarity": 99.9
+      },
+      {
+        "player": "Ray Williams",
+        "tier": "High-Level Starter",
+        "similarity": 99.7
+      },
+      {
+        "player": "Willie McCarter",
+        "tier": "Bust",
+        "similarity": 99.6
+      }
+    ]
+  },
+  {
+    "player": "Devin Harris",
+    "draft_season": 2004,
+    "overall_pick": 5.0,
+    "college": "Wisconsin",
+    "true_tier": "all_star",
+    "pred_tier": "superstar",
+    "correct": false,
+    "ordinal_error": 2,
+    "confidence_max": 0.553,
+    "confidence_true": 0.022,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Brandon Roy",
+        "tier": "All-NBA",
+        "similarity": 86.0
+      },
+      {
+        "player": "Rashad McCants",
+        "tier": "Rotation Player",
+        "similarity": 84.4
+      },
+      {
+        "player": "Delonte West",
+        "tier": "Starter",
+        "similarity": 84.2
+      },
+      {
+        "player": "Shake Milton",
+        "tier": "Rotation Player",
+        "similarity": 83.8
+      },
+      {
+        "player": "Ben Gordon",
+        "tier": "High-Level Starter",
+        "similarity": 83.3
+      }
+    ]
+  },
+  {
+    "player": "Sleepy Floyd",
+    "draft_season": 1982,
+    "overall_pick": 13.0,
+    "college": "Georgetown",
+    "true_tier": "all_star",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.32,
+    "confidence_true": 0.073,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Kenny Smith",
+        "tier": "High-Level Starter",
+        "similarity": 100.0
+      },
+      {
+        "player": "Fat Lever",
+        "tier": "All-NBA",
+        "similarity": 100.0
+      },
+      {
+        "player": "John Roche",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Tate Armstrong",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Jim Barnett",
+        "tier": "Rotation Player",
+        "similarity": 99.5
+      }
+    ]
+  },
+  {
+    "player": "Walt Hazzard",
+    "draft_season": 1964,
+    "overall_pick": 5.0,
+    "college": "UCLA",
+    "true_tier": "all_star",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.287,
+    "confidence_true": 0.219,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Freddie Boyd",
+        "tier": "Rotation Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "Brendan McCann",
+        "tier": "Bust",
+        "similarity": 99.6
+      },
+      {
+        "player": "Otis Birdsong",
+        "tier": "All-NBA",
+        "similarity": 99.3
+      },
+      {
+        "player": "Frank Selvy",
+        "tier": "All-Star",
+        "similarity": 99.3
+      },
+      {
+        "player": "Phil Ford",
+        "tier": "All-NBA",
+        "similarity": 99.1
+      }
+    ]
+  },
+  {
+    "player": "Bob Netolicky",
+    "draft_season": 1967,
+    "overall_pick": 18.0,
+    "college": "Drake University",
+    "true_tier": "all_star",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 5,
+    "confidence_max": 0.423,
+    "confidence_true": 0.195,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Gene Wiley",
+        "tier": "Rotation Player",
+        "similarity": 98.7
+      },
+      {
+        "player": "Alex Hannum",
+        "tier": "Rotation Player",
+        "similarity": 97.4
+      },
+      {
+        "player": "Ed Peterson",
+        "tier": "Bust",
+        "similarity": 97.0
+      },
+      {
+        "player": "Chris Gatling",
+        "tier": "All-Star",
+        "similarity": 96.6
+      },
+      {
+        "player": "Charlie Hardnett",
+        "tier": "Bust",
+        "similarity": 96.4
+      }
+    ]
+  },
+  {
+    "player": "Gus Gerard",
+    "draft_season": 1975,
+    "overall_pick": 50.0,
+    "college": "Virginia",
+    "true_tier": "all_star",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 5,
+    "confidence_max": 0.521,
+    "confidence_true": 0.052,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Guy Morgan",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Robert Reid",
+        "tier": "Starter",
+        "similarity": 99.8
+      },
+      {
+        "player": "Brian Davis",
+        "tier": "Bust",
+        "similarity": 99.5
+      },
+      {
+        "player": "Georgios Kalaitzakis",
+        "tier": "Bust",
+        "similarity": 99.4
+      },
+      {
+        "player": "Sun Yue",
+        "tier": "Bust",
+        "similarity": 99.3
+      }
+    ]
+  },
+  {
+    "player": "Rudy LaRusso",
+    "draft_season": 1959,
+    "overall_pick": 12.0,
+    "college": "Dartmouth College",
+    "true_tier": "all_star",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.304,
+    "confidence_true": 0.216,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Tom Heinsohn",
+        "tier": "All-NBA",
+        "similarity": 100.0
+      },
+      {
+        "player": "Jack Nichols",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "James Hardy",
+        "tier": "Rotation Player",
+        "similarity": 99.5
+      },
+      {
+        "player": "Red Morrison",
+        "tier": "Bust",
+        "similarity": 99.5
+      },
+      {
+        "player": "Charlie Paulk",
+        "tier": "Bust",
+        "similarity": 99.5
+      }
+    ]
+  },
+  {
+    "player": "Jalen Duren",
+    "draft_season": 2022,
+    "overall_pick": 13.0,
+    "college": "Memphis",
+    "true_tier": "all_star",
+    "pred_tier": "high_level_starter",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.747,
+    "confidence_true": 0.027,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Derrick Favors",
+        "tier": "High-Level Starter",
+        "similarity": 91.7
+      },
+      {
+        "player": "Meyers Leonard",
+        "tier": "Rotation Player",
+        "similarity": 85.3
+      },
+      {
+        "player": "J.J. Hickson",
+        "tier": "Starter",
+        "similarity": 82.5
+      },
+      {
+        "player": "Jarrett Allen",
+        "tier": "All-Star",
+        "similarity": 79.2
+      },
+      {
+        "player": "Byron Mullens",
+        "tier": "End-of-Bench Player",
+        "similarity": 78.8
+      }
+    ]
+  },
+  {
+    "player": "Jeff Teague",
+    "draft_season": 2009,
+    "overall_pick": 19.0,
+    "college": "Wake Forest",
+    "true_tier": "all_star",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.332,
+    "confidence_true": 0.024,
+    "n_missing_features": 8,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Gilbert Arenas",
+        "tier": "All-NBA",
+        "similarity": 88.2
+      },
+      {
+        "player": "Elliot Williams",
+        "tier": "Bust",
+        "similarity": 87.3
+      },
+      {
+        "player": "Tre Mann",
+        "tier": "Rotation Player",
+        "similarity": 85.2
+      },
+      {
+        "player": "Nick Calathes",
+        "tier": "Bust",
+        "similarity": 84.4
+      },
+      {
+        "player": "Jarrett Jack",
+        "tier": "Starter",
+        "similarity": 84.3
+      }
+    ]
+  },
+  {
+    "player": "Mehmet Okur",
+    "draft_season": 2001,
+    "overall_pick": 38.0,
+    "college": "NA",
+    "true_tier": "all_star",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 5,
+    "confidence_max": 0.367,
+    "confidence_true": 0.049,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Robert Werdann",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Dean Garrett",
+        "tier": "High-Level Starter",
+        "similarity": 100.0
+      },
+      {
+        "player": "David Andersen",
+        "tier": "Bust",
+        "similarity": 99.9
+      },
+      {
+        "player": "Charles Shackleford",
+        "tier": "Rotation Player",
+        "similarity": 99.9
+      },
+      {
+        "player": "Jim Johnstone",
+        "tier": "Bust",
+        "similarity": 99.9
+      }
+    ]
+  },
+  {
+    "player": "Randy Smith",
+    "draft_season": 1971,
+    "overall_pick": 104.0,
+    "college": "Buffalo State",
+    "true_tier": "all_nba",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 6,
+    "confidence_max": 0.779,
+    "confidence_true": 0.003,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Kevin Pritchard",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Scott Haffner",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Frank Russell",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Sam Williams",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "A.J. English",
+        "tier": "Bust",
+        "similarity": 99.8
+      }
+    ]
+  },
+  {
+    "player": "Derrick Rose",
+    "draft_season": 2008,
+    "overall_pick": 1.0,
+    "college": "Memphis",
+    "true_tier": "all_nba",
+    "pred_tier": "all_nba",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.638,
+    "confidence_true": 0.638,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "De'Aaron Fox",
+        "tier": "All-NBA",
+        "similarity": 90.6
+      },
+      {
+        "player": "John Wall",
+        "tier": "All-NBA",
+        "similarity": 87.5
+      },
+      {
+        "player": "Jaden Ivey",
+        "tier": "Rotation Player",
+        "similarity": 86.0
+      },
+      {
+        "player": "Jalen Suggs",
+        "tier": "Starter",
+        "similarity": 85.9
+      },
+      {
+        "player": "James Harden",
+        "tier": "Superstar",
+        "similarity": 85.5
+      }
+    ]
+  },
+  {
+    "player": "Vince Carter",
+    "draft_season": 1998,
+    "overall_pick": 5.0,
+    "college": "UNC",
+    "true_tier": "all_nba",
+    "pred_tier": "all_nba",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.266,
+    "confidence_true": 0.266,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Jerry Stackhouse",
+        "tier": "All-Star",
+        "similarity": 100.0
+      },
+      {
+        "player": "Marques Johnson",
+        "tier": "All-NBA",
+        "similarity": 99.5
+      },
+      {
+        "player": "Purvis Short",
+        "tier": "Starter",
+        "similarity": 98.7
+      },
+      {
+        "player": "Ray Allen",
+        "tier": "All-NBA",
+        "similarity": 97.6
+      },
+      {
+        "player": "Jim Jackson",
+        "tier": "Starter",
+        "similarity": 97.0
+      }
+    ]
+  },
+  {
+    "player": "Gail Goodrich",
+    "draft_season": 1965,
+    "overall_pick": 10.0,
+    "college": "UCLA",
+    "true_tier": "all_nba",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 6,
+    "confidence_max": 0.281,
+    "confidence_true": 0.059,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Jack Kiley",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Chuck Mencel",
+        "tier": "Bust",
+        "similarity": 99.5
+      },
+      {
+        "player": "Bobby Hurley",
+        "tier": "Rotation Player",
+        "similarity": 99.3
+      },
+      {
+        "player": "Jim King",
+        "tier": "All-Star",
+        "similarity": 99.3
+      },
+      {
+        "player": "Jay Arnette",
+        "tier": "Bust",
+        "similarity": 99.3
+      }
+    ]
+  },
+  {
+    "player": "Slater Martin",
+    "draft_season": 1949,
+    "overall_pick": NaN,
+    "college": "Texas",
+    "true_tier": "all_nba",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 6,
+    "confidence_max": 0.705,
+    "confidence_true": 0.017,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Tom Kelly",
+        "tier": "Bust",
+        "similarity": 98.2
+      },
+      {
+        "player": "Jack Parkinson",
+        "tier": "Bust",
+        "similarity": 98.0
+      },
+      {
+        "player": "Dee Gibson",
+        "tier": "Bust",
+        "similarity": 96.4
+      },
+      {
+        "player": "Hank Biasatti",
+        "tier": "Bust",
+        "similarity": 96.4
+      },
+      {
+        "player": "Saul Mariaschin",
+        "tier": "Bust",
+        "similarity": 96.4
+      }
+    ]
+  },
+  {
+    "player": "Jaylen Brown",
+    "draft_season": 2016,
+    "overall_pick": 3.0,
+    "college": "California",
+    "true_tier": "all_nba",
+    "pred_tier": "starter",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.344,
+    "confidence_true": 0.113,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Jaden McDaniels",
+        "tier": "Starter",
+        "similarity": 82.5
+      },
+      {
+        "player": "Archie Goodwin",
+        "tier": "End-of-Bench Player",
+        "similarity": 81.6
+      },
+      {
+        "player": "Keon Johnson",
+        "tier": "Bust",
+        "similarity": 79.4
+      },
+      {
+        "player": "Cam Reddish",
+        "tier": "Rotation Player",
+        "similarity": 79.3
+      },
+      {
+        "player": "Anthony Edwards",
+        "tier": "All-NBA",
+        "similarity": 77.4
+      }
+    ]
+  },
+  {
+    "player": "Phil Ford",
+    "draft_season": 1978,
+    "overall_pick": 2.0,
+    "college": "UNC",
+    "true_tier": "all_nba",
+    "pred_tier": "all_nba",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.239,
+    "confidence_true": 0.239,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Lucius Allen",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Brendan McCann",
+        "tier": "Bust",
+        "similarity": 99.9
+      },
+      {
+        "player": "Freddie Boyd",
+        "tier": "Rotation Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "Jerry West",
+        "tier": "Superstar",
+        "similarity": 99.5
+      },
+      {
+        "player": "Bob Cousy",
+        "tier": "Superstar",
+        "similarity": 99.5
+      }
+    ]
+  },
+  {
+    "player": "Randy Smith",
+    "draft_season": 1970,
+    "overall_pick": 205.0,
+    "college": "Buffalo State",
+    "true_tier": "all_nba",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 6,
+    "confidence_max": 0.718,
+    "confidence_true": 0.006,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Myron Brown",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Keith Smith",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Dirk Minniefield",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Mike Dunleavy",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      },
+      {
+        "player": "Ken Charles",
+        "tier": "Rotation Player",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Goran Dragi\u0107",
+    "draft_season": 2008,
+    "overall_pick": 45.0,
+    "college": "NA",
+    "true_tier": "all_nba",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 6,
+    "confidence_max": 0.676,
+    "confidence_true": 0.016,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Jeff McInnis",
+        "tier": "Starter",
+        "similarity": 100.0
+      },
+      {
+        "player": "Mark Radford",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Greg Deane",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Jimmy Conner",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Darrell Elston",
+        "tier": "Bust",
+        "similarity": 100.0
+      }
+    ]
+  },
+  {
+    "player": "Sam Jones",
+    "draft_season": 1957,
+    "overall_pick": 8.0,
+    "college": "NC Central",
+    "true_tier": "all_nba",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 6,
+    "confidence_max": 0.398,
+    "confidence_true": 0.057,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Ron Lee",
+        "tier": "Rotation Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "Corky Devlin",
+        "tier": "Bust",
+        "similarity": 99.5
+      },
+      {
+        "player": "Bo Kimble",
+        "tier": "Bust",
+        "similarity": 99.4
+      },
+      {
+        "player": "Ron Williams",
+        "tier": "Rotation Player",
+        "similarity": 98.7
+      },
+      {
+        "player": "Larry Hennessy",
+        "tier": "Bust",
+        "similarity": 98.1
+      }
+    ]
+  },
+  {
+    "player": "Willis Reed",
+    "draft_season": 1964,
+    "overall_pick": 10.0,
+    "college": "Grambling State University",
+    "true_tier": "all_nba",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 4,
+    "confidence_max": 0.318,
+    "confidence_true": 0.106,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "J\u00e9r\u00f4me Mo\u00efso",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Detlef Schrempf",
+        "tier": "All-NBA",
+        "similarity": 100.0
+      },
+      {
+        "player": "Nate Bowman",
+        "tier": "End-of-Bench Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "Danny Schayes",
+        "tier": "High-Level Starter",
+        "similarity": 99.5
+      },
+      {
+        "player": "Craig Raymond",
+        "tier": "Rotation Player",
+        "similarity": 99.5
+      }
+    ]
+  },
+  {
+    "player": "Sam Cassell",
+    "draft_season": 1993,
+    "overall_pick": 24.0,
+    "college": "Florida State",
+    "true_tier": "all_nba",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 6,
+    "confidence_max": 0.678,
+    "confidence_true": 0.033,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Red Owens",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Forest Able",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "Bryce Drew",
+        "tier": "End-of-Bench Player",
+        "similarity": 99.5
+      },
+      {
+        "player": "Mitchell Wiggins",
+        "tier": "Rotation Player",
+        "similarity": 99.5
+      },
+      {
+        "player": "Leon Benbow",
+        "tier": "Bust",
+        "similarity": 99.5
+      }
+    ]
+  },
+  {
+    "player": "Russell Westbrook",
+    "draft_season": 2008,
+    "overall_pick": 4.0,
+    "college": "UCLA",
+    "true_tier": "superstar",
+    "pred_tier": "all_nba",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.487,
+    "confidence_true": 0.092,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Daniel Gibson",
+        "tier": "Rotation Player",
+        "similarity": 87.9
+      },
+      {
+        "player": "Mo Williams",
+        "tier": "All-Star",
+        "similarity": 86.3
+      },
+      {
+        "player": "Jrue Holiday",
+        "tier": "All-Star",
+        "similarity": 85.0
+      },
+      {
+        "player": "Shai Gilgeous-Alexander",
+        "tier": "Superstar",
+        "similarity": 84.9
+      },
+      {
+        "player": "Rajon Rondo",
+        "tier": "All-NBA",
+        "similarity": 84.8
+      }
+    ]
+  },
+  {
+    "player": "Joel Embiid",
+    "draft_season": 2014,
+    "overall_pick": 3.0,
+    "college": "Kansas",
+    "true_tier": "superstar",
+    "pred_tier": "high_level_starter",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.344,
+    "confidence_true": 0.032,
+    "n_missing_features": 0,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Chinanu Onuaku",
+        "tier": "Bust",
+        "similarity": 78.1
+      },
+      {
+        "player": "Bruno Fernando",
+        "tier": "End-of-Bench Player",
+        "similarity": 77.7
+      },
+      {
+        "player": "Jaren Jackson Jr.",
+        "tier": "All-Star",
+        "similarity": 76.3
+      },
+      {
+        "player": "Wendell Carter Jr.",
+        "tier": "Starter",
+        "similarity": 73.5
+      },
+      {
+        "player": "Jalen Duren",
+        "tier": "All-Star",
+        "similarity": 72.3
+      }
+    ]
+  },
+  {
+    "player": "Allen Iverson",
+    "draft_season": 1996,
+    "overall_pick": 1.0,
+    "college": "Georgetown",
+    "true_tier": "superstar",
+    "pred_tier": "superstar",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.307,
+    "confidence_true": 0.307,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Kenny Anderson",
+        "tier": "All-Star",
+        "similarity": 99.5
+      },
+      {
+        "player": "Mahmoud Abdul-Rauf",
+        "tier": "Starter",
+        "similarity": 99.5
+      },
+      {
+        "player": "Kelvin Ransey",
+        "tier": "Rotation Player",
+        "similarity": 96.4
+      },
+      {
+        "player": "Bob Cousy",
+        "tier": "Superstar",
+        "similarity": 95.8
+      },
+      {
+        "player": "Zeke Sinicola",
+        "tier": "Bust",
+        "similarity": 95.4
+      }
+    ]
+  },
+  {
+    "player": "Steve Nash",
+    "draft_season": 1996,
+    "overall_pick": 15.0,
+    "college": "Santa Clara",
+    "true_tier": "superstar",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 7,
+    "confidence_max": 0.496,
+    "confidence_true": 0.002,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Terry Porter",
+        "tier": "All-Star",
+        "similarity": 100.0
+      },
+      {
+        "player": "John Duren",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Bob Schafer",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Nemanja Nedovi\u0107",
+        "tier": "Bust",
+        "similarity": 99.9
+      },
+      {
+        "player": "Mark Jackson",
+        "tier": "All-Star",
+        "similarity": 99.9
+      }
+    ]
+  },
+  {
+    "player": "Chris Paul",
+    "draft_season": 2005,
+    "overall_pick": 4.0,
+    "college": "Wake Forest",
+    "true_tier": "superstar",
+    "pred_tier": "all_nba",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.53,
+    "confidence_true": 0.201,
+    "n_missing_features": 6,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Russell Westbrook",
+        "tier": "Superstar",
+        "similarity": 82.9
+      },
+      {
+        "player": "Kyle Lowry",
+        "tier": "All-NBA",
+        "similarity": 82.4
+      },
+      {
+        "player": "Raymond Felton",
+        "tier": "Starter",
+        "similarity": 82.1
+      },
+      {
+        "player": "Shai Gilgeous-Alexander",
+        "tier": "Superstar",
+        "similarity": 81.2
+      },
+      {
+        "player": "Luke Ridnour",
+        "tier": "High-Level Starter",
+        "similarity": 80.3
+      }
+    ]
+  },
+  {
+    "player": "Paul George",
+    "draft_season": 2010,
+    "overall_pick": 10.0,
+    "college": "Fresno State",
+    "true_tier": "superstar",
+    "pred_tier": "starter",
+    "correct": false,
+    "ordinal_error": 4,
+    "confidence_max": 0.743,
+    "confidence_true": 0.041,
+    "n_missing_features": 3,
+    "has_college_data": true,
+    "top_comps": [
+      {
+        "player": "Joe Johnson",
+        "tier": "All-NBA",
+        "similarity": 85.3
+      },
+      {
+        "player": "Corey Brewer",
+        "tier": "Rotation Player",
+        "similarity": 85.1
+      },
+      {
+        "player": "Caron Butler",
+        "tier": "All-Star",
+        "similarity": 84.8
+      },
+      {
+        "player": "Cade Cunningham",
+        "tier": "All-NBA",
+        "similarity": 84.5
+      },
+      {
+        "player": "Rudy Gay",
+        "tier": "Starter",
+        "similarity": 84.0
+      }
+    ]
+  },
+  {
+    "player": "Dirk Nowitzki",
+    "draft_season": 1998,
+    "overall_pick": 9.0,
+    "college": "NA",
+    "true_tier": "superstar",
+    "pred_tier": "rotation",
+    "correct": false,
+    "ordinal_error": 5,
+    "confidence_max": 0.256,
+    "confidence_true": 0.014,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Nen\u00ea",
+        "tier": "High-Level Starter",
+        "similarity": 99.3
+      },
+      {
+        "player": "Mo Bamba",
+        "tier": "Rotation Player",
+        "similarity": 98.3
+      },
+      {
+        "player": "Amar'e Stoudemire",
+        "tier": "All-NBA",
+        "similarity": 98.2
+      },
+      {
+        "player": "Mouhamed Sene",
+        "tier": "Bust",
+        "similarity": 97.6
+      },
+      {
+        "player": "Robert Swift",
+        "tier": "Bust",
+        "similarity": 97.0
+      }
+    ]
+  },
+  {
+    "player": "Tim Duncan",
+    "draft_season": 1997,
+    "overall_pick": 1.0,
+    "college": "Wake Forest",
+    "true_tier": "superstar",
+    "pred_tier": "high_level_starter",
+    "correct": false,
+    "ordinal_error": 3,
+    "confidence_max": 0.359,
+    "confidence_true": 0.083,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Pau Gasol",
+        "tier": "All-NBA",
+        "similarity": 99.5
+      },
+      {
+        "player": "Benoit Benjamin",
+        "tier": "Starter",
+        "similarity": 99.5
+      },
+      {
+        "player": "Andrea Bargnani",
+        "tier": "Starter",
+        "similarity": 99.3
+      },
+      {
+        "player": "Brad Daugherty",
+        "tier": "All-NBA",
+        "similarity": 99.3
+      },
+      {
+        "player": "Hakeem Olajuwon",
+        "tier": "Superstar",
+        "similarity": 99.3
+      }
+    ]
+  },
+  {
+    "player": "Jason Kidd",
+    "draft_season": 1994,
+    "overall_pick": 2.0,
+    "college": "California",
+    "true_tier": "superstar",
+    "pred_tier": "superstar",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.499,
+    "confidence_true": 0.499,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Ray Allen",
+        "tier": "All-NBA",
+        "similarity": 99.5
+      },
+      {
+        "player": "Chauncey Billups",
+        "tier": "Superstar",
+        "similarity": 99.5
+      },
+      {
+        "player": "David Thompson",
+        "tier": "Superstar",
+        "similarity": 99.1
+      },
+      {
+        "player": "Glen Selbo",
+        "tier": "Bust",
+        "similarity": 98.8
+      },
+      {
+        "player": "Michael Jordan",
+        "tier": "Superstar",
+        "similarity": 97.8
+      }
+    ]
+  },
+  {
+    "player": "Bob Cousy",
+    "draft_season": 1950,
+    "overall_pick": 4.0,
+    "college": "Holy Cross",
+    "true_tier": "superstar",
+    "pred_tier": "superstar",
+    "correct": true,
+    "ordinal_error": 0,
+    "confidence_max": 0.247,
+    "confidence_true": 0.247,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Kelvin Ransey",
+        "tier": "Rotation Player",
+        "similarity": 99.8
+      },
+      {
+        "player": "Phil Ford",
+        "tier": "All-NBA",
+        "similarity": 99.5
+      },
+      {
+        "player": "Lucius Allen",
+        "tier": "Rotation Player",
+        "similarity": 99.5
+      },
+      {
+        "player": "Brendan McCann",
+        "tier": "Bust",
+        "similarity": 99.5
+      },
+      {
+        "player": "Ernie DiGregorio",
+        "tier": "Rotation Player",
+        "similarity": 99.3
+      }
+    ]
+  },
+  {
+    "player": "Mark Price",
+    "draft_season": 1986,
+    "overall_pick": 25.0,
+    "college": "Georgia Tech",
+    "true_tier": "superstar",
+    "pred_tier": "bust",
+    "correct": false,
+    "ordinal_error": 7,
+    "confidence_max": 0.538,
+    "confidence_true": 0.024,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Dick Bunt",
+        "tier": "Bust",
+        "similarity": 100.0
+      },
+      {
+        "player": "Joe Dolhon",
+        "tier": "Bust",
+        "similarity": 99.8
+      },
+      {
+        "player": "John Stockton",
+        "tier": "Superstar",
+        "similarity": 99.5
+      },
+      {
+        "player": "Franklin Edwards",
+        "tier": "Rotation Player",
+        "similarity": 99.5
+      },
+      {
+        "player": "Larry Drew",
+        "tier": "Starter",
+        "similarity": 99.5
+      }
+    ]
+  },
+  {
+    "player": "Shaquille O'Neal",
+    "draft_season": 1992,
+    "overall_pick": 1.0,
+    "college": "LSU",
+    "true_tier": "superstar",
+    "pred_tier": "all_nba",
+    "correct": false,
+    "ordinal_error": 1,
+    "confidence_max": 0.484,
+    "confidence_true": 0.152,
+    "n_missing_features": 22,
+    "has_college_data": false,
+    "top_comps": [
+      {
+        "player": "Eddy Curry",
+        "tier": "Starter",
+        "similarity": 90.2
+      },
+      {
+        "player": "DeSagana Diop",
+        "tier": "Rotation Player",
+        "similarity": 84.7
+      },
+      {
+        "player": "Paolo Banchero",
+        "tier": "All-Star",
+        "similarity": 82.3
+      },
+      {
+        "player": "Yao Ming",
+        "tier": "All-NBA",
+        "similarity": 81.7
+      },
+      {
+        "player": "Elton Brand",
+        "tier": "All-NBA",
+        "similarity": 80.2
+      }
+    ]
+  }
+]
