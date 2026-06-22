@@ -29,14 +29,14 @@ def _present(missing: dict, name: str) -> bool:
 def strengths(fv: FeatureVector) -> list[str]:
     out = []
     v, m = fv.values, fv.missing
-    if _present(m, "ts_pct") and _v(v, "ts_pct") >= 60:
-        out.append(f"Elite scoring efficiency (TS% {_v(v,'ts_pct'):.1f}) for the volume/role.")
+    if _present(m, "ts_pct") and _v(v, "ts_pct") >= 0.60:
+        out.append(f"Elite scoring efficiency (TS% {_v(v,'ts_pct')*100:.1f}) for the volume/role.")
     if _present(m, "ast_pct") and _v(v, "ast_pct") >= 28:
         out.append(f"High-level playmaking for the position (AST% {_v(v,'ast_pct'):.1f}).")
-    if _present(m, "usg_pct") and _v(v, "usg_pct") >= 28 and _present(m, "ts_pct") and _v(v, "ts_pct") >= 55:
+    if _present(m, "usg_pct") and _v(v, "usg_pct") >= 28 and _present(m, "ts_pct") and _v(v, "ts_pct") >= 0.55:
         out.append("Produces efficiently even while carrying a heavy offensive workload -- a real signal of translatable offensive skill, not just empty volume.")
-    if _present(m, "fg3_pct") and _v(v, "fg3_pct") >= 38:
-        out.append(f"Efficient 3-point shooter (3P% {_v(v,'fg3_pct'):.1f}), a skill that tends to translate directly to the NBA level.")
+    if _present(m, "fg3_pct") and _v(v, "fg3_pct") >= 0.38:
+        out.append(f"Efficient 3-point shooter (3P% {_v(v,'fg3_pct')*100:.1f}), a skill that tends to translate directly to the NBA level.")
     if _present(m, "blk_per40") and _v(v, "blk_per40") >= 2.5:
         out.append("Real rim-protection signal (blocks per-40) for an interior/wing defender.")
     if _present(m, "stl_per40") and _v(v, "stl_per40") >= 2.0:
@@ -49,12 +49,12 @@ def strengths(fv: FeatureVector) -> list[str]:
 def weaknesses(fv: FeatureVector) -> list[str]:
     out = []
     v, m = fv.values, fv.missing
-    if _present(m, "ts_pct") and _v(v, "ts_pct") < 50 and _present(m, "usg_pct") and _v(v, "usg_pct") >= 25:
-        out.append(f"Inefficient on real offensive volume (TS% {_v(v,'ts_pct'):.1f} on {_v(v,'usg_pct'):.1f}% usage) -- a real translation risk, not just a small-sample blip.")
+    if _present(m, "ts_pct") and _v(v, "ts_pct") < 0.50 and _present(m, "usg_pct") and _v(v, "usg_pct") >= 25:
+        out.append(f"Inefficient on real offensive volume (TS% {_v(v,'ts_pct')*100:.1f} on {_v(v,'usg_pct'):.1f}% usage) -- a real translation risk, not just a small-sample blip.")
     if _present(m, "tov_pct") and _v(v, "tov_pct") >= 22:
         out.append("High turnover rate relative to usage -- decision-making/ball security is a question mark.")
-    if _present(m, "ft_pct") and _v(v, "ft_pct") < 65:
-        out.append(f"Poor free-throw shooting (FT% {_v(v,'ft_pct'):.1f}) -- historically a fairly reliable indicator of shooting touch that tends to predict NBA 3-point/FT performance.")
+    if _present(m, "ft_pct") and _v(v, "ft_pct") < 0.65:
+        out.append(f"Poor free-throw shooting (FT% {_v(v,'ft_pct')*100:.1f}) -- historically a fairly reliable indicator of shooting touch that tends to predict NBA 3-point/FT performance.")
     if _present(m, "age_at_draft") and _v(v, "age_at_draft") >= 22.5:
         out.append("Old for the draft class -- less developmental runway, and production needs to be judged against younger peers' projection curve, not taken at face value.")
     return out
@@ -80,7 +80,7 @@ def risk_indicators(fv: FeatureVector, *, missing_data_count: Optional[int] = No
             "data matched) -- this projection is leaning heavily on physical profile and draft "
             "context alone and should be treated as low-confidence until real college stats are loaded."
         )
-    if _present(m, "ft_pct") and _v(v, "ft_pct") < 60 and _present(m, "fg3_pct") and _v(v, "fg3_pct") < 30:
+    if _present(m, "ft_pct") and _v(v, "ft_pct") < 0.60 and _present(m, "fg3_pct") and _v(v, "fg3_pct") < 0.30:
         out.append("Shooting indicators (FT% and 3P%) both point the same negative direction -- real spacing/shooting risk at the next level.")
     return out
 
