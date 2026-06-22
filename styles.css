@@ -120,7 +120,7 @@ button, input, select { font: inherit; }
 
 .brand-logo svg {
   flex-shrink: 0;
-  filter: drop-shadow(0 0 6px rgba(249,115,22,0.5));
+  filter: drop-shadow(0 0 6px rgba(124,92,255,0.5));
 }
 
 .brand-text {
