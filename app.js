@@ -7,6 +7,27 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function animateCountUp(container, duration = 600) {
+  container.querySelectorAll("strong").forEach((el) => {
+    const text = el.textContent;
+    const match = text.match(/^-?[\d.]+/);
+    if (!match) return;
+    const target = parseFloat(match[0]);
+    if (!Number.isFinite(target)) return;
+    const suffix = text.slice(match[0].length);
+    const decimals = (match[0].split(".")[1] || "").length;
+    const start = performance.now();
+    function tick(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = (target * eased).toFixed(decimals) + suffix;
+      if (p < 1) requestAnimationFrame(tick);
+      else el.textContent = text;
+    }
+    requestAnimationFrame(tick);
+  });
+}
+
 function seasonStart(season) {
   return Number(String(season).slice(0, 4));
 }
@@ -770,6 +791,7 @@ function renderProfile(player) {
     .map((t) => `<span class="tag">${t}</span>`).join("");
   $("#heroStats").innerHTML = [["PTS",l.pts],["REB",l.reb],["AST",l.ast],["3P",l.three],["TS%",l.ts]]
     .map(([label, val]) => `<div class="hero-stat"><strong>${fmt(val,"pts")}</strong><span>${label} last season</span></div>`).join("");
+  animateCountUp($("#heroStats"));
   const facts = [["Age",player.age],["Position",player.position],["Experience",player.experience],
     ["Minutes",fmt(l.min,"min")],["Usage",`${fmt(l.usg,"usg")}%`],["Games",l.gp],
     ["College",player.college||"—"],["Season",l.season],["Team",l.team||"—"]];
