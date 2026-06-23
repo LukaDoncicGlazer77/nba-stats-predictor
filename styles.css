@@ -17,10 +17,12 @@
   --accent-1: #7c5cff;
   --accent-2: #5b8cff;
   --accent-3: #22d3ee;
+  --accent-warm: #ff7a45;
   --accent-grad: linear-gradient(135deg, var(--accent-1), var(--accent-2));
   --accent-grad-2: linear-gradient(135deg, var(--accent-2), var(--accent-3));
-  --shadow: 0 12px 40px -8px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
-  --shadow-lift: 0 24px 60px -12px rgba(0,0,0,0.65), 0 4px 16px rgba(0,0,0,0.4);
+  --accent-strip: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3), var(--accent-warm));
+  --shadow: 0 16px 48px -10px rgba(0,0,0,0.68), 0 3px 10px rgba(0,0,0,0.45);
+  --shadow-lift: 0 30px 70px -14px rgba(0,0,0,0.72), 0 6px 20px rgba(0,0,0,0.45);
   --glow-accent: 0 0 0 1px rgba(124,140,255,0.18), 0 8px 30px -6px rgba(124,92,255,0.35);
   --sidebar-w: 252px;
   --card-border: rgba(255,255,255,0.09);
@@ -517,7 +519,7 @@ button, input, select { font: inherit; }
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3));
+  background: var(--accent-strip);
   opacity: 0.85;
 }
 
@@ -745,7 +747,7 @@ button, input, select { font: inherit; }
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3));
+  background: var(--accent-strip);
   opacity: 0.55;
   transition: opacity 0.18s;
 }
