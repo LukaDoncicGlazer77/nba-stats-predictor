@@ -4225,6 +4225,9 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .profile-hero-statrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .player-browser-controls { flex-direction: column; align-items: stretch; gap: 10px; }
   .player-filter-input { max-width: none; }
+  .cmp-header { flex-direction: column; align-items: stretch; }
+  .cmp-mode-selector { width: 100%; }
+  .cmp-mode-btn { flex: 1; }
 }
 
 @media (max-width: 600px) {
