@@ -949,21 +949,40 @@ class Handler(SimpleHTTPRequestHandler):
         pass
 
 
-def ensure_users_table():
-    conn = connect()
-    try:
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS archive_users (
-                email TEXT PRIMARY KEY,
-                password_hash TEXT NOT NULL,
-                password_salt TEXT NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-            )
-        """)
-        conn.commit()
-    finally:
-        conn.close()
+def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
+    """Idempotent (CREATE TABLE IF NOT EXISTS) and only needs to succeed once
+    ever -- the table persists across restarts. Retries with a short backoff
+    to ride out transient connection hiccups at cold boot (seen in
+    production: psycopg2.OperationalError "server didn't return client
+    encoding" against the Supabase pooler), and does NOT crash the whole
+    server on final failure -- a brand-new deploy where this table somehow
+    still doesn't exist would just mean signups fail until the next
+    successful run, rather than the entire site going down for every visitor
+    over a one-time startup step unrelated to most requests."""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            conn = connect()
+            try:
+                cur = conn.cursor()
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS archive_users (
+                        email TEXT PRIMARY KEY,
+                        password_hash TEXT NOT NULL,
+                        password_salt TEXT NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    )
+                """)
+                conn.commit()
+                return
+            finally:
+                conn.close()
+        except Exception as exc:
+            print(f"ensure_users_table attempt {attempt}/{max_attempts} failed: {exc}")
+            if attempt == max_attempts:
+                print("ensure_users_table giving up after max attempts -- continuing startup anyway "
+                      "(the table almost certainly already exists from a prior successful run).")
+                return
+            time.sleep(retry_delay_seconds)
 
 
 def main():
