@@ -2293,11 +2293,6 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .pred-stat, .pred-stat strong, .pred-stat span { display: none; }
 
 /* ── Responsive ── */
-@media (max-width: 1100px) {
-  .overview-grid, .workbench { grid-template-columns: 1fr; }
-  .dashboard-grid { grid-template-columns: 1fr 1fr; }
-  .stat-card.wide { grid-column: span 2; }
-}
 
 /* Mobile nav drawer toggle button — hidden on desktop, shown via the
    @media block below. Lives in the topbar. */
@@ -2324,51 +2319,6 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   z-index: 99;
 }
 .mobile-nav-backdrop.open { display: block; }
-
-@media (max-width: 800px) {
-  :root { --sidebar-w: 0px; }
-  .main-content { margin-left: 0; }
-  .mobile-nav-toggle { display: flex; }
-  .topbar { padding: 10px 16px; }
-
-  /* Sidebar becomes an off-canvas drawer instead of disappearing entirely —
-     without this there was no way to navigate the app at all on mobile. */
-  .sidebar {
-    width: 260px;
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-  }
-  .sidebar.open { transform: translateX(0); }
-
-  .page { padding: 18px 16px; }
-  .page-header { flex-wrap: wrap; }
-  .players-shell { grid-template-columns: 1fr; }
-  .comparison-selectors { grid-template-columns: 1fr; }
-  .vs-badge { margin: 0 auto; }
-  .compare-cards { grid-template-columns: 1fr; }
-  .dashboard-grid { grid-template-columns: 1fr; }
-  .stat-card.wide { grid-column: span 1; }
-
-  .cmp-overview4, .cmp-overview2 { grid-template-columns: 1fr; }
-  .cmp-player-bar { grid-template-columns: repeat(2, 1fr); }
-  .pred-grid { grid-template-columns: 1fr; }
-  .co-hero-stats { grid-template-columns: repeat(2, 1fr); }
-
-  .profile-topnav { flex-wrap: wrap; padding: 10px 16px; gap: 8px; }
-  .profile-tab-group { flex: 1 1 100%; order: 3; overflow-x: auto; justify-content: flex-start; }
-  .profile-hero-statrow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-@media (max-width: 480px) {
-  .page { padding: 14px 12px; }
-  .topbar-search-wrap { max-width: none; }
-  .topbar-user { display: none; }
-  .player-avatar-hero { width: 76px; height: 76px; font-size: 1.5rem; }
-  .profile-hero-main { gap: 14px; }
-  .cmp-player-bar { grid-template-columns: 1fr; }
-  .co-hero-stats { grid-template-columns: 1fr; }
-  .profile-hero-statrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 
 /* ── Auth Screen ────────────────────────────────────────────────────────── */
 #authScreen {
@@ -2794,20 +2744,6 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   transition: border-color 0.15s, background 0.15s;
 }
 .onboard-chip:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.22); }
-
-@media (max-width: 600px) {
-  .onboard-orb { filter: blur(50px); }
-  .onboard-icon-badge { width: 80px; height: 80px; border-radius: 22px; margin-bottom: 22px; }
-  .onboard-icon-badge svg { width: 36px; height: 36px; }
-  .onboard-skip { top: 16px; right: 16px; }
-  .onboard-dots { bottom: 96px; }
-  .onboard-next { bottom: 40px; width: 86%; max-width: 320px; }
-  .onboard-badges { gap: 0; }
-  .onboard-badge { padding: 14px 18px; }
-  .onboard-mock-stat { padding: 12px 14px; }
-  .onboard-mock-comp { flex-wrap: wrap; justify-content: center; }
-  .onboard-mock-comp-bar { width: 100px; }
-}
 
 .login-logo {
   display: flex;
@@ -3803,10 +3739,6 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   margin-bottom: 0;
 }
 
-@media (max-width: 720px) {
-  .co-hero-stats { grid-template-columns: repeat(2, 1fr); }
-}
-
 /* Advanced metrics header */
 .cmp-adv-header {
   display: flex;
@@ -4200,12 +4132,6 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   border: 1px solid rgba(124,140,255,0.3);
 }
 
-@media (max-width: 1100px) {
-  .proj-breakdown-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .proj-verdict { flex-wrap: wrap; }
-  .proj-verdict-conf { border-left: none; border-top: 1px solid var(--card-border); width: 100%; padding-top: 10px; }
-}
-
 /* ── Draft Projection page ──────────────────────────────────────────────── */
 .dp-banner {
   background: rgba(255, 200, 80, 0.08);
@@ -4244,3 +4170,83 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 #draftProjCard .cmp-table4 thead th, #draftProjCard .cmp-table4 tbody td { text-align: left; }
 #draftProjCard .cmp-table4 thead th:nth-child(n+2), #draftProjCard .cmp-table4 tbody td:nth-child(n+2) { text-align: right; }
 #draftProjCard .cmp-table4 thead th:first-child, #draftProjCard .cmp-table4 tbody td:first-child { text-align: left; }
+
+
+/* ── Mobile / responsive breakpoints (moved to end of file so they always win the CSS cascade over base rules defined later in source — previously some mobile overrides were silently overridden by unconditional rules appearing further down the file) ── */
+
+@media (max-width: 1100px) {
+  .overview-grid, .workbench { grid-template-columns: 1fr; }
+  .dashboard-grid { grid-template-columns: 1fr 1fr; }
+  .stat-card.wide { grid-column: span 2; }
+}
+
+@media (max-width: 800px) {
+  :root { --sidebar-w: 0px; }
+  .main-content { margin-left: 0; }
+  .mobile-nav-toggle { display: flex; }
+  .topbar { padding: 10px 16px; }
+
+  /* Sidebar becomes an off-canvas drawer instead of disappearing entirely —
+     without this there was no way to navigate the app at all on mobile. */
+  .sidebar {
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .page { padding: 18px 16px; }
+  .page-header { flex-wrap: wrap; }
+  .players-shell { grid-template-columns: 1fr; }
+  .comparison-selectors { grid-template-columns: 1fr; }
+  .vs-badge { margin: 0 auto; }
+  .compare-cards { grid-template-columns: 1fr; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .stat-card.wide { grid-column: span 1; }
+
+  .cmp-overview4, .cmp-overview2 { grid-template-columns: 1fr; }
+  .cmp-player-bar { grid-template-columns: repeat(2, 1fr); }
+  .pred-grid { grid-template-columns: 1fr; }
+  .co-hero-stats { grid-template-columns: repeat(2, 1fr); }
+
+  .profile-topnav { flex-wrap: wrap; padding: 10px 16px; gap: 8px; }
+  .profile-tab-group { flex: 1 1 100%; order: 3; overflow-x: auto; justify-content: flex-start; }
+  .profile-hero-statrow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .page { padding: 14px 12px; }
+  .topbar-search-wrap { max-width: none; }
+  .topbar-user { display: none; }
+  .player-avatar-hero { width: 76px; height: 76px; font-size: 1.5rem; }
+  .profile-hero-main { gap: 14px; }
+  .cmp-player-bar { grid-template-columns: 1fr; }
+  .co-hero-stats { grid-template-columns: 1fr; }
+  .profile-hero-statrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .player-browser-controls { flex-direction: column; align-items: stretch; gap: 10px; }
+  .player-filter-input { max-width: none; }
+}
+
+@media (max-width: 600px) {
+  .onboard-orb { filter: blur(50px); }
+  .onboard-icon-badge { width: 80px; height: 80px; border-radius: 22px; margin-bottom: 22px; }
+  .onboard-icon-badge svg { width: 36px; height: 36px; }
+  .onboard-skip { top: 16px; right: 16px; }
+  .onboard-dots { bottom: 96px; }
+  .onboard-next { bottom: 40px; width: 86%; max-width: 320px; }
+  .onboard-badges { gap: 0; }
+  .onboard-badge { padding: 14px 18px; }
+  .onboard-mock-stat { padding: 12px 14px; }
+  .onboard-mock-comp { flex-wrap: wrap; justify-content: center; }
+  .onboard-mock-comp-bar { width: 100px; }
+}
+
+@media (max-width: 720px) {
+  .co-hero-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 1100px) {
+  .proj-breakdown-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .proj-verdict { flex-wrap: wrap; }
+  .proj-verdict-conf { border-left: none; border-top: 1px solid var(--card-border); width: 100%; padding-top: 10px; }
+}
