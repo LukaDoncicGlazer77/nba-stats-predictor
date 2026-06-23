@@ -7,8 +7,8 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function animateCountUp(container, duration = 600) {
-  container.querySelectorAll("strong").forEach((el) => {
+function animateCountUp(container, duration = 600, selector = "strong") {
+  container.querySelectorAll(selector).forEach((el) => {
     const text = el.textContent;
     const match = text.match(/^-?[\d.]+/);
     if (!match) return;
@@ -209,6 +209,7 @@ async function loadDashboard(season) {
         <td>${p.fg_pct ? (p.fg_pct).toFixed(1) + "%" : "—"}</td>
       </tr>
     `).join("");
+    animateCountUp($("#scoringLeaders"), 600, "td.highlight");
 
     $("#assistLeaders").innerHTML = data.top_assisters.map((p, i) => `
       <li>
@@ -217,6 +218,7 @@ async function loadDashboard(season) {
         <span class="stat-val">${(p.ast || 0).toFixed(1)}</span>
       </li>
     `).join("");
+    animateCountUp($("#assistLeaders"), 600, ".stat-val");
 
     $("#reboundLeaders").innerHTML = data.top_rebounders.map((p, i) => `
       <li>
@@ -225,6 +227,7 @@ async function loadDashboard(season) {
         <span class="stat-val">${(p.reb || 0).toFixed(1)}</span>
       </li>
     `).join("");
+    animateCountUp($("#reboundLeaders"), 600, ".stat-val");
 
     const awardNames = {
       "nba mvp":          "MVP",
