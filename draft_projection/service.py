@@ -25,13 +25,22 @@ from draft_projection.features import FEATURE_NAMES, build_feature_vector
 from draft_projection.labels import TIERS, TIER_LABEL
 from draft_projection.predict import (
     blend_tier_probabilities, comp_based_tier_probabilities, expected_floor_ceiling,
-    load_trained_model, ml_tier_probabilities,
+    load_trained_hierarchical_model, load_trained_model, ml_tier_probabilities,
+    ml_tier_probabilities_hierarchical,
 )
 
 log = logging.getLogger("draft_projection.service")
 
 TOP_N_COMPS_FOR_POOL_SCORING = 50  # comp-based probability estimator wants a wide pool
 TOP_N_COMPS_TO_RETURN = 10         # but the API/UI only show the closest 10
+
+# Flip to True to serve the experimental two-stage hierarchical model
+# (career_projection_model_hierarchical.pkl) instead of the single 8-way
+# model -- see train_career_projection_hierarchical.py's module docstring
+# for what it does differently and its known limitations. False is the
+# default/production behavior; this is a one-line, fully reversible switch
+# specifically so trying it doesn't require touching anything else.
+USE_HIERARCHICAL_MODEL = True
 
 _model_bundle_cache = {"loaded": False, "bundle": None}
 
@@ -41,9 +50,29 @@ def _get_model_bundle() -> Optional[dict]:
     the server picks up a newly-trained model file; this isn't a hot reload,
     matching how other model .pkl files are loaded elsewhere in this repo."""
     if not _model_bundle_cache["loaded"]:
-        _model_bundle_cache["bundle"] = load_trained_model()
+        if USE_HIERARCHICAL_MODEL:
+            _model_bundle_cache["bundle"] = load_trained_hierarchical_model()
+        else:
+            _model_bundle_cache["bundle"] = load_trained_model()
         _model_bundle_cache["loaded"] = True
     return _model_bundle_cache["bundle"]
+
+
+def _ml_tier_probabilities_any(model_bundle: Optional[dict], row: dict) -> Optional[dict]:
+    """Dispatches to the right prediction function based on the bundle's
+    own model_type marker, so build_draft_projection() doesn't need to know
+    which architecture is currently loaded."""
+    if model_bundle is None:
+        return None
+    if model_bundle.get("model_type") == "hierarchical":
+        return ml_tier_probabilities_hierarchical(model_bundle, row)
+    return ml_tier_probabilities(model_bundle, row)
+
+
+def _model_feature_names(model_bundle: dict) -> list:
+    if model_bundle.get("model_type") == "hierarchical":
+        return model_bundle["stage1_features"]
+    return model_bundle["features"]
 
 
 def build_draft_projection(conn, q, pool: HistoricalPool, *, player_name: str,
@@ -65,8 +94,8 @@ def build_draft_projection(conn, q, pool: HistoricalPool, *, player_name: str,
     ml_probs = None
     if model_bundle is not None:
         row = fv.as_row()
-        if all(c in row for c in model_bundle["features"]):
-            ml_probs = ml_tier_probabilities(model_bundle, row)
+        if all(c in row for c in _model_feature_names(model_bundle)):
+            ml_probs = _ml_tier_probabilities_any(model_bundle, row)
         else:
             log.warning("Trained model's feature schema doesn't match current FEATURE_NAMES -- "
                         "skipping ML layer until retrained.")

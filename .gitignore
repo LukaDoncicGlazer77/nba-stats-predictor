@@ -8,4 +8,6 @@ nba.db-wal
 *.bak3
 career_projection_model_ablation_no_missing_flags.pkl
 career_projection_model_experiment_classweighted.pkl
+career_projection_model_narrowfix.pkl
+career_projection_model_original_26season_approved.pkl
 .venv/
