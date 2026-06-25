@@ -6,6 +6,7 @@ import json
 import os
 import re
 import secrets
+import threading
 import time
 import traceback
 import urllib.request
@@ -72,17 +73,31 @@ def _load_stats_model():
 # player; only changes when build_career_labels.py / load_ncaa_stats.py are
 # re-run, which means restarting the server, matching the model-loading
 # pattern above rather than the time-based _SEASONS_CACHE below) ───────────
+#
+# Lock is load-bearing, not defensive boilerplate: ThreadingHTTPServer spawns
+# a thread per request, and this build now takes 45+ seconds against the
+# full 1950-2026 dataset (was much faster against the smaller original
+# range). Without the lock, every concurrent request that arrives before the
+# first build finishes sees _draft_projection_pool as None and starts its
+# own redundant 45-second build, each holding its own DB connection open the
+# whole time -- confirmed live (2026-06-25) as the actual cause of
+# production connection-pool exhaustion (Supabase's pool here is only 15
+# connections), not a crash in any specific route.
 _draft_projection_pool = None
+_draft_projection_pool_lock = threading.Lock()
 def _get_draft_projection_pool():
     global _draft_projection_pool
-    if _draft_projection_pool is None:
-        import draft_projection.comp_engine as comp_engine
-        conn = connect()
-        try:
-            _draft_projection_pool = comp_engine.build_historical_pool(conn, q, current_season=2026)
-        finally:
-            conn.close()
-        print(f"Draft projection historical pool built: {len(_draft_projection_pool)} players.")
+    if _draft_projection_pool is not None:
+        return _draft_projection_pool
+    with _draft_projection_pool_lock:
+        if _draft_projection_pool is None:  # re-check: another thread may have finished while we waited for the lock
+            import draft_projection.comp_engine as comp_engine
+            conn = connect()
+            try:
+                _draft_projection_pool = comp_engine.build_historical_pool(conn, q, current_season=2026)
+            finally:
+                conn.close()
+            print(f"Draft projection historical pool built: {len(_draft_projection_pool)} players.")
     return _draft_projection_pool
 
 SALARY_CAPS_M = {
