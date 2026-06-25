@@ -441,23 +441,32 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json_rows(rows)
 
         if parsed.path == "/api/dashboard":
+            # Check cache before any DB work. Default to 2026 if no param;
+            # the cached result includes the real seasons_available list.
+            _season_param = params.get("season", [""])[0] or ""
+            season = int(_season_param) if _season_param.isdigit() else 2026
+            cached = _dashboard_cache_get(season)
+            if cached is not None:
+                return self.send_json(cached)
+
             conn = connect()
             try:
-                # archive_team_summaries is ~30 rows/season, far smaller than
-                # archive_player_per_game, so use it for season discovery.
+                # Cache miss: discover available seasons from archive_team_summaries
+                # (small table, ~30 rows/season) and re-resolve the latest season.
                 ts_season_rows = q(conn, "SELECT DISTINCT season FROM archive_team_summaries WHERE season != ''", ())
                 all_seasons_sorted = sorted(
                     [r["season"] for r in ts_season_rows if str(r["season"]).isdigit()],
                     key=lambda s: int(s), reverse=True
                 )
-                latest_season = int(all_seasons_sorted[0]) if all_seasons_sorted else 2026
-                season = int(params.get("season", [latest_season])[0] or latest_season)
+                if not _season_param.isdigit():
+                    latest_season = int(all_seasons_sorted[0]) if all_seasons_sorted else 2026
+                    season = latest_season
+                    # Check cache again now that we know the real latest season
+                    cached = _dashboard_cache_get(season)
+                    if cached is not None:
+                        return self.send_json(cached)
 
                 seasons_available = all_seasons_sorted
-
-                cached = _dashboard_cache_get(season)
-                if cached is not None:
-                    return self.send_json(cached)
 
                 # Reuse the seasons cache (populated by /api/seasons) if warm;
                 # avoids a slow full-table scan of archive_player_per_game.
