@@ -302,6 +302,17 @@ class Handler(SimpleHTTPRequestHandler):
                 conn.close()
             return self.send_json({"user_count": row[0]})
 
+        if parsed.path == "/api/admin/user-emails":
+            admin_key = os.environ.get("ADMIN_KEY")
+            if not admin_key or not hmac.compare_digest(params.get("key", [""])[0], admin_key):
+                return self.send_json({"error": "Not found"}, status=404)
+            conn = connect()
+            try:
+                rows = q(conn, "SELECT email, created_at FROM archive_users ORDER BY created_at")
+            finally:
+                conn.close()
+            return self.send_json([{"email": r[0], "created_at": r[1].isoformat()} for r in rows])
+
         if parsed.path == "/api/seasons":
             cached = _seasons_cache_get()
             if cached is not None:
