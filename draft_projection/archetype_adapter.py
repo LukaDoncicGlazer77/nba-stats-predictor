@@ -9,11 +9,9 @@ Engine, 3&D Wing, Rim Protector, etc.) an NBA player already gets from
 /api/archetype -- "this prospect's college profile reads most like X" is a
 same-units comparison, not a parallel system.
 
-Percentile-ranking happens within (academic_year, division) groups, mirroring
-archetype_engine.add_percentiles()'s per-NBA-season grouping -- a prospect's
-usage/rebounding/etc. percentile should be computed against their actual
-peer group (same season, same division), not a different competitive level
-or era.
+Percentile-ranking happens within academic_year groups against
+archive_cbb_player_stats (sports-reference.com/cbb), which has fg3a_rate
+and ft_rate pre-computed. archive_ncaa_player_stats is empty and not used.
 """
 from __future__ import annotations
 
@@ -25,28 +23,16 @@ import archetype_engine as ae
 
 log = logging.getLogger("draft_projection.archetype_adapter")
 
-# NCAA column -> the _pr key archetype_engine's pure functions expect.
 PERCENTILE_COLS = ["usg_pct", "ast_pct", "blk_pct", "dreb_pct", "stl_pct", "fg3a_rate", "ft_rate"]
 
 
-def _add_derived_rates(rows: list[dict]) -> None:
-    """fg3a_rate = 3PA/FGA, ft_rate = FTA/FGA -- the same definitions
-    archetype_engine expects from NBA's x3p_ar/f_tr, computed here since the
-    NCAA scraper stores raw fg3a/fga/fta rather than the pre-divided rate."""
-    for r in rows:
-        fga = r.get("fga")
-        r["fg3a_rate"] = (r["fg3a"] / fga) if fga and r.get("fg3a") is not None else None
-        r["ft_rate"] = (r["fta"] / fga) if fga and r.get("fta") is not None else None
-
-
 def _add_college_percentiles(rows: list[dict]) -> None:
-    """Mutates rows in place, adding f"{col}_pr" keys, grouped by
-    (academic_year, division). Missing values default to the neutral 0.5
-    percentile -- matches archetype_engine.add_percentiles' own convention
-    for missing data rather than dropping the player."""
+    """Mutates rows in place, adding f"{col}_pr" keys, grouped by academic_year.
+    Missing values default to 0.5 -- matches archetype_engine.add_percentiles'
+    convention for missing data."""
     groups = defaultdict(list)
     for r in rows:
-        groups[(r.get("academic_year"), r.get("division"))].append(r)
+        groups[r.get("academic_year")].append(r)
 
     for group_rows in groups.values():
         for col in PERCENTILE_COLS:
@@ -68,7 +54,7 @@ def _row_to_archetype_input(r: dict) -> dict:
         "blk_pct_pr": r["blk_pct_pr"], "drb_pct_pr": r["dreb_pct_pr"],
         "stl_pct_pr": r["stl_pct_pr"], "fg3a_rate_pr": r["fg3a_rate_pr"],
         "ft_rate_pr": r["ft_rate_pr"],
-        "dbpm": None,  # no NBA-style defensive box plus-minus at the college level
+        "dbpm": None,  # no NBA-style defensive BPM at the college level
     }
 
 
@@ -76,30 +62,28 @@ def compute_archetype_mix(conn, q, *, player_name: str) -> Optional[dict]:
     """Returns the same named_mix shape archetype_engine.build_player_report
     already returns for NBA players (9 archetype names -> percentage),
     computed from this prospect's most recent college season's peer pool.
-    Returns None if no college stats are available (scraper not run yet, or
-    no name match) -- callers must treat that as "unknown", not "zero"."""
+    Returns None if no college stats are available."""
     from server import normalize_name_for_match
     key = normalize_name_for_match(player_name)
 
     season_rows = q(conn, """
-        SELECT academic_year, division FROM archive_ncaa_player_stats
+        SELECT academic_year FROM archive_cbb_player_stats
         WHERE name_key = ? ORDER BY academic_year DESC LIMIT 1
     """, (key,))
     if not season_rows:
         return None
-    academic_year, division = season_rows[0]["academic_year"], season_rows[0]["division"]
+    academic_year = season_rows[0]["academic_year"]
 
     pool_rows = q(conn, """
-        SELECT name_key, player_name, academic_year, division,
-               usg_pct, ast_pct, blk_pct, dreb_pct, stl_pct, fg3a, fga, fta
-        FROM archive_ncaa_player_stats
-        WHERE academic_year = ? AND division = ?
-    """, (academic_year, division))
+        SELECT name_key, academic_year,
+               usg_pct, ast_pct, blk_pct, dreb_pct, stl_pct, fg3a_rate, ft_rate
+        FROM archive_cbb_player_stats
+        WHERE academic_year = ?
+    """, (academic_year,))
     if not pool_rows:
         return None
 
     rows = [dict(r) for r in pool_rows]
-    _add_derived_rates(rows)
     _add_college_percentiles(rows)
 
     target_rows = [r for r in rows if r["name_key"] == key]
@@ -116,11 +100,8 @@ def compute_archetype_mix(conn, q, *, player_name: str) -> Optional[dict]:
 
 
 def archetype_match_strength(mix_a: Optional[dict], mix_b: Optional[dict]) -> Optional[float]:
-    """0-100 similarity between two named_mix dicts (cosine over the 9
-    archetype percentages -- these are compositional proportions summing to
-    100%, which is exactly the case cosine similarity is well-suited for,
-    unlike the scalar features in comp_engine). None if either side is
-    unavailable -- never silently scored as dissimilar."""
+    """0-100 cosine similarity between two named_mix dicts. None if either
+    side is unavailable."""
     if not mix_a or not mix_b:
         return None
     keys = set(mix_a) | set(mix_b)
