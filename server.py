@@ -468,44 +468,80 @@ class Handler(SimpleHTTPRequestHandler):
 
                 seasons_available = all_seasons_sorted
 
-                # Use NULLIF(col,'')::float instead of safe_float() to avoid
-                # PL/pgSQL subtransaction overhead, with LIMIT to keep result sets small.
-                _dedup_where = """
-                    AND NOT (team NOT IN ('TOT','2TM','3TM') AND player IN (
-                        SELECT player FROM archive_player_per_game
-                        WHERE season = ? GROUP BY player HAVING COUNT(*) > 1
-                    ))
-                """
-                _base_where = f"WHERE season = ? AND g != '' AND NULLIF(g,'')::int >= 20 {_dedup_where}"
+                # Reuse the seasons cache (populated by /api/seasons) if warm;
+                # avoids a slow full-table scan of archive_player_per_game.
+                seasons_cache = _seasons_cache_get()
+                if seasons_cache is not None:
+                    per_game_rows = [
+                        {
+                            "player": r["player_name"],
+                            "player_id": r["player_id"],
+                            "team": r["team_abbreviation"],
+                            "pts_per_game": r.get("pts"),
+                            "trb_per_game": r.get("reb"),
+                            "ast_per_game": r.get("ast"),
+                            "fg_percent": (r["fg"] / 100) if r.get("fg") is not None else None,
+                            "g": r.get("gp"),
+                        }
+                        for r in seasons_cache if str(r.get("season_start")) == str(season)
+                    ]
+                else:
+                    # Cold start: fetch directly. archive_player_per_game can be
+                    # slow without an index on season; results are cached so only
+                    # the first cold request pays this cost.
+                    raw_pg = q(conn, """
+                        SELECT player, player_id, team,
+                               pts_per_game, trb_per_game, ast_per_game, fg_percent, g
+                        FROM archive_player_per_game
+                        WHERE season = ?
+                    """, (str(season),))
+                    per_game_rows = [dict(r) for r in raw_pg]
 
-                top_scorers = [dict(r) for r in q(conn, f"""
-                    SELECT player, player_id, team,
-                           ROUND((NULLIF(pts_per_game,'')::float)::numeric, 1) AS pts,
-                           ROUND((NULLIF(trb_per_game,'')::float)::numeric, 1) AS reb,
-                           ROUND((NULLIF(ast_per_game,'')::float)::numeric, 1) AS ast,
-                           ROUND((NULLIF(fg_percent,'')::float * 100)::numeric, 1) AS fg_pct
-                    FROM archive_player_per_game {_base_where}
-                      AND pts_per_game != ''
-                    ORDER BY NULLIF(pts_per_game,'')::float DESC NULLS LAST LIMIT 10
-                """, (str(season), str(season)))]
+                # Dedup: prefer TOT/2TM/3TM rows for traded players
+                traded = set()
+                for r in per_game_rows:
+                    if r["team"] in ("TOT", "2TM", "3TM"):
+                        traded.add(r["player"])
 
-                top_assisters = [dict(r) for r in q(conn, f"""
-                    SELECT player, player_id, team,
-                           ROUND((NULLIF(ast_per_game,'')::float)::numeric, 1) AS ast,
-                           ROUND((NULLIF(pts_per_game,'')::float)::numeric, 1) AS pts
-                    FROM archive_player_per_game {_base_where}
-                      AND ast_per_game != ''
-                    ORDER BY NULLIF(ast_per_game,'')::float DESC NULLS LAST LIMIT 5
-                """, (str(season), str(season)))]
+                def _keep(r):
+                    if r["player"] in traded and r["team"] not in ("TOT", "2TM", "3TM"):
+                        return False
+                    g = safe_float_py(r["g"])
+                    return g is not None and g >= 20
 
-                top_rebounders = [dict(r) for r in q(conn, f"""
-                    SELECT player, player_id, team,
-                           ROUND((NULLIF(trb_per_game,'')::float)::numeric, 1) AS reb,
-                           ROUND((NULLIF(pts_per_game,'')::float)::numeric, 1) AS pts
-                    FROM archive_player_per_game {_base_where}
-                      AND trb_per_game != ''
-                    ORDER BY NULLIF(trb_per_game,'')::float DESC NULLS LAST LIMIT 5
-                """, (str(season), str(season)))]
+                eligible = [r for r in per_game_rows if _keep(r)]
+
+                def _cast_pg(r):
+                    return {
+                        "player": r["player"],
+                        "player_id": r["player_id"],
+                        "team": r["team"],
+                        "pts": safe_float_py(r["pts_per_game"]),
+                        "reb": safe_float_py(r["trb_per_game"]),
+                        "ast": safe_float_py(r["ast_per_game"]),
+                        "fg_pct": (lambda v: round(v * 100, 1) if v is not None else None)(safe_float_py(r["fg_percent"])),
+                    }
+
+                cast_eligible = [_cast_pg(r) for r in eligible]
+
+                top_scorers = sorted(
+                    [r for r in cast_eligible if r["pts"] is not None],
+                    key=lambda r: r["pts"], reverse=True
+                )[:10]
+
+                top_assisters = sorted(
+                    [r for r in cast_eligible if r["ast"] is not None],
+                    key=lambda r: r["ast"], reverse=True
+                )[:5]
+                top_assisters = [{"player": r["player"], "player_id": r["player_id"], "team": r["team"],
+                                   "ast": r["ast"], "pts": r["pts"]} for r in top_assisters]
+
+                top_rebounders = sorted(
+                    [r for r in cast_eligible if r["reb"] is not None],
+                    key=lambda r: r["reb"], reverse=True
+                )[:5]
+                top_rebounders = [{"player": r["player"], "player_id": r["player_id"], "team": r["team"],
+                                    "reb": r["reb"], "pts": r["pts"]} for r in top_rebounders]
 
                 awards = q(conn, """
                     SELECT a.award, a.player, a.player_id, a.winner, a.share
@@ -1085,31 +1121,6 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
             time.sleep(retry_delay_seconds)
 
 
-def _ensure_indexes():
-    """Create indexes on large archive tables if they don't exist.
-    Runs in a background thread so startup is non-blocking.
-    These are read-only archive tables so index builds don't block queries."""
-    indexes = [
-        ("idx_ppg_season", "archive_player_per_game", "season"),
-        ("idx_pd_season",  "archive_player_dashboard", "season"),
-        ("idx_adv_season", "archive_advanced", "season"),
-    ]
-    try:
-        conn = connect()
-        try:
-            cur = conn.cursor()
-            for idx_name, table, col in indexes:
-                cur.execute(
-                    f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({col})"
-                )
-                conn.commit()
-                print(f"Index {idx_name} ensured on {table}({col}).")
-        finally:
-            conn.close()
-    except Exception as exc:
-        print(f"_ensure_indexes failed (non-fatal): {exc}")
-
-
 def _prewarm_pool():
     try:
         _get_draft_projection_pool()
@@ -1117,38 +1128,9 @@ def _prewarm_pool():
         print(f"Pre-warm failed (non-fatal): {exc}")
 
 
-def _prewarm_seasons():
-    """Populate the /api/seasons cache on startup so the Players tab is fast.
-    Runs as a daemon thread; non-fatal if it fails."""
-    try:
-        if _seasons_cache_get() is not None:
-            return
-        conn = connect()
-        try:
-            rows = q(conn, """
-                SELECT player AS player_name, player_id,
-                       team AS team_abbreviation, pos, age,
-                       g AS gp, mp_per_game AS min,
-                       pts_per_game AS pts, trb_per_game AS reb, ast_per_game AS ast,
-                       x3p_per_game AS three, stl_per_game AS stl, blk_per_game AS blk,
-                       tov_per_game AS tov, fg_percent AS fg, x3p_percent AS three_pct,
-                       ft_percent AS ft_pct, bpm AS net_rating, usg_percent AS usg_pct,
-                       ts_percent AS ts_pct, per, vorp, ws, ows, dws, season
-                FROM archive_player_dashboard
-                ORDER BY player, season
-            """, ())
-        finally:
-            conn.close()
-        result = [_cast_season_row(dict(r)) for r in rows]
-        _seasons_cache_set(result)
-        print(f"Seasons pre-warm complete: {len(result)} rows cached.")
-    except Exception as exc:
-        print(f"Seasons pre-warm failed (non-fatal): {exc}")
-
-
 def main():
     ensure_users_table()
-    threading.Thread(target=_ensure_indexes, daemon=True).start()
+    threading.Thread(target=_prewarm_pool, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")
