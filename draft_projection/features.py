@@ -211,19 +211,31 @@ class NCAAStatsProvider:
         candidates = [(r["academic_year"], _ncaa_row_to_features(dict(r))) for r in rows]
         return _select_plausible_row(candidates, season)
 
-    def bulk_fetch_all(self, conn, q) -> dict:
+    def bulk_fetch_all(self, conn, q, *, name_keys=None) -> dict:
         """Used by pool-building (thousands of players) to avoid one
         round-trip per player -- a single query, grouped in Python. Returns
         ALL seasons per name_key (not just the most recent) so the caller
         can pick the one that's actually temporally plausible for a given
-        player's draft season -- see _select_plausible_row."""
+        player's draft season -- see _select_plausible_row.
+
+        name_keys: if provided, fetches only those players (dramatically
+        reduces memory when building a filtered pool)."""
         try:
-            rows = q(conn, f"""
-                SELECT name_key, {", ".join(_NCAA_RAW_COLS)}, class_year, position,
-                       height_in, weight_lb, academic_year
-                FROM archive_ncaa_player_stats
-                ORDER BY name_key, academic_year DESC
-            """)
+            if name_keys:
+                rows = q(conn, f"""
+                    SELECT name_key, {", ".join(_NCAA_RAW_COLS)}, class_year, position,
+                           height_in, weight_lb, academic_year
+                    FROM archive_ncaa_player_stats
+                    WHERE name_key = ANY(%s)
+                    ORDER BY name_key, academic_year DESC
+                """, (list(name_keys),))
+            else:
+                rows = q(conn, f"""
+                    SELECT name_key, {", ".join(_NCAA_RAW_COLS)}, class_year, position,
+                           height_in, weight_lb, academic_year
+                    FROM archive_ncaa_player_stats
+                    ORDER BY name_key, academic_year DESC
+                """)
         except Exception as exc:
             log.warning("NCAAStatsProvider bulk fetch failed: %s", exc)
             return {}
@@ -281,19 +293,31 @@ class SportsReferenceCBBProvider:
         candidates = [(r["academic_year"], _cbb_row_to_features(dict(r))) for r in rows]
         return _select_plausible_row(candidates, season)
 
-    def bulk_fetch_all(self, conn, q) -> dict:
+    def bulk_fetch_all(self, conn, q, *, name_keys=None) -> dict:
         """Used by pool-building (thousands of players) to avoid one
         round-trip per player -- a single query, grouped in Python. Returns
         ALL seasons per name_key (not just the most recent) so the caller
         can pick the one that's actually temporally plausible for a given
-        player's draft season -- see _select_plausible_row."""
+        player's draft season -- see _select_plausible_row.
+
+        name_keys: if provided, fetches only those players (dramatically
+        reduces memory when building a filtered pool)."""
         try:
-            rows = q(conn, f"""
-                SELECT name_key, {", ".join(_CBB_RAW_COLS)}, class_year, position,
-                       height_in, weight_lb, academic_year
-                FROM archive_cbb_player_stats
-                ORDER BY name_key, academic_year DESC
-            """)
+            if name_keys:
+                rows = q(conn, f"""
+                    SELECT name_key, {", ".join(_CBB_RAW_COLS)}, class_year, position,
+                           height_in, weight_lb, academic_year
+                    FROM archive_cbb_player_stats
+                    WHERE name_key = ANY(%s)
+                    ORDER BY name_key, academic_year DESC
+                """, (list(name_keys),))
+            else:
+                rows = q(conn, f"""
+                    SELECT name_key, {", ".join(_CBB_RAW_COLS)}, class_year, position,
+                           height_in, weight_lb, academic_year
+                    FROM archive_cbb_player_stats
+                    ORDER BY name_key, academic_year DESC
+                """)
         except Exception as exc:
             log.warning("SportsReferenceCBBProvider bulk fetch failed: %s", exc)
             return {}
@@ -327,7 +351,7 @@ class CareerInfoProvider:
             return {}
         return self._row_to_features(dict(rows[0]))
 
-    def bulk_fetch_all(self, conn, q) -> dict:
+    def bulk_fetch_all(self, conn, q, *, name_keys=None) -> dict:
         try:
             rows = q(conn, "SELECT player_id, ht_in_in, wt, pos FROM archive_player_career_info")
         except Exception as exc:
@@ -455,7 +479,7 @@ def build_feature_vector(conn, q, *, player_name: str, college: Optional[str] = 
     return _raw_to_vector(raw, age_at_draft, overall_pick)
 
 
-def bulk_build_feature_vectors(conn, q, requests: list[dict]) -> list[FeatureVector]:
+def bulk_build_feature_vectors(conn, q, requests: list[dict], *, allowed_name_keys=None) -> list[FeatureVector]:
     """Same merge logic as build_feature_vector, but for many prospects at
     once (e.g. building the ~8,000-player historical comp pool) -- uses each
     provider's bulk_fetch_all() (one query total per provider) instead of
@@ -484,7 +508,7 @@ def bulk_build_feature_vectors(conn, q, requests: list[dict]) -> list[FeatureVec
         if bulk_fetch is None:
             continue
         try:
-            bulk_tables[provider.name] = bulk_fetch(conn, q)
+            bulk_tables[provider.name] = bulk_fetch(conn, q, name_keys=allowed_name_keys)
         except Exception as exc:
             log.warning("Provider %s bulk fetch failed, skipping: %s", provider.name, exc)
             bulk_tables[provider.name] = {}

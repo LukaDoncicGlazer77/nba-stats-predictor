@@ -111,7 +111,9 @@ def build_historical_pool(conn, q, current_season: int = 2026, min_draft_season:
         }
         for row in label_rows
     ]
-    vectors = bulk_build_feature_vectors(conn, q, requests)
+    from server import normalize_name_for_match
+    pool_name_keys = {normalize_name_for_match(row["player"]) for row in label_rows}
+    vectors = bulk_build_feature_vectors(conn, q, requests, allowed_name_keys=pool_name_keys)
 
     members: list[PoolMember] = []
     for row, fv in zip(label_rows, vectors):
