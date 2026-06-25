@@ -1128,8 +1128,38 @@ def _prewarm_pool():
         print(f"Pre-warm failed (non-fatal): {exc}")
 
 
+def _prewarm_seasons():
+    """Populate the /api/seasons cache on startup so the Players tab is fast.
+    Runs as a daemon thread; non-fatal if it fails."""
+    try:
+        if _seasons_cache_get() is not None:
+            return
+        conn = connect()
+        try:
+            rows = q(conn, """
+                SELECT player AS player_name, player_id,
+                       team AS team_abbreviation, pos, age,
+                       g AS gp, mp_per_game AS min,
+                       pts_per_game AS pts, trb_per_game AS reb, ast_per_game AS ast,
+                       x3p_per_game AS three, stl_per_game AS stl, blk_per_game AS blk,
+                       tov_per_game AS tov, fg_percent AS fg, x3p_percent AS three_pct,
+                       ft_percent AS ft_pct, bpm AS net_rating, usg_percent AS usg_pct,
+                       ts_percent AS ts_pct, per, vorp, ws, ows, dws, season
+                FROM archive_player_dashboard
+                ORDER BY player, season
+            """, ())
+        finally:
+            conn.close()
+        result = [_cast_season_row(dict(r)) for r in rows]
+        _seasons_cache_set(result)
+        print(f"Seasons pre-warm complete: {len(result)} rows cached.")
+    except Exception as exc:
+        print(f"Seasons pre-warm failed (non-fatal): {exc}")
+
+
 def main():
     ensure_users_table()
+    threading.Thread(target=_prewarm_seasons, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")
