@@ -487,7 +487,7 @@ class Handler(SimpleHTTPRequestHandler):
                     FROM archive_player_per_game {_base_where}
                       AND pts_per_game != ''
                     ORDER BY NULLIF(pts_per_game,'')::float DESC NULLS LAST LIMIT 10
-                """, (str(season), str(season), str(season)))]
+                """, (str(season), str(season)))]
 
                 top_assisters = [dict(r) for r in q(conn, f"""
                     SELECT player, player_id, team,
@@ -496,7 +496,7 @@ class Handler(SimpleHTTPRequestHandler):
                     FROM archive_player_per_game {_base_where}
                       AND ast_per_game != ''
                     ORDER BY NULLIF(ast_per_game,'')::float DESC NULLS LAST LIMIT 5
-                """, (str(season), str(season), str(season)))]
+                """, (str(season), str(season)))]
 
                 top_rebounders = [dict(r) for r in q(conn, f"""
                     SELECT player, player_id, team,
@@ -505,7 +505,7 @@ class Handler(SimpleHTTPRequestHandler):
                     FROM archive_player_per_game {_base_where}
                       AND trb_per_game != ''
                     ORDER BY NULLIF(trb_per_game,'')::float DESC NULLS LAST LIMIT 5
-                """, (str(season), str(season), str(season)))]
+                """, (str(season), str(season)))]
 
                 awards = q(conn, """
                     SELECT a.award, a.player, a.player_id, a.winner, a.share
