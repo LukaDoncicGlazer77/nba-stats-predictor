@@ -1035,8 +1035,17 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
             time.sleep(retry_delay_seconds)
 
 
+def _prewarm_pool():
+    try:
+        _get_draft_projection_pool()
+    except Exception as exc:
+        print(f"Pre-warm failed (non-fatal): {exc}")
+
+
 def main():
     ensure_users_table()
+    t = threading.Thread(target=_prewarm_pool, daemon=True)
+    t.start()
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")

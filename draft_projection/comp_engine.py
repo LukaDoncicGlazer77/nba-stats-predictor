@@ -85,12 +85,18 @@ class HistoricalPool:
         return bool(self.members)
 
 
-def build_historical_pool(conn, q, current_season: int = 2026) -> HistoricalPool:
+def build_historical_pool(conn, q, current_season: int = 2026, min_draft_season: int = 1984) -> HistoricalPool:
     """One feature-vector pass over every labeled historical draft pick.
     Uses bulk_build_feature_vectors (one query per provider total, not one
     per player) -- callers should still cache the result for the lifetime
-    of a server process, this isn't free, just no longer minutes-slow."""
+    of a server process, this isn't free, just no longer minutes-slow.
+
+    min_draft_season limits the pool to the draft-lottery era (1984+) by
+    default -- pre-lottery NBA is a poor comp baseline for modern prospects
+    and including it more than triples pool size with low signal-density."""
     labels = build_career_labels(conn, q, current_season=current_season)
+    if min_draft_season:
+        labels = labels[labels["season"] >= min_draft_season]
 
     birth_rows = q(conn, "SELECT player_id, birth_date FROM archive_player_career_info")
     birth_by_id = {r["player_id"]: r["birth_date"] for r in birth_rows}

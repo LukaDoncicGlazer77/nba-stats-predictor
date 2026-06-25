@@ -31,6 +31,7 @@ from draft_projection.labels import TIER_RANK, TIERS, TIER_LABEL
 log = logging.getLogger("draft_projection.predict")
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "career_projection_model.pkl")
+HIERARCHICAL_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "career_projection_model_hierarchical.pkl")
 
 # Comp-based estimator: weight by similarity^POWER so the most-similar comps
 # dominate the vote rather than every one of the top_n comps counting almost
@@ -91,6 +92,33 @@ def ml_tier_probabilities(model_bundle: Optional[dict], feature_row: dict) -> Op
     probs = model_bundle["model"].predict_proba(x)[0]
     tiers = model_bundle["tiers"]
     return {t: float(p) for t, p in zip(tiers, probs)}
+
+
+def load_trained_hierarchical_model() -> Optional[dict]:
+    if not os.path.exists(HIERARCHICAL_MODEL_PATH):
+        return None
+    import joblib
+    try:
+        return joblib.load(HIERARCHICAL_MODEL_PATH)
+    except Exception as exc:
+        log.warning("Failed to load %s: %s", HIERARCHICAL_MODEL_PATH, exc)
+        return None
+
+
+def ml_tier_probabilities_hierarchical(model_bundle: Optional[dict], feature_row: dict) -> Optional[dict]:
+    """Soft composition: P(tier=k) = P_stage1(non-bust) * P_stage2(tier=k|non-bust)."""
+    if model_bundle is None:
+        return None
+    x1 = np.array([[feature_row[c] for c in model_bundle["stage1_features"]]])
+    x2 = np.array([[feature_row[c] for c in model_bundle["stage2_features"]]])
+    p_nonbust = float(model_bundle["stage1_model"].predict_proba(x1)[0][1])
+    p_bust = 1.0 - p_nonbust
+    p_stage2 = model_bundle["stage2_model"].predict_proba(x2)[0]
+    tiers = model_bundle["tiers"]
+    out = {tiers[0]: p_bust}
+    for t, p in zip(tiers[1:], p_stage2):
+        out[t] = p_nonbust * float(p)
+    return out
 
 
 def blend_tier_probabilities(comp_probs: dict, ml_probs: Optional[dict], ml_weight: float = 0.7) -> dict:
