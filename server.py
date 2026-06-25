@@ -311,7 +311,7 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, "SELECT email, created_at FROM archive_users ORDER BY created_at")
             finally:
                 conn.close()
-            return self.send_json([{"email": r[0], "created_at": r[1].isoformat()} for r in rows])
+            return self.send_json([{"email": r["email"], "created_at": r["created_at"].isoformat()} for r in rows])
 
         if parsed.path == "/api/seasons":
             cached = _seasons_cache_get()
