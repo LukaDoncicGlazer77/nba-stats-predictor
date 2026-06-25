@@ -192,9 +192,16 @@ def to_json(obj):
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
+STATIC_DIR = ROOT / "static"
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=ROOT, **kwargs)
+        # Only the static/ subdirectory is served over HTTP -- previously this
+        # was ROOT, which meant server.py, nba.db, the trained .pkl models,
+        # and every training/scraper script were directly downloadable from
+        # production (confirmed live: curl .../server.py returned 200).
+        super().__init__(*args, directory=STATIC_DIR, **kwargs)
 
     def send_json(self, payload, status=200):
         body = json.dumps(payload, default=to_json).encode("utf-8")
@@ -286,7 +293,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/admin/user-count":
             admin_key = os.environ.get("ADMIN_KEY")
-            if not admin_key or params.get("key", [""])[0] != admin_key:
+            if not admin_key or not hmac.compare_digest(params.get("key", [""])[0], admin_key):
                 return self.send_json({"error": "Not found"}, status=404)
             conn = connect()
             try:

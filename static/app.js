@@ -787,7 +787,7 @@ function renderProfile(player) {
     img.alt = player.name;
     img.style.cssText = "width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:12px;";
   } else {
-    avatarEl.innerHTML = `<span class="avatar-ini">${initials(player.name)}</span>`;
+    avatarEl.innerHTML = `<span class="avatar-ini">${escapeHtml(initials(player.name))}</span>`;
   }
   $("#playerSummary").textContent = player.summary;
   $("#playerTags").innerHTML = [player.archetype, player.experience, `${fmt(l.pts,"pts")} PPG`, `${fmt(l.ast,"ast")} APG`]
@@ -1813,7 +1813,7 @@ function setupCmpSearch(i) {
     const pool = cmpMode === "prospect" ? [...players, ...allProspects.map(wrapProspect)] : players;
     if (!q || !pool.length) { dropdown.classList.remove("open"); return; }
     const matches = pool.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
-    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${p.name}">${p.name} <span style="color:var(--muted);font-size:0.75em">· ${p.isProspect ? (p.team||"Prospect") : (latestSeason(p)?.team||"")}</span></div>`).join("");
+    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} <span style="color:var(--muted);font-size:0.75em">· ${escapeHtml(p.isProspect ? (p.team||"Prospect") : (latestSeason(p)?.team||""))}</span></div>`).join("");
     dropdown.classList.toggle("open", matches.length > 0);
     dropdown.querySelectorAll(".compare-option").forEach(opt => {
       opt.addEventListener("click", () => {
@@ -1941,7 +1941,7 @@ function setupCareerOutcomeSearch() {
     const pool = allProspects.map(wrapProspect);
     if (!q || !pool.length) { dropdown.classList.remove("open"); return; }
     const matches = pool.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
-    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${p.name}">${p.name} <span style="color:var(--muted);font-size:0.75em">· ${p.team||"Prospect"}</span></div>`).join("");
+    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} <span style="color:var(--muted);font-size:0.75em">· ${escapeHtml(p.team||"Prospect")}</span></div>`).join("");
     dropdown.classList.toggle("open", matches.length > 0);
     dropdown.querySelectorAll(".compare-option").forEach(opt => {
       opt.addEventListener("click", () => {
@@ -2010,18 +2010,18 @@ function renderComparison() {
 
 // ── Career Outcome (prospect projection) ───────────────────────────────────────
 async function renderCareerOutcomeView(container, prospect) {
-  container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⏳</div><div>Projecting career outcome for ${prospect.name}...</div></div>`;
+  container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⏳</div><div>Projecting career outcome for ${escapeHtml(prospect.name)}...</div></div>`;
   let data;
   try {
     data = await fetch(`/api/prospect-outcome?name=${encodeURIComponent(prospect.name)}`).then(r => r.json());
     if (data.error) throw new Error(data.error);
   } catch (e) {
-    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚠</div><div>Couldn't load a career outcome projection for ${prospect.name}.</div></div>`;
+    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚠</div><div>Couldn't load a career outcome projection for ${escapeHtml(prospect.name)}.</div></div>`;
     return;
   }
   const { comps, summary } = data;
   if (!comps.length) {
-    container.innerHTML = `<div class="compare-placeholder"><div>No comparable historical draft picks found for ${prospect.name}.</div></div>`;
+    container.innerHTML = `<div class="compare-placeholder"><div>No comparable historical draft picks found for ${escapeHtml(prospect.name)}.</div></div>`;
     return;
   }
   const co_icon = (key) => `<svg class="co-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PROJ_BREAKDOWN_ICONS[key] || ""}</svg>`;
@@ -2072,7 +2072,7 @@ async function renderCareerOutcomeView(container, prospect) {
           <div class="co-hero-avatar-wrap">${cmpAvatar(prospect, 76)}</div>
           <div>
             <p class="co-hero-eyebrow">Projected Career Outcome</p>
-            <h3 class="co-hero-name">${prospect.name}</h3>
+            <h3 class="co-hero-name">${escapeHtml(prospect.name)}</h3>
             <p class="co-sub">
               Based on ${summary.comp_count} historical draft picks near projected slot #${prospect.rank}${prospect.position ? ` at a similar position (${prospect.position})` : ""}.
             </p>
@@ -2206,7 +2206,7 @@ function setupDraftProjectionSearch() {
     const pool = allProspects.map(wrapProspect);
     if (!q || !pool.length) { dropdown.classList.remove("open"); return; }
     const matches = pool.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
-    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${p.name}">${p.name} <span style="color:var(--muted);font-size:0.75em">· ${p.team||"Prospect"}</span></div>`).join("");
+    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} <span style="color:var(--muted);font-size:0.75em">· ${escapeHtml(p.team||"Prospect")}</span></div>`).join("");
     dropdown.classList.toggle("open", matches.length > 0);
     dropdown.querySelectorAll(".compare-option").forEach(opt => {
       opt.addEventListener("click", () => {
@@ -2297,13 +2297,13 @@ function buildComparablesTable(comparables) {
 }
 
 async function renderDraftProjectionView(container, prospect) {
-  container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⏳</div><div>Generating career-tier projection for ${prospect.name}...</div></div>`;
+  container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⏳</div><div>Generating career-tier projection for ${escapeHtml(prospect.name)}...</div></div>`;
   let data;
   try {
     data = await fetch(`/api/draft-projection?name=${encodeURIComponent(prospect.name)}`).then(r => r.json());
     if (data.error) throw new Error(data.error);
   } catch (e) {
-    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚠</div><div>Couldn't load a draft projection for ${prospect.name}.</div></div>`;
+    container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⚠</div><div>Couldn't load a draft projection for ${escapeHtml(prospect.name)}.</div></div>`;
     return;
   }
 
@@ -2319,7 +2319,7 @@ async function renderDraftProjectionView(container, prospect) {
 
   container.innerHTML = `
     <div class="cmp-pcard" style="max-width:1040px;margin:0 auto" id="draftProjCard">
-      <div class="cmp-pcard-title">Career-Tier Projection — ${prospect.name}</div>
+      <div class="cmp-pcard-title">Career-Tier Projection — ${escapeHtml(prospect.name)}</div>
       ${banner}${mlBanner}
 
       <div class="cmp-overview4" style="grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px">
