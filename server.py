@@ -1035,8 +1035,26 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
             time.sleep(retry_delay_seconds)
 
 
+def _warm_draft_projection_pool_background():
+    """Pre-builds the draft projection pool in the background right after
+    startup, instead of waiting for the first real request to trigger the
+    ~45-second cold build. Confirmed live (2026-06-25): a real first request
+    hitting that cold build took long enough to exceed the platform's
+    gateway timeout (502 at ~43s, with no application-level error -- the
+    request was genuinely still working, just not fast enough for the
+    proxy). Runs in a daemon thread so it never delays the server actually
+    binding and serving every other route; _get_draft_projection_pool()'s
+    own lock means a real request arriving mid-warm-up just waits for this
+    thread instead of racing it."""
+    try:
+        _get_draft_projection_pool()
+    except Exception as exc:
+        print(f"Background draft-projection pool warm-up failed (will retry lazily on first real request): {exc}")
+
+
 def main():
     ensure_users_table()
+    threading.Thread(target=_warm_draft_projection_pool_background, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")
