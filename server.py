@@ -272,6 +272,23 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "Incorrect email or password"}, status=401)
             return self.send_json({"ok": True, "email": email})
 
+        if parsed.path == "/api/admin/delete-users":
+            admin_key = os.environ.get("ADMIN_KEY")
+            if not admin_key or not hmac.compare_digest(body.get("key", ""), admin_key):
+                return self.send_json({"error": "Not found"}, status=404)
+            emails = [e.strip().lower() for e in body.get("emails", []) if e.strip()]
+            if not emails:
+                return self.send_json({"error": "emails list required"}, status=400)
+            conn = connect()
+            try:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM archive_users WHERE email = ANY(%s)", (emails,))
+                deleted = cur.rowcount
+                conn.commit()
+            finally:
+                conn.close()
+            return self.send_json({"ok": True, "deleted": deleted})
+
         return self.send_json({"error": "Not found"}, status=404)
 
     def do_GET(self):
