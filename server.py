@@ -1130,7 +1130,6 @@ def _prewarm_pool():
 
 def main():
     ensure_users_table()
-    threading.Thread(target=_prewarm_pool, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")
