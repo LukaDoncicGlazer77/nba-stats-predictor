@@ -443,9 +443,11 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/dashboard":
             conn = connect()
             try:
-                raw_seasons = q(conn, "SELECT DISTINCT season FROM archive_player_per_game WHERE season != ''", ())
+                # archive_team_summaries is ~30 rows/season, far smaller than
+                # archive_player_per_game, so use it for season discovery.
+                ts_season_rows = q(conn, "SELECT DISTINCT season FROM archive_team_summaries WHERE season != ''", ())
                 all_seasons_sorted = sorted(
-                    [r["season"] for r in raw_seasons if str(r["season"]).isdigit()],
+                    [r["season"] for r in ts_season_rows if str(r["season"]).isdigit()],
                     key=lambda s: int(s), reverse=True
                 )
                 latest_season = int(all_seasons_sorted[0]) if all_seasons_sorted else 2026
@@ -454,12 +456,6 @@ class Handler(SimpleHTTPRequestHandler):
                 cached = _dashboard_cache_get(season)
                 if cached is not None:
                     return self.send_json(cached)
-
-                ts_seasons = q(conn, "SELECT DISTINCT season FROM archive_team_summaries WHERE season != ''", ())
-                seasons_available = sorted(
-                    [r["season"] for r in ts_seasons if str(r["season"]).isdigit()],
-                    key=lambda s: int(s), reverse=True
-                )
 
                 # Fetch all per-game rows for this season; cast in Python to avoid
                 # safe_float()/safe_int() PL/pgSQL subtransaction overhead.
