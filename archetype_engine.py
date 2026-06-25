@@ -190,7 +190,13 @@ def creation_burden(p):
 def defensive_role(p):
     rim = 0.6 * p["blk_pct_pr"] + 0.4 * p["drb_pct_pr"]
     versatile = p["stl_pct_pr"] if p["dbpm"] is None else 0.5 * p["stl_pct_pr"] + 0.5 * max(p["dbpm"], 0) / 5
-    return _softmax({"rim_protector": rim, "versatile_defender": versatile})
+    softmaxed = _softmax({"rim_protector": rim, "versatile_defender": versatile})
+    return {
+        "rim_protector": softmaxed["rim_protector"],
+        "versatile_defender": softmaxed["versatile_defender"],
+        "rim_protector_raw": rim,
+        "versatile_defender_raw": versatile,
+    }
 
 
 def scoring_profile(p):
@@ -214,17 +220,20 @@ def hybrid_offensive_big_score(p):
 def named_archetype_mix(p, creation, defense, scoring, usage):
     low_creation = creation["non_creator_finisher"] + creation["off_ball_scorer"]
     hybrid = hybrid_offensive_big_score(p)
+    rim_raw = defense["rim_protector_raw"]
+    versatile_raw = defense["versatile_defender_raw"]
+
     raw = {
         "Heliocentric Engine": creation["heliocentric_engine"],
         "Secondary Playmaker": creation["secondary_playmaker"],
-        "Off-Ball Scorer": creation["off_ball_scorer"] * (scoring["three_pt_pressure"] / 100) * 2,
-        "Scoring Big": creation["off_ball_scorer"] * (scoring["interior_pressure"] / 100) * 2
-        + creation["non_creator_finisher"] * (scoring["interior_pressure"] / 100) * 1.5,
-        "Playmaking Big": creation["secondary_playmaker"] * (defense["rim_protector"] / 100) * 1.5
-        + creation["heliocentric_engine"] * (defense["rim_protector"] / 100) * 1.5,
-        "Rim Protector": defense["rim_protector"] * (low_creation / 100) * 2,
-        "3&D Wing": defense["versatile_defender"] * (scoring["three_pt_pressure"] / 100) * (low_creation / 100) * 3,
-        "Defensive Wing": defense["versatile_defender"] * (low_creation / 100) * 2 * (1 if usage == "low" else 0.5),
+        "Off-Ball Scorer": creation["off_ball_scorer"] * scoring["three_pt_pressure"] / 100 * 2,
+        "Scoring Big": creation["off_ball_scorer"] * scoring["interior_pressure"] / 100 * 2
+            + creation["non_creator_finisher"] * scoring["interior_pressure"] / 100 * 1.5,
+        "Playmaking Big": creation["secondary_playmaker"] * rim_raw * 1.5
+            + creation["heliocentric_engine"] * rim_raw * 1.5,
+        "Rim Protector": rim_raw * (low_creation / 100) * 2,
+        "3&D Wing": versatile_raw * scoring["three_pt_pressure"] / 100 * (low_creation / 100) * 3,
+        "Defensive Wing": versatile_raw * (low_creation / 100) * 2 * (1 if usage == "low" else 0.5),
         "Hybrid Offensive Big": hybrid * 4,
     }
     total = sum(raw.values()) or 1.0
