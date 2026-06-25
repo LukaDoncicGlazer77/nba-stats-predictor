@@ -85,6 +85,8 @@ def _load_stats_model():
 # connections), not a crash in any specific route.
 _draft_projection_pool = None
 _draft_projection_pool_lock = threading.Lock()
+_draft_projection_cache = {}   # name -> (result_dict, timestamp)
+_DRAFT_PROJECTION_CACHE_TTL = 600  # 10 minutes
 def _get_draft_projection_pool():
     global _draft_projection_pool
     if _draft_projection_pool is not None:
@@ -666,6 +668,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"prospect": prospect, "comps": comps, "summary": summary})
 
         if parsed.path == "/api/draft-projection":
+            import time as _time
             name = (params.get("name", [""])[0] or "").strip()
             if not name:
                 return self.send_json({"error": "name required"}, status=400)
@@ -674,6 +677,11 @@ class Handler(SimpleHTTPRequestHandler):
             pick_param = (params.get("overall_pick", [""])[0] or "").strip()
             age_at_draft = safe_float_py(age_param) if age_param else None
             overall_pick = safe_float_py(pick_param) if pick_param else None
+
+            cache_key = f"{name}|{college}|{age_at_draft}|{overall_pick}"
+            cached = _draft_projection_cache.get(cache_key)
+            if cached and (_time.time() - cached[1]) < _DRAFT_PROJECTION_CACHE_TTL:
+                return self.send_json(cached[0])
 
             conn = connect()
             try:
@@ -695,6 +703,10 @@ class Handler(SimpleHTTPRequestHandler):
                             # a mock-rank approximation doesn't overstate
                             # precision.
                             overall_pick = safe_float_py(p.get("rank"))
+                    cache_key = f"{name}|{college}|{age_at_draft}|{overall_pick}"
+                    cached = _draft_projection_cache.get(cache_key)
+                    if cached and (_time.time() - cached[1]) < _DRAFT_PROJECTION_CACHE_TTL:
+                        return self.send_json(cached[0])
 
                 import draft_projection.service as draft_service
                 pool = _get_draft_projection_pool()
@@ -704,6 +716,7 @@ class Handler(SimpleHTTPRequestHandler):
                 )
             finally:
                 conn.close()
+            _draft_projection_cache[cache_key] = (result, _time.time())
             return self.send_json(result)
 
         if parsed.path == "/api/ncaa-stats":
@@ -1035,8 +1048,16 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
             time.sleep(retry_delay_seconds)
 
 
+def _prewarm_pool():
+    try:
+        _get_draft_projection_pool()
+    except Exception as exc:
+        print(f"Pre-warm failed (non-fatal): {exc}")
+
+
 def main():
     ensure_users_table()
+    threading.Thread(target=_prewarm_pool, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")
