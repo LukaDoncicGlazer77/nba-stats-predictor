@@ -168,6 +168,21 @@ def _seasons_cache_set(rows):
     _SEASONS_CACHE["ts"] = time.time()
 
 
+_DASHBOARD_CACHE = {}  # season_int -> (data_dict, timestamp)
+_DASHBOARD_CACHE_TTL = 600
+
+
+def _dashboard_cache_get(season):
+    entry = _DASHBOARD_CACHE.get(season)
+    if entry and (time.time() - entry[1]) < _DASHBOARD_CACHE_TTL:
+        return entry[0]
+    return None
+
+
+def _dashboard_cache_set(season, data):
+    _DASHBOARD_CACHE[season] = (data, time.time())
+
+
 def _cast_season_row(row):
     fg = safe_float_py(row.get("fg"))
     usg = safe_float_py(row.get("usg_pct"))
@@ -398,17 +413,19 @@ class Handler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/players":
             search = (params.get("search", [""])[0] or "").strip()
+            # Use NULLIF(col,'')::type instead of safe_float()/safe_int() to avoid
+            # PL/pgSQL subtransaction overhead on every row.
             sql = """
                 SELECT
                   player AS player_name,
                   player_id,
                   COUNT(*) AS seasons,
-                  MIN(safe_int(season)) AS first_season_start,
-                  MAX(safe_int(season)) AS latest_season_start,
-                  ROUND(AVG(safe_float(pts_per_game))::numeric, 1) AS career_pts,
-                  ROUND(AVG(safe_float(trb_per_game))::numeric, 1) AS career_reb,
-                  ROUND(AVG(safe_float(ast_per_game))::numeric, 1) AS career_ast,
-                  ROUND((AVG(safe_float(ts_percent)) * 100)::numeric, 1) AS career_ts_pct
+                  MIN(NULLIF(season, '')::int) AS first_season_start,
+                  MAX(NULLIF(season, '')::int) AS latest_season_start,
+                  ROUND(AVG(NULLIF(pts_per_game, '')::float)::numeric, 1) AS career_pts,
+                  ROUND(AVG(NULLIF(trb_per_game, '')::float)::numeric, 1) AS career_reb,
+                  ROUND(AVG(NULLIF(ast_per_game, '')::float)::numeric, 1) AS career_ast,
+                  ROUND((AVG(NULLIF(ts_percent, '')::float) * 100)::numeric, 1) AS career_ts_pct
                 FROM archive_player_dashboard
             """
             args = []
@@ -426,61 +443,78 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/dashboard":
             conn = connect()
             try:
-                latest_season = q1(conn,
-                    "SELECT MAX(safe_int(season)) FROM archive_player_per_game"
-                )[0]
+                raw_seasons = q(conn, "SELECT DISTINCT season FROM archive_player_per_game WHERE season != ''", ())
+                all_seasons_sorted = sorted(
+                    [r["season"] for r in raw_seasons if str(r["season"]).isdigit()],
+                    key=lambda s: int(s), reverse=True
+                )
+                latest_season = int(all_seasons_sorted[0]) if all_seasons_sorted else 2026
                 season = int(params.get("season", [latest_season])[0] or latest_season)
 
-                seasons_available = [r["season"] for r in q(conn,
-                    "SELECT season FROM (SELECT DISTINCT season FROM archive_team_summaries) t ORDER BY safe_int(season) DESC"
-                )]
+                cached = _dashboard_cache_get(season)
+                if cached is not None:
+                    return self.send_json(cached)
 
-                top_scorers = q(conn, """
-                    SELECT player, player_id, team,
-                           safe_float(pts_per_game) AS pts,
-                           safe_float(trb_per_game) AS reb,
-                           safe_float(ast_per_game) AS ast,
-                           safe_float(fg_percent)*100 AS fg_pct
-                    FROM archive_player_per_game p
-                    WHERE season = ?
-                      AND pts_per_game != '' AND g != ''
-                      AND safe_int(g) >= 20
-                      AND NOT (team NOT IN ('TOT','2TM','3TM') AND player IN (
-                          SELECT player FROM archive_player_per_game
-                          WHERE season = ? GROUP BY player HAVING COUNT(*) > 1
-                      ))
-                    ORDER BY safe_float(pts_per_game) DESC NULLS LAST LIMIT 10
-                """, (str(season), str(season)))
+                ts_seasons = q(conn, "SELECT DISTINCT season FROM archive_team_summaries WHERE season != ''", ())
+                seasons_available = sorted(
+                    [r["season"] for r in ts_seasons if str(r["season"]).isdigit()],
+                    key=lambda s: int(s), reverse=True
+                )
 
-                top_assisters = q(conn, """
+                # Fetch all per-game rows for this season; cast in Python to avoid
+                # safe_float()/safe_int() PL/pgSQL subtransaction overhead.
+                per_game_rows = q(conn, """
                     SELECT player, player_id, team,
-                           safe_float(ast_per_game) AS ast,
-                           safe_float(pts_per_game) AS pts
+                           pts_per_game, trb_per_game, ast_per_game, fg_percent, g
                     FROM archive_player_per_game
                     WHERE season = ?
-                      AND ast_per_game != '' AND g != ''
-                      AND safe_int(g) >= 20
-                      AND NOT (team NOT IN ('TOT','2TM','3TM') AND player IN (
-                          SELECT player FROM archive_player_per_game
-                          WHERE season = ? GROUP BY player HAVING COUNT(*) > 1
-                      ))
-                    ORDER BY safe_float(ast_per_game) DESC NULLS LAST LIMIT 5
-                """, (str(season), str(season)))
+                """, (str(season),))
 
-                top_rebounders = q(conn, """
-                    SELECT player, player_id, team,
-                           safe_float(trb_per_game) AS reb,
-                           safe_float(pts_per_game) AS pts
-                    FROM archive_player_per_game
-                    WHERE season = ?
-                      AND trb_per_game != '' AND g != ''
-                      AND safe_int(g) >= 20
-                      AND NOT (team NOT IN ('TOT','2TM','3TM') AND player IN (
-                          SELECT player FROM archive_player_per_game
-                          WHERE season = ? GROUP BY player HAVING COUNT(*) > 1
-                      ))
-                    ORDER BY safe_float(trb_per_game) DESC NULLS LAST LIMIT 5
-                """, (str(season), str(season)))
+                # Dedup: prefer TOT/2TM/3TM rows for traded players
+                traded = set()
+                for r in per_game_rows:
+                    if r["team"] in ("TOT", "2TM", "3TM"):
+                        traded.add(r["player"])
+
+                def _keep(r):
+                    if r["player"] in traded and r["team"] not in ("TOT", "2TM", "3TM"):
+                        return False
+                    g = safe_float_py(r["g"])
+                    return g is not None and g >= 20
+
+                eligible = [r for r in per_game_rows if _keep(r)]
+
+                def _cast_pg(r):
+                    return {
+                        "player": r["player"],
+                        "player_id": r["player_id"],
+                        "team": r["team"],
+                        "pts": safe_float_py(r["pts_per_game"]),
+                        "reb": safe_float_py(r["trb_per_game"]),
+                        "ast": safe_float_py(r["ast_per_game"]),
+                        "fg_pct": (lambda v: round(v * 100, 1) if v is not None else None)(safe_float_py(r["fg_percent"])),
+                    }
+
+                cast_eligible = [_cast_pg(r) for r in eligible]
+
+                top_scorers = sorted(
+                    [r for r in cast_eligible if r["pts"] is not None],
+                    key=lambda r: r["pts"], reverse=True
+                )[:10]
+
+                top_assisters = sorted(
+                    [r for r in cast_eligible if r["ast"] is not None],
+                    key=lambda r: r["ast"], reverse=True
+                )[:5]
+                top_assisters = [{"player": r["player"], "player_id": r["player_id"], "team": r["team"],
+                                   "ast": r["ast"], "pts": r["pts"]} for r in top_assisters]
+
+                top_rebounders = sorted(
+                    [r for r in cast_eligible if r["reb"] is not None],
+                    key=lambda r: r["reb"], reverse=True
+                )[:5]
+                top_rebounders = [{"player": r["player"], "player_id": r["player_id"], "team": r["team"],
+                                    "reb": r["reb"], "pts": r["pts"]} for r in top_rebounders]
 
                 awards = q(conn, """
                     SELECT a.award, a.player, a.player_id, a.winner, a.share
@@ -489,30 +523,44 @@ class Handler(SimpleHTTPRequestHandler):
                     ORDER BY a.award
                 """, (str(season),))
 
-                team_standings = q(conn, """
-                    SELECT team, abbreviation, w, l,
-                           CASE WHEN safe_float(w) IS NOT NULL AND safe_float(l) IS NOT NULL
-                                AND (safe_float(w) + safe_float(l)) > 0
-                                THEN ROUND((safe_float(w)/(safe_float(w)+safe_float(l)))::numeric, 3)
-                                ELSE NULL END AS win_pct,
-                           safe_float(n_rtg) AS net_rtg,
-                           playoffs
+                raw_standings = q(conn, """
+                    SELECT team, abbreviation, w, l, n_rtg, playoffs
                     FROM archive_team_summaries
                     WHERE season = ? AND abbreviation != 'NA'
-                    ORDER BY safe_float(w) DESC NULLS LAST
                 """, (str(season),))
+
+                def _cast_standing(r):
+                    w = safe_float_py(r["w"])
+                    l = safe_float_py(r["l"])
+                    total = (w or 0) + (l or 0)
+                    return {
+                        "team": r["team"],
+                        "abbreviation": r["abbreviation"],
+                        "w": w,
+                        "l": l,
+                        "win_pct": round(w / total, 3) if w is not None and total > 0 else None,
+                        "net_rtg": safe_float_py(r["n_rtg"]),
+                        "playoffs": r["playoffs"],
+                    }
+
+                team_standings = sorted(
+                    [_cast_standing(r) for r in raw_standings],
+                    key=lambda r: r["w"] or 0, reverse=True
+                )
             finally:
                 conn.close()
 
-            return self.send_json({
+            result = {
                 "season": season,
                 "seasons_available": seasons_available,
-                "top_scorers": [dict(r) for r in top_scorers],
-                "top_assisters": [dict(r) for r in top_assisters],
-                "top_rebounders": [dict(r) for r in top_rebounders],
+                "top_scorers": top_scorers,
+                "top_assisters": top_assisters,
+                "top_rebounders": top_rebounders,
                 "awards": [dict(r) for r in awards],
-                "team_standings": [dict(r) for r in team_standings],
-            })
+                "team_standings": team_standings,
+            }
+            _dashboard_cache_set(season, result)
+            return self.send_json(result)
 
         if parsed.path == "/api/playoffs":
             season = (params.get("season", ["2026"])[0] or "2026").strip()
@@ -538,19 +586,19 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, """
                     SELECT d.season, d.overall_pick, d.round, d.tm AS team,
                            d.player, d.player_id, d.college,
-                           ROUND(AVG(safe_float(p.pts_per_game))::numeric, 1) AS career_pts,
-                           ROUND(AVG(safe_float(p.trb_per_game))::numeric, 1) AS career_reb,
-                           ROUND(AVG(safe_float(p.ast_per_game))::numeric, 1) AS career_ast,
+                           ROUND(AVG(NULLIF(p.pts_per_game, '')::float)::numeric, 1) AS career_pts,
+                           ROUND(AVG(NULLIF(p.trb_per_game, '')::float)::numeric, 1) AS career_reb,
+                           ROUND(AVG(NULLIF(p.ast_per_game, '')::float)::numeric, 1) AS career_ast,
                            COUNT(p.season) AS seasons_played
                     FROM archive_draft_pick_history d
                     LEFT JOIN archive_player_per_game p ON p.player_id = d.player_id
                     WHERE d.season = ?
                     GROUP BY d.player_id, d.overall_pick, d.season, d.round, d.tm, d.player, d.college
-                    ORDER BY safe_int(d.overall_pick)
+                    ORDER BY NULLIF(d.overall_pick, '')::int NULLS LAST
                 """, (season,))
                 seasons_available = q(conn, """
-                    SELECT season FROM (SELECT DISTINCT season FROM archive_draft_pick_history) t
-                    ORDER BY safe_int(season) DESC
+                    SELECT season FROM (SELECT DISTINCT season FROM archive_draft_pick_history WHERE season != '') t
+                    ORDER BY season::int DESC
                 """)
             finally:
                 conn.close()
@@ -566,7 +614,7 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, """
                     SELECT rank, name, pos, age, school, height, weight, status, country
                     FROM archive_draft_prospects_2026
-                    ORDER BY safe_int(rank)
+                    ORDER BY NULLIF(rank, '')::int NULLS LAST
                 """)
             finally:
                 conn.close()
@@ -589,28 +637,25 @@ class Handler(SimpleHTTPRequestHandler):
 
                 picks = q(conn, """
                     WITH season_rows AS (
-                        -- A traded player has one row per team plus a 2TM/3TM/.. aggregate
-                        -- row for that season; keep only the aggregate (or the lone row
-                        -- if there was no trade) so career stats aren't double-counted.
                         SELECT DISTINCT ON (player_id, season)
                                player_id, season, pos, pts_per_game, trb_per_game, ast_per_game
                         FROM archive_player_per_game
-                        WHERE safe_int(season) IS NOT NULL
+                        WHERE season != ''
                         ORDER BY player_id, season,
                                  CASE WHEN team ~ 'TM$' THEN 0 ELSE 1 END
                     ),
                     rookie_pos AS (
                         SELECT DISTINCT ON (player_id) player_id, pos
                         FROM season_rows
-                        ORDER BY player_id, safe_int(season) ASC
+                        ORDER BY player_id, season::int ASC
                     ),
                     career AS (
                         SELECT player_id,
-                               ROUND(AVG(safe_float(pts_per_game))::numeric, 1) AS career_pts,
-                               ROUND(AVG(safe_float(trb_per_game))::numeric, 1) AS career_reb,
-                               ROUND(AVG(safe_float(ast_per_game))::numeric, 1) AS career_ast,
+                               ROUND(AVG(NULLIF(pts_per_game, '')::float)::numeric, 1) AS career_pts,
+                               ROUND(AVG(NULLIF(trb_per_game, '')::float)::numeric, 1) AS career_reb,
+                               ROUND(AVG(NULLIF(ast_per_game, '')::float)::numeric, 1) AS career_ast,
                                COUNT(season) AS seasons_played,
-                               ROUND(MAX(safe_float(pts_per_game))::numeric, 1) AS peak_pts
+                               ROUND(MAX(NULLIF(pts_per_game, '')::float)::numeric, 1) AS peak_pts
                         FROM season_rows
                         GROUP BY player_id
                     )
@@ -620,7 +665,7 @@ class Handler(SimpleHTTPRequestHandler):
                     FROM archive_draft_pick_history d
                     JOIN career c ON c.player_id = d.player_id
                     LEFT JOIN rookie_pos rp ON rp.player_id = d.player_id
-                    WHERE safe_int(d.overall_pick) IS NOT NULL
+                    WHERE d.overall_pick != ''
                 """)
             finally:
                 conn.close()
@@ -754,7 +799,8 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, """
                     SELECT player, player_id, team, season, lg, replaced
                     FROM archive_all_star_selections
-                    ORDER BY safe_int(season) DESC, player
+                    WHERE season != ''
+                    ORDER BY season::int DESC, player
                     LIMIT 100
                 """)
             finally:
