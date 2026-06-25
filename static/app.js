@@ -2250,17 +2250,32 @@ function buildOutcomeProbabilityBars(probabilities) {
   }).join("");
 }
 
+const ARCHETYPE_COLOR = {
+  "Heliocentric Engine":  "#c061e0",
+  "Secondary Playmaker":  "#7e6ee0",
+  "Off-Ball Scorer":      "#4eb8e0",
+  "Scoring Big":          "#4ecbb0",
+  "Playmaking Big":       "#8fd15a",
+  "Rim Protector":        "#e0c14e",
+  "3&D Wing":             "#4e9de0",
+  "Defensive Wing":       "#e08a4e",
+  "Hybrid Offensive Big": "#c06160",
+};
+
 function buildArchetypeMixBars(mix) {
   if (!mix) {
     return `<p style="color:var(--muted);font-size:0.85rem">No college archetype profile available yet -- requires college statistical data that hasn't been loaded.</p>`;
   }
   const entries = Object.entries(mix).sort((a, b) => b[1] - a[1]);
-  return entries.map(([name, pct]) => `
+  return entries.map(([name, pct], i) => {
+    const color = ARCHETYPE_COLOR[name] || `hsl(${(i * 40) % 360},65%,60%)`;
+    return `
     <div class="dp-prob-row">
       <div class="dp-prob-label">${name}</div>
-      <div class="dp-prob-track"><div class="dp-prob-fill" style="width:${pct}%;background:var(--accent)"></div></div>
+      <div class="dp-prob-track"><div class="dp-prob-fill" style="width:${pct}%;background:${color}"></div></div>
       <div class="dp-prob-pct">${pct.toFixed(1)}%</div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 function buildExplainabilityLists(explainability) {
