@@ -1085,6 +1085,31 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
             time.sleep(retry_delay_seconds)
 
 
+def _ensure_indexes():
+    """Create indexes on large archive tables if they don't exist.
+    Runs in a background thread so startup is non-blocking.
+    These are read-only archive tables so index builds don't block queries."""
+    indexes = [
+        ("idx_ppg_season", "archive_player_per_game", "season"),
+        ("idx_pd_season",  "archive_player_dashboard", "season"),
+        ("idx_adv_season", "archive_advanced", "season"),
+    ]
+    try:
+        conn = connect()
+        try:
+            cur = conn.cursor()
+            for idx_name, table, col in indexes:
+                cur.execute(
+                    f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({col})"
+                )
+                conn.commit()
+                print(f"Index {idx_name} ensured on {table}({col}).")
+        finally:
+            conn.close()
+    except Exception as exc:
+        print(f"_ensure_indexes failed (non-fatal): {exc}")
+
+
 def _prewarm_pool():
     try:
         _get_draft_projection_pool()
@@ -1123,6 +1148,7 @@ def _prewarm_seasons():
 
 def main():
     ensure_users_table()
+    threading.Thread(target=_ensure_indexes, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")
