@@ -453,18 +453,40 @@ class Handler(SimpleHTTPRequestHandler):
                 latest_season = int(all_seasons_sorted[0]) if all_seasons_sorted else 2026
                 season = int(params.get("season", [latest_season])[0] or latest_season)
 
+                seasons_available = all_seasons_sorted
+
                 cached = _dashboard_cache_get(season)
                 if cached is not None:
                     return self.send_json(cached)
 
-                # Fetch all per-game rows for this season; cast in Python to avoid
-                # safe_float()/safe_int() PL/pgSQL subtransaction overhead.
-                per_game_rows = q(conn, """
-                    SELECT player, player_id, team,
-                           pts_per_game, trb_per_game, ast_per_game, fg_percent, g
-                    FROM archive_player_per_game
-                    WHERE season = ?
-                """, (str(season),))
+                # Reuse the seasons cache (populated by /api/seasons) if warm;
+                # avoids a slow full-table scan of archive_player_per_game.
+                seasons_cache = _seasons_cache_get()
+                if seasons_cache is not None:
+                    per_game_rows = [
+                        {
+                            "player": r["player_name"],
+                            "player_id": r["player_id"],
+                            "team": r["team_abbreviation"],
+                            "pts_per_game": r.get("pts"),
+                            "trb_per_game": r.get("reb"),
+                            "ast_per_game": r.get("ast"),
+                            "fg_percent": (r["fg"] / 100) if r.get("fg") is not None else None,
+                            "g": r.get("gp"),
+                        }
+                        for r in seasons_cache if str(r.get("season_start")) == str(season)
+                    ]
+                else:
+                    # Cold start: fetch directly. archive_player_per_game can be
+                    # slow without an index on season; results are cached so only
+                    # the first cold request pays this cost.
+                    raw_pg = q(conn, """
+                        SELECT player, player_id, team,
+                               pts_per_game, trb_per_game, ast_per_game, fg_percent, g
+                        FROM archive_player_per_game
+                        WHERE season = ?
+                    """, (str(season),))
+                    per_game_rows = [dict(r) for r in raw_pg]
 
                 # Dedup: prefer TOT/2TM/3TM rows for traded players
                 traded = set()
