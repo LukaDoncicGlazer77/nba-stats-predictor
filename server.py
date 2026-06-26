@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import datetime
 import decimal
 import hashlib
 import hmac
@@ -363,7 +364,32 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, "SELECT email, created_at FROM archive_users ORDER BY created_at")
             finally:
                 conn.close()
-            return self.send_json([{"email": r["email"], "created_at": r["created_at"].isoformat()} for r in rows])
+            now = datetime.datetime.now(datetime.timezone.utc)
+            def member_for(ts):
+                if ts is None:
+                    return "unknown"
+                delta = now - ts.replace(tzinfo=datetime.timezone.utc) if ts.tzinfo is None else now - ts
+                days = delta.days
+                if days == 0:
+                    return "today"
+                if days == 1:
+                    return "1 day"
+                if days < 7:
+                    return f"{days} days"
+                if days < 14:
+                    return "1 week"
+                if days < 30:
+                    return f"{days // 7} weeks"
+                if days < 60:
+                    return "1 month"
+                if days < 365:
+                    return f"{days // 30} months"
+                return f"{days // 365}y {(days % 365) // 30}m"
+            return self.send_json([{
+                "email": r["email"],
+                "created_at": r["created_at"].isoformat(),
+                "member_for": member_for(r["created_at"]),
+            } for r in rows])
 
         if parsed.path == "/api/seasons":
             cached = _seasons_cache_get()
