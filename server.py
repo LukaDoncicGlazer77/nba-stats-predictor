@@ -111,7 +111,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 
 
 def connect():
-    return psycopg2.connect(DATABASE_URL)
+    return psycopg2.connect(DATABASE_URL, connect_timeout=10)
 
 
 def q(conn, sql, params=()):
@@ -265,6 +265,9 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b""
+        if self.headers.get("Content-Encoding") == "gzip":
+            import gzip as _gzip
+            raw = _gzip.decompress(raw)
         try:
             body = json.loads(raw) if raw else {}
         except json.JSONDecodeError:
