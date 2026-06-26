@@ -423,12 +423,12 @@ class Handler(SimpleHTTPRequestHandler):
                   player AS player_name,
                   player_id,
                   COUNT(*) AS seasons,
-                  MIN(NULLIF(season, '')::int) AS first_season_start,
-                  MAX(NULLIF(season, '')::int) AS latest_season_start,
-                  ROUND(AVG(NULLIF(pts_per_game, '')::float)::numeric, 1) AS career_pts,
-                  ROUND(AVG(NULLIF(trb_per_game, '')::float)::numeric, 1) AS career_reb,
-                  ROUND(AVG(NULLIF(ast_per_game, '')::float)::numeric, 1) AS career_ast,
-                  ROUND((AVG(NULLIF(ts_percent, '')::float) * 100)::numeric, 1) AS career_ts_pct
+                  MIN(NULLIF(NULLIF(season, ''), 'NA')::int) AS first_season_start,
+                  MAX(NULLIF(NULLIF(season, ''), 'NA')::int) AS latest_season_start,
+                  ROUND(AVG(NULLIF(NULLIF(pts_per_game, ''), 'NA')::float)::numeric, 1) AS career_pts,
+                  ROUND(AVG(NULLIF(NULLIF(trb_per_game, ''), 'NA')::float)::numeric, 1) AS career_reb,
+                  ROUND(AVG(NULLIF(NULLIF(ast_per_game, ''), 'NA')::float)::numeric, 1) AS career_ast,
+                  ROUND((AVG(NULLIF(NULLIF(ts_percent, ''), 'NA')::float) * 100)::numeric, 1) AS career_ts_pct
                 FROM archive_player_dashboard
             """
             args = []
@@ -616,15 +616,15 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, """
                     SELECT d.season, d.overall_pick, d.round, d.tm AS team,
                            d.player, d.player_id, d.college,
-                           ROUND(AVG(NULLIF(p.pts_per_game, '')::float)::numeric, 1) AS career_pts,
-                           ROUND(AVG(NULLIF(p.trb_per_game, '')::float)::numeric, 1) AS career_reb,
-                           ROUND(AVG(NULLIF(p.ast_per_game, '')::float)::numeric, 1) AS career_ast,
+                           ROUND(AVG(NULLIF(NULLIF(p.pts_per_game, ''), 'NA')::float)::numeric, 1) AS career_pts,
+                           ROUND(AVG(NULLIF(NULLIF(p.trb_per_game, ''), 'NA')::float)::numeric, 1) AS career_reb,
+                           ROUND(AVG(NULLIF(NULLIF(p.ast_per_game, ''), 'NA')::float)::numeric, 1) AS career_ast,
                            COUNT(p.season) AS seasons_played
                     FROM archive_draft_pick_history d
                     LEFT JOIN archive_player_per_game p ON p.player_id = d.player_id
                     WHERE d.season = ?
                     GROUP BY d.player_id, d.overall_pick, d.season, d.round, d.tm, d.player, d.college
-                    ORDER BY NULLIF(d.overall_pick, '')::int NULLS LAST
+                    ORDER BY NULLIF(NULLIF(d.overall_pick, ''), 'NA')::int NULLS LAST
                 """, (season,))
                 seasons_available = q(conn, """
                     SELECT season FROM (SELECT DISTINCT season FROM archive_draft_pick_history WHERE season != '') t
@@ -644,7 +644,7 @@ class Handler(SimpleHTTPRequestHandler):
                 rows = q(conn, """
                     SELECT rank, name, pos, age, school, height, weight, status, country
                     FROM archive_draft_prospects_2026
-                    ORDER BY NULLIF(rank, '')::int NULLS LAST
+                    ORDER BY NULLIF(NULLIF(rank, ''), 'NA')::int NULLS LAST
                 """)
             finally:
                 conn.close()
@@ -681,11 +681,11 @@ class Handler(SimpleHTTPRequestHandler):
                     ),
                     career AS (
                         SELECT player_id,
-                               ROUND(AVG(NULLIF(pts_per_game, '')::float)::numeric, 1) AS career_pts,
-                               ROUND(AVG(NULLIF(trb_per_game, '')::float)::numeric, 1) AS career_reb,
-                               ROUND(AVG(NULLIF(ast_per_game, '')::float)::numeric, 1) AS career_ast,
+                               ROUND(AVG(NULLIF(NULLIF(pts_per_game, ''), 'NA')::float)::numeric, 1) AS career_pts,
+                               ROUND(AVG(NULLIF(NULLIF(trb_per_game, ''), 'NA')::float)::numeric, 1) AS career_reb,
+                               ROUND(AVG(NULLIF(NULLIF(ast_per_game, ''), 'NA')::float)::numeric, 1) AS career_ast,
                                COUNT(season) AS seasons_played,
-                               ROUND(MAX(NULLIF(pts_per_game, '')::float)::numeric, 1) AS peak_pts
+                               ROUND(MAX(NULLIF(NULLIF(pts_per_game, ''), 'NA')::float)::numeric, 1) AS peak_pts
                         FROM season_rows
                         GROUP BY player_id
                     )
