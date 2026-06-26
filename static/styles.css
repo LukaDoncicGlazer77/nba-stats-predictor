@@ -3187,7 +3187,6 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .dp-search-wrap {
   position: relative;
   width: 100%;
-  max-width: 520px;
 }
 .dp-search-icon {
   position: absolute;
@@ -3241,22 +3240,23 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 .dp-chips-row {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   width: 100%;
-  justify-content: center;
+  justify-content: space-between;
 }
 .dp-chip {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 6px 13px 6px 10px;
+  gap: 2px;
+  flex: 1;
+  padding: 8px 6px;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 999px;
+  border-radius: 12px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.12s;
-  white-space: nowrap;
+  min-width: 0;
 }
 .dp-chip:hover {
   background: rgba(124,92,255,0.14);
@@ -3264,20 +3264,29 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   transform: translateY(-1px);
 }
 .dp-chip-rank {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 800;
   color: var(--accent-1);
   opacity: 0.75;
-  min-width: 20px;
 }
 .dp-chip-name {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: center;
 }
 .dp-chip-meta {
-  font-size: 0.68rem;
+  font-size: 0.63rem;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: center;
 }
 
 /* Filled / selected state for draft projection bar */
