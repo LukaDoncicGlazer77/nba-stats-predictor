@@ -2797,3 +2797,16 @@ document.addEventListener("click", (e) => {
 
 loadDashboard();
 navigate("dashboard");
+
+// Heartbeat: ping every 60s to track active time for logged-in users
+(function startHeartbeat() {
+  const email = localStorage.getItem('sf_session');
+  if (!email || email === 'guest') return;
+  const ping = () => fetch('/api/heartbeat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  }).catch(() => {});
+  ping();
+  setInterval(ping, 60000);
+})();

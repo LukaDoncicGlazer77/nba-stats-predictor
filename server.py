@@ -308,6 +308,33 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "Incorrect email or password"}, status=401)
             return self.send_json({"ok": True, "email": email})
 
+        if parsed.path == "/api/heartbeat":
+            email = (body.get("email") or "").strip().lower()
+            if not email or "@" not in email:
+                return self.send_json({"ok": False}, status=400)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            conn = connect()
+            try:
+                row = q1(conn, "SELECT last_seen_at, total_active_seconds FROM archive_users WHERE email = %s", (email,))
+                if not row:
+                    return self.send_json({"ok": False}, status=404)
+                last_seen, total = row
+                # If last heartbeat was within 90s, count the gap as active time
+                if last_seen is not None:
+                    last = last_seen.replace(tzinfo=datetime.timezone.utc) if last_seen.tzinfo is None else last_seen
+                    gap = (now - last).total_seconds()
+                    if gap <= 90:
+                        total += int(gap)
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE archive_users SET last_seen_at = %s, total_active_seconds = %s WHERE email = %s",
+                    (now, total, email),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+            return self.send_json({"ok": True})
+
         if parsed.path == "/api/admin/delete-users":
             admin_key = os.environ.get("ADMIN_KEY")
             if not admin_key or not hmac.compare_digest(body.get("key", ""), admin_key):
@@ -361,7 +388,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "Not found"}, status=404)
             conn = connect()
             try:
-                rows = q(conn, "SELECT email, created_at FROM archive_users ORDER BY created_at")
+                rows = q(conn, "SELECT email, created_at, total_active_seconds FROM archive_users ORDER BY created_at")
             finally:
                 conn.close()
             now = datetime.datetime.now(datetime.timezone.utc)
@@ -385,10 +412,19 @@ class Handler(SimpleHTTPRequestHandler):
                 if days < 365:
                     return f"{days // 30} months"
                 return f"{days // 365}y {(days % 365) // 30}m"
+            def fmt_time(secs):
+                if not secs:
+                    return "0 min"
+                secs = int(secs)
+                h, m = divmod(secs // 60, 60)
+                if h >= 1:
+                    return f"{h}h {m}m" if m else f"{h}h"
+                return f"{secs // 60}m" if secs >= 60 else f"{secs}s"
             return self.send_json([{
                 "email": r["email"],
                 "created_at": r["created_at"].isoformat(),
                 "member_for": member_for(r["created_at"]),
+                "time_on_site": fmt_time(r["total_active_seconds"]),
             } for r in rows])
 
         if parsed.path == "/api/seasons":
@@ -1136,6 +1172,11 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
                         password_salt TEXT NOT NULL,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
+                """)
+                cur.execute("""
+                    ALTER TABLE archive_users
+                        ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ,
+                        ADD COLUMN IF NOT EXISTS total_active_seconds INTEGER NOT NULL DEFAULT 0
                 """)
                 conn.commit()
                 return
