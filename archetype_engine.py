@@ -171,6 +171,15 @@ def add_efficiency_under_load(pool):
 
 # ── archetype dimensions (same math as the prototype) ─────────────────────
 
+def _size_factor(ht_in) -> float:
+    """Logistic gate for 'Big' archetypes. Returns ~1.0 at 6'9"+ (81 in),
+    ~0.5 at 6'6" (78 in), ~0.18 at 6'5", ~0.01 at 6'3" and below.
+    Missing height → 1.0 so an unknown-height player is never penalised."""
+    if ht_in is None:
+        return 1.0
+    return 1.0 / (1.0 + math.exp(-1.5 * (ht_in - 78)))
+
+
 def _softmax(scores: dict) -> dict:
     exps = {k: math.exp(1.5 * v) for k, v in scores.items()}
     total = sum(exps.values()) or 1.0
@@ -222,19 +231,20 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
     hybrid = hybrid_offensive_big_score(p)
     rim_raw = defense["rim_protector_raw"]
     versatile_raw = defense["versatile_defender_raw"]
+    sf = _size_factor(p.get("ht_in"))
 
     raw = {
         "Heliocentric Engine": creation["heliocentric_engine"],
         "Secondary Playmaker": creation["secondary_playmaker"],
         "Off-Ball Scorer": creation["off_ball_scorer"] * scoring["three_pt_pressure"] / 100 * 2,
-        "Scoring Big": creation["off_ball_scorer"] * scoring["interior_pressure"] / 100 * 2
-            + creation["non_creator_finisher"] * scoring["interior_pressure"] / 100 * 1.5,
-        "Playmaking Big": creation["secondary_playmaker"] * rim_raw * 1.5
-            + creation["heliocentric_engine"] * rim_raw * 1.5,
-        "Rim Protector": rim_raw * (low_creation / 100) * 2,
+        "Scoring Big": sf * (creation["off_ball_scorer"] * scoring["interior_pressure"] / 100 * 2
+            + creation["non_creator_finisher"] * scoring["interior_pressure"] / 100 * 1.5),
+        "Playmaking Big": sf * (creation["secondary_playmaker"] * rim_raw * 1.5
+            + creation["heliocentric_engine"] * rim_raw * 1.5),
+        "Rim Protector": sf * (rim_raw * (low_creation / 100) * 2),
         "3&D Wing": versatile_raw * scoring["three_pt_pressure"] / 100 * (low_creation / 100) * 3,
         "Defensive Wing": versatile_raw * (low_creation / 100) * 2 * (1 if usage == "low" else 0.5),
-        "Hybrid Offensive Big": hybrid * 4,
+        "Hybrid Offensive Big": sf * (hybrid * 4),
     }
     total = sum(raw.values()) or 1.0
     return {k: round(100 * v / total, 1) for k, v in raw.items()}
