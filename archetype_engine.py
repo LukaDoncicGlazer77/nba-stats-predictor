@@ -189,7 +189,7 @@ def _softmax(scores: dict) -> dict:
 def creation_burden(p):
     usg, ast = p["usg_pct_pr"], p["ast_pct_pr"]
     return _softmax({
-        "heliocentric_engine": min(usg, ast) if usg > 0.85 and ast > 0.75 else 0.3 * usg + 0.3 * ast,
+        "heliocentric_engine": usg * ast,
         "secondary_playmaker": ast if 0.55 <= usg < 0.85 else 0.4 * ast,
         "off_ball_scorer": (1 - ast) * usg if usg >= 0.4 else 0.3,
         "non_creator_finisher": (1 - usg) * (1 - ast),
