@@ -2170,29 +2170,61 @@ function renderDraftProjectionBar() {
   const bar = $("#draftProjectionBar");
   if (!bar) return;
   const color = cmpColor(0);
+
   if (!draftProjectionProspect) {
-    bar.innerHTML = `<div class="cmp-search-slot" id="draftProjSlot0">
-      <div class="cmp-slot-inner">
-        <span class="cmp-slot-icon">+</span>
-        <span class="cmp-slot-label">Add Draft Prospect</span>
-        <input id="draftProjSearch0" type="search" placeholder="Search by name..." class="cmp-search-input" autocomplete="off" spellcheck="false"/>
-      </div>
-      <div class="compare-dropdown" id="draftProjDrop0"></div>
-    </div>`;
+    const top10 = allProspects.slice(0, 10);
+    const chips = top10.map(p => {
+      const wrapped = wrapProspect(p);
+      return `<button class="dp-chip" data-name="${escapeHtml(wrapped.name)}">
+        <span class="dp-chip-rank">#${p.rank}</span>
+        <span class="dp-chip-name">${escapeHtml(wrapped.name)}</span>
+        <span class="dp-chip-meta">${escapeHtml(p.pos)} · ${escapeHtml(p.school)}</span>
+      </button>`;
+    }).join("");
+
+    bar.innerHTML = `
+      <div class="dp-search-hero">
+        <div class="dp-search-label">2026 NBA Draft — ${allProspects.length} prospects ranked</div>
+        <div class="dp-search-wrap" id="draftProjSlot0">
+          <svg class="dp-search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M13 13L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <input id="draftProjSearch0" type="search" placeholder="Search any prospect by name…"
+            class="dp-search-input" autocomplete="off" spellcheck="false"/>
+          <div class="compare-dropdown" id="draftProjDrop0"></div>
+        </div>
+        <div class="dp-chips-label">Top lottery picks — click to project</div>
+        <div class="dp-chips-row">${chips}</div>
+      </div>`;
+
     setupDraftProjectionSearch();
+
+    bar.querySelectorAll(".dp-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const pool = allProspects.map(wrapProspect);
+        const found = pool.find(p => p.name === btn.dataset.name);
+        if (found) {
+          draftProjectionProspect = found;
+          renderDraftProjectionBar();
+          renderDraftProjectionPage();
+        }
+      });
+    });
     return;
   }
+
   const p = draftProjectionProspect;
-  bar.innerHTML = `<div class="cmp-search-slot cmp-slot-filled" id="draftProjSlot0">
-    <div class="cmp-slot-color-bar" style="background:${color}"></div>
+  bar.innerHTML = `<div class="dp-selected-bar">
+    <div class="cmp-slot-color-bar" style="background:${color};border-radius:6px 6px 0 0"></div>
     <div class="cmp-selected-inner">
-      ${cmpAvatar(p, 44)}
+      ${cmpAvatar(p, 48)}
       <div class="cmp-selected-info">
-        <div class="cmp-selected-name">${p.name}</div>
+        <div class="cmp-selected-name" style="font-size:1rem">${escapeHtml(p.name)}</div>
         <div class="cmp-selected-meta">${p.position||"—"} · ${p.team||"—"} · ${p.status||"Prospect"}</div>
         <div class="cmp-selected-meta">${p.height||"—"} · ${p.weight||"—"} · Mock Rank #${p.rank||"—"}</div>
       </div>
-      <button class="cmp-remove-btn draft-proj-remove-btn">✕</button>
+      <button class="cmp-remove-btn draft-proj-remove-btn" title="Clear">✕</button>
     </div>
   </div>`;
 }
@@ -2206,7 +2238,14 @@ function setupDraftProjectionSearch() {
     const pool = allProspects.map(wrapProspect);
     if (!q || !pool.length) { dropdown.classList.remove("open"); return; }
     const matches = pool.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
-    dropdown.innerHTML = matches.map(p => `<div class="compare-option" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} <span style="color:var(--muted);font-size:0.75em">· ${escapeHtml(p.team||"Prospect")}</span></div>`).join("");
+    dropdown.innerHTML = matches.map(p => {
+      const raw = allProspects.find(r => wrapProspect(r).name === p.name) || {};
+      return `<div class="compare-option" data-name="${escapeHtml(p.name)}">
+        <span class="dp-drop-rank">#${raw.rank||"—"}</span>
+        ${escapeHtml(p.name)}
+        <span style="color:var(--muted);font-size:0.75em">· ${escapeHtml(raw.pos||"—")} · ${escapeHtml(raw.school||"Prospect")}</span>
+      </div>`;
+    }).join("");
     dropdown.classList.toggle("open", matches.length > 0);
     dropdown.querySelectorAll(".compare-option").forEach(opt => {
       opt.addEventListener("click", () => {
