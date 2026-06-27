@@ -3154,6 +3154,9 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .cmp-mode-btn.active { background: var(--sidebar-active); color: #fff; }
 .cmp-mode-btn:hover:not(.active) { color: var(--ink); }
 
+/* Draft projection bar overrides the 4-col grid to full width */
+.dp-player-bar { grid-template-columns: 1fr !important; }
+
 /* ── Draft Projection search hero ───────────────────────────────────────── */
 .dp-search-hero {
   display: flex;
