@@ -116,6 +116,7 @@ function showLoginWall() {
 
 function navigate(section) {
   if (MEMBERS_ONLY.has(section) && !isLoggedIn()) {
+    localStorage.setItem('sf_redirect', section);
     showLoginWall();
     return;
   }
@@ -128,6 +129,8 @@ function navigate(section) {
   if (section !== "player-profile") currentSection = section;
   const btn = document.querySelector(`.nav-item[data-section="${navSection}"]`);
   if (btn) btn.classList.add("active");
+  // keep URL in sync so links are shareable
+  history.replaceState(null, '', '#' + section);
 
   if (section === "dashboard" && !dashboardLoaded) loadDashboard();
   if (section === "players") {
@@ -2796,7 +2799,8 @@ document.addEventListener("click", (e) => {
 })();
 
 loadDashboard();
-navigate("dashboard");
+const _initialSection = (location.hash.slice(1) || "dashboard");
+navigate(_initialSection);
 
 // Heartbeat: ping every 60s to track active time for logged-in users
 (function startHeartbeat() {
