@@ -184,6 +184,38 @@ def _dashboard_cache_set(season, data):
     _DASHBOARD_CACHE[season] = (data, time.time())
 
 
+# ── Heartbeat buffer: accumulate in memory, flush to DB every 5 min ─────────
+# Each heartbeat request previously opened a new psycopg2 connection, which
+# exhausted Supabase's 15-connection pool under any real user load.
+_heartbeat_buffer = {}  # email -> {"last_seen": datetime, "delta_seconds": int}
+_heartbeat_lock = threading.Lock()
+_HEARTBEAT_FLUSH_INTERVAL = 300  # seconds
+
+
+def _flush_heartbeats():
+    while True:
+        time.sleep(_HEARTBEAT_FLUSH_INTERVAL)
+        with _heartbeat_lock:
+            if not _heartbeat_buffer:
+                continue
+            snapshot = dict(_heartbeat_buffer)
+            _heartbeat_buffer.clear()
+        try:
+            conn = connect()
+            try:
+                cur = conn.cursor()
+                for email, data in snapshot.items():
+                    cur.execute(
+                        "UPDATE archive_users SET last_seen_at = %s, total_active_seconds = total_active_seconds + %s WHERE email = %s",
+                        (data["last_seen"], data["delta_seconds"], email),
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as exc:
+            print(f"Heartbeat flush failed (non-fatal): {exc}")
+
+
 def _cast_season_row(row):
     fg = safe_float_py(row.get("fg"))
     usg = safe_float_py(row.get("usg_pct"))
@@ -313,26 +345,17 @@ class Handler(SimpleHTTPRequestHandler):
             if not email or "@" not in email:
                 return self.send_json({"ok": False}, status=400)
             now = datetime.datetime.now(datetime.timezone.utc)
-            conn = connect()
-            try:
-                row = q1(conn, "SELECT last_seen_at, total_active_seconds FROM archive_users WHERE email = %s", (email,))
-                if not row:
-                    return self.send_json({"ok": False}, status=404)
-                last_seen, total = row
-                # If last heartbeat was within 90s, count the gap as active time
-                if last_seen is not None:
-                    last = last_seen.replace(tzinfo=datetime.timezone.utc) if last_seen.tzinfo is None else last_seen
-                    gap = (now - last).total_seconds()
-                    if gap <= 90:
-                        total += int(gap)
-                cur = conn.cursor()
-                cur.execute(
-                    "UPDATE archive_users SET last_seen_at = %s, total_active_seconds = %s WHERE email = %s",
-                    (now, total, email),
-                )
-                conn.commit()
-            finally:
-                conn.close()
+            with _heartbeat_lock:
+                prev = _heartbeat_buffer.get(email)
+                if prev:
+                    gap = (now - prev["last_seen"]).total_seconds()
+                    delta = int(gap) if gap <= 90 else 0
+                    _heartbeat_buffer[email] = {
+                        "last_seen": now,
+                        "delta_seconds": prev["delta_seconds"] + delta,
+                    }
+                else:
+                    _heartbeat_buffer[email] = {"last_seen": now, "delta_seconds": 0}
             return self.send_json({"ok": True})
 
         if parsed.path == "/api/admin/delete-users":
@@ -1201,6 +1224,7 @@ def _prewarm_pool():
 def main():
     ensure_users_table()
     threading.Thread(target=_prewarm_pool, daemon=True).start()
+    threading.Thread(target=_flush_heartbeats, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")
