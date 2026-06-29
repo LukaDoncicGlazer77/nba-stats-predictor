@@ -117,7 +117,9 @@ function showLoginWall() {
 function navigate(section) {
   if (MEMBERS_ONLY.has(section) && !isLoggedIn()) {
     localStorage.setItem('sf_redirect', section);
-    showLoginWall();
+    if (document.getElementById('appShell').style.display !== 'none') {
+      showLoginWall();
+    }
     return;
   }
   document.querySelectorAll(".page").forEach((p) => p.classList.add("hidden"));
