@@ -15,7 +15,10 @@ and ft_rate pre-computed. archive_ncaa_player_stats is empty and not used.
 """
 from __future__ import annotations
 
+import csv
 import logging
+import os
+import re
 from collections import defaultdict
 from typing import Optional
 
@@ -24,6 +27,75 @@ import archetype_engine as ae
 log = logging.getLogger("draft_projection.archetype_adapter")
 
 PERCENTILE_COLS = ["usg_pct", "ast_pct", "blk_pct", "dreb_pct", "stl_pct", "fg3a_rate", "ft_rate"]
+# Shot-zone cols are ranked separately — they stay None when absent so scoring_profile()
+# can fall back to fg3a_rate_pr / ft_rate_pr for players without Barttorvik coverage.
+SHOT_ZONE_COLS = ["rim_att_rate", "three_att_rate"]
+
+
+def _normalize_btv_name(name: str) -> str:
+    name = str(name or "").strip()
+    if "," in name:
+        last, first = name.split(",", 1)
+        name = f"{first.strip()} {last.strip()}"
+    return re.sub(r"[^a-z ]", "", name.lower()).strip()
+
+
+def _to_float(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+# (normalized_name, year) -> {rim_att_rate, three_att_rate}
+_SHOT_ZONES: dict[tuple, dict] = {}
+
+def _load_shot_zones() -> None:
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shot_zones.csv")
+    if not os.path.exists(path):
+        log.warning("shot_zones.csv not found at %s — shot-zone scoring signals disabled", path)
+        return
+    loaded = 0
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            rim_a = _to_float(row.get("rim_a"))
+            mid_a = _to_float(row.get("mid_a"))
+            three_a = _to_float(row.get("three_a"))
+            if rim_a is None or mid_a is None or three_a is None:
+                continue
+            total = rim_a + mid_a + three_a
+            if total <= 0:
+                continue
+            try:
+                year = int(row["year"])
+            except (KeyError, ValueError):
+                continue
+            key = (_normalize_btv_name(row.get("player", "")), year)
+            _SHOT_ZONES[key] = {
+                "rim_att_rate": rim_a / total,
+                "three_att_rate": three_a / total,
+            }
+            loaded += 1
+    log.info("Loaded %d shot-zone records from shot_zones.csv", loaded)
+
+_load_shot_zones()
+
+
+def _add_shot_zone_percentiles(rows: list[dict]) -> None:
+    """Ranks rim_att_rate / three_att_rate only among rows that HAVE the data.
+    Players without coverage keep None so scoring_profile() can fall back."""
+    groups = defaultdict(list)
+    for r in rows:
+        groups[r.get("academic_year")].append(r)
+    for group_rows in groups.values():
+        for col in SHOT_ZONE_COLS:
+            present = [r for r in group_rows if r.get(col) is not None]
+            n = len(present)
+            if n == 0:
+                continue
+            ordered = sorted(present, key=lambda r: r[col])
+            for i, r in enumerate(ordered):
+                r[f"{col}_pr"] = (i + 1) / n
 
 
 def _add_college_percentiles(rows: list[dict]) -> None:
@@ -54,6 +126,8 @@ def _row_to_archetype_input(r: dict) -> dict:
         "blk_pct_pr": r["blk_pct_pr"], "drb_pct_pr": r["dreb_pct_pr"],
         "stl_pct_pr": r["stl_pct_pr"], "fg3a_rate_pr": r["fg3a_rate_pr"],
         "ft_rate_pr": r["ft_rate_pr"],
+        "rim_att_rate_pr": r.get("rim_att_rate_pr"),
+        "three_att_rate_pr": r.get("three_att_rate_pr"),
         "dbpm": None,  # no NBA-style defensive BPM at the college level
         "ht_in": r.get("height_in"),  # feeds _size_factor() in named_archetype_mix
     }
@@ -85,7 +159,21 @@ def compute_archetype_mix(conn, q, *, player_name: str) -> Optional[dict]:
         return None
 
     rows = [dict(r) for r in pool_rows]
+
+    # Merge Barttorvik shot-zone rates into each row before percentile ranking.
+    # Key: (normalized player name, academic_year). Missing → None, falls back
+    # to ft_rate_pr / fg3a_rate_pr inside scoring_profile().
+    for r in rows:
+        sz = _SHOT_ZONES.get((r.get("name_key", ""), r.get("academic_year")))
+        if sz:
+            r["rim_att_rate"] = sz["rim_att_rate"]
+            r["three_att_rate"] = sz["three_att_rate"]
+        else:
+            r["rim_att_rate"] = None
+            r["three_att_rate"] = None
+
     _add_college_percentiles(rows)
+    _add_shot_zone_percentiles(rows)
 
     target_rows = [r for r in rows if r["name_key"] == key]
     if not target_rows:

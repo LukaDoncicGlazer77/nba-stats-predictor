@@ -209,6 +209,10 @@ def defensive_role(p):
 
 
 def scoring_profile(p):
+    rim_pr = p.get("rim_att_rate_pr")
+    three_pr = p.get("three_att_rate_pr")
+    if rim_pr is not None and three_pr is not None:
+        return _softmax({"three_pt_pressure": three_pr, "interior_pressure": rim_pr})
     return _softmax({"three_pt_pressure": p["fg3a_rate_pr"], "interior_pressure": p["ft_rate_pr"]})
 
 
