@@ -1009,7 +1009,7 @@
                 const redirect = localStorage.getItem('sf_redirect');
                 if (redirect) {
                   localStorage.removeItem('sf_redirect');
-                  if (typeof navigate === 'function') navigate(redirect);
+                  if (typeof navigate === 'function' && isLoggedIn()) navigate(redirect);
                 }
               }, 400);
             }, 300);
