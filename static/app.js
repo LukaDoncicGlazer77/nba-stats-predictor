@@ -1023,7 +1023,107 @@ async function renderPredictions(player, projections = []) {
   const ringR = 42, ringC = 2 * Math.PI * ringR;
   const ringOffset = ringC * (1 - Math.min(mlSalaryM, 62) / 62);
 
+  // ── Potential Score ──────────────────────────────────────────────────────
+  // Peak projected score: take best pts/reb/ast season from trajectory
+  const bestProjScore = projections.length > 0
+    ? Math.max(...projections.map(s => {
+        const p = Math.min(100, ((s.pts||0) / 35) * 100);
+        const r = Math.min(100, ((s.reb||0) / 15) * 100);
+        const a = Math.min(100, ((s.ast||0) / 12) * 100);
+        return p * 0.5 + r * 0.25 + a * 0.25;
+      }))
+    : effScore;
+  // Age ceiling: younger players have more room to grow
+  const ageCeiling = age <= 22 ? 1.22 : age <= 25 ? 1.12 : age <= 28 ? 1.04 : age <= 32 ? 0.97 : 0.88;
+  const potScore = Math.min(100, Math.round(Math.max(effScore, bestProjScore) * ageCeiling));
+
+  const [potTier, potColor, potDesc] =
+    potScore >= 85 ? ["Superstar",    "#f0c040", "Franchise cornerstone, perennial All-Star candidate"] :
+    potScore >= 70 ? ["All-Star",     "#5b8af0", "Projected ceiling as a consistent All-Star contributor"] :
+    potScore >= 55 ? ["Solid Starter","#3ecf8e", "Expected to hold a starting role at peak performance"] :
+    potScore >= 40 ? ["Rotation",     "#7a8fb0", "Viable rotation piece with a defined role"] :
+                     ["Developmental","rgba(255,255,255,0.35)", "Still developing — ceiling highly uncertain"];
+
+  // Needle math: semi-circle center (110,115), r=90
+  // Score 0 → left end, Score 100 → right end
+  const potAngle = Math.PI * (1 - potScore / 100); // radians from positive x-axis
+  const potNx = 110 + 82 * Math.cos(potAngle);
+  const potNy = 115 - 82 * Math.sin(potAngle);
+  // Arrowhead: two points perpendicular to needle direction, near the tip
+  const perpAngle = potAngle + Math.PI / 2;
+  const tipX = 110 + 90 * Math.cos(potAngle);
+  const tipY = 115 - 90 * Math.sin(potAngle);
+  const arr1x = (potNx + 6 * Math.cos(perpAngle)).toFixed(1);
+  const arr1y = (potNy - 6 * Math.sin(perpAngle)).toFixed(1);
+  const arr2x = (potNx - 6 * Math.cos(perpAngle)).toFixed(1);
+  const arr2y = (potNy + 6 * Math.sin(perpAngle)).toFixed(1);
+
+  // Age factor label for factors strip
+  const ageLabel = age <= 22 ? `Age ${age} · High upside` :
+                   age <= 25 ? `Age ${age} · Still developing` :
+                   age <= 28 ? `Age ${age} · Entering prime` :
+                   age <= 32 ? `Age ${age} · Peak or declining` :
+                               `Age ${age} · Likely declining`;
+
   el.innerHTML = `
+    <!-- Potential Score panel -->
+    <div class="pred-panel pred-potential-panel">
+      <div class="pred-pot-gauge-wrap">
+        <svg class="pred-pot-svg" viewBox="0 0 220 130" fill="none">
+          <defs>
+            <linearGradient id="potGrad" x1="20" y1="115" x2="200" y2="115" gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stop-color="#ef4444"/>
+              <stop offset="35%"  stop-color="#f97316"/>
+              <stop offset="65%"  stop-color="#facc15"/>
+              <stop offset="100%" stop-color="#22c55e"/>
+            </linearGradient>
+            <filter id="needleGlow">
+              <feGaussianBlur stdDeviation="2.5" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <!-- Background track -->
+          <path d="M 20,115 A 90,90 0 0,1 200,115"
+            stroke="rgba(255,255,255,0.08)" stroke-width="14" stroke-linecap="round"/>
+          <!-- Colored gradient track -->
+          <path d="M 20,115 A 90,90 0 0,1 200,115"
+            stroke="url(#potGrad)" stroke-width="14" stroke-linecap="round" opacity="0.85"/>
+          <!-- Tick marks at 0/25/50/75/100 -->
+          ${[0,25,50,75,100].map(v => {
+            const a = Math.PI * (1 - v/100);
+            const ix = 110 + 97 * Math.cos(a), iy = 115 - 97 * Math.sin(a);
+            const ox = 110 + 107 * Math.cos(a), oy = 115 - 107 * Math.sin(a);
+            return `<line x1="${ix.toFixed(1)}" y1="${iy.toFixed(1)}" x2="${ox.toFixed(1)}" y2="${oy.toFixed(1)}"
+              stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>`;
+          }).join("")}
+          <!-- Needle base circle -->
+          <circle cx="110" cy="115" r="6" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <!-- Needle line -->
+          <line x1="110" y1="115" x2="${potNx.toFixed(1)}" y2="${potNy.toFixed(1)}"
+            stroke="${potColor}" stroke-width="2.5" stroke-linecap="round" filter="url(#needleGlow)"/>
+          <!-- Arrowhead -->
+          <polygon points="${tipX.toFixed(1)},${tipY.toFixed(1)} ${arr1x},${arr1y} ${arr2x},${arr2y}"
+            fill="${potColor}" filter="url(#needleGlow)"/>
+          <!-- Score text -->
+          <text x="110" y="98" text-anchor="middle"
+            font-size="26" font-weight="800" fill="${potColor}" font-family="inherit">${potScore}</text>
+          <text x="110" y="110" text-anchor="middle"
+            font-size="9" fill="rgba(255,255,255,0.4)" font-family="inherit">/ 100</text>
+        </svg>
+        <div class="pred-pot-label">Potential Score</div>
+      </div>
+      <div class="pred-pot-info">
+        <div class="pred-pot-title">Projected Peak Rating</div>
+        <div class="pred-pot-tier" style="color:${potColor}">${potTier}</div>
+        <div class="pred-pot-desc">${potDesc}</div>
+        <div class="pred-pot-factors">
+          <span class="pred-pot-factor">${ageLabel}</span>
+          <span class="pred-pot-factor">Eff Score ${effScore}/100</span>
+          ${projections.length > 0 ? `<span class="pred-pot-factor">${projections.length} season${projections.length > 1 ? "s" : ""} projected</span>` : ""}
+        </div>
+      </div>
+    </div>
+
     <!-- Efficiency gauge panel -->
     <div class="pred-panel">
       <div class="pred-panel-label">Efficiency Score</div>
