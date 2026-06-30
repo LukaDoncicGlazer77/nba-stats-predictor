@@ -126,7 +126,7 @@ def _init_pool():
     with _db_pool_lock:
         if _db_pool is None:
             _db_pool = psycopg2.pool.ThreadedConnectionPool(
-                minconn=1, maxconn=5,
+                minconn=1, maxconn=8,
                 dsn=DATABASE_URL,
                 connect_timeout=10,
             )
@@ -137,11 +137,22 @@ def _init_pool():
 def get_conn():
     pool = _init_pool()
     conn = pool.getconn()
+    # Ping before yielding: psycopg2 won't know the server closed the socket
+    # (e.g. after a Supabase restart) until we actually send something. A cheap
+    # SELECT 1 here catches stale connections and replaces them transparently.
+    try:
+        conn.cursor().execute("SELECT 1")
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        try:
+            pool.putconn(conn, close=True)
+        except Exception:
+            pass
+        conn = pool.getconn()  # fresh connection; raises PoolError if exhausted
     discard = False
     try:
         yield conn
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
-        # Connection-level failure — discard instead of returning to pool.
+        # Connection-level failure during use — discard instead of returning to pool.
         discard = True
         raise
     finally:
