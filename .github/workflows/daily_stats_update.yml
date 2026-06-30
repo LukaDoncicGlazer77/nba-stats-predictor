@@ -1,0 +1,42 @@
+name: Daily NBA Stats Update
+
+on:
+  schedule:
+    # 6 AM ET daily (10 AM UTC; shift by 1h in EST winter but close enough)
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+    inputs:
+      season:
+        description: "Season end-year to update (leave blank for auto)"
+        required: false
+      dry_run:
+        description: "Dry run (scrape only, no DB writes)"
+        required: false
+        default: "false"
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install scraper dependencies
+        run: pip install requests beautifulsoup4 psycopg2-binary
+
+      - name: Run stats update
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.season }}" ]; then
+            ARGS="$ARGS --season ${{ github.event.inputs.season }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          python update_current_season.py $ARGS
