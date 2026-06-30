@@ -673,6 +673,12 @@ function openPlayerProfile(player) {
 function renderPlayerProfile() {
   if (!playerState.player) return;
   const player = playerState.player;
+  if (typeof gtag === 'function') {
+    gtag('event', 'player_profile_view', {
+      player_name: player.name,
+      player_id: player.id,
+    });
+  }
   const projections = projectPlayer(player);
   renderProfile(player);
   renderProjectionsPane(player, projections);
