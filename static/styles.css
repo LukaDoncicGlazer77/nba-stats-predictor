@@ -2890,11 +2890,13 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 
 .btn-google-signin {
-  display: flex;
-  width: 100%;
+  display: flex !important;
+  width: 100% !important;
   height: 44px;
-  border: none;
-  background: transparent;
+  border: none !important;
+  background: transparent !important;
+  -webkit-appearance: none;
+  appearance: none;
   color: var(--ink);
   font-size: 0.88rem;
   font-weight: 600;
@@ -2903,11 +2905,11 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   justify-content: center;
   gap: 10px;
   transition: background 0.15s;
-  box-sizing: border-box;
+  box-sizing: border-box !important;
   padding: 0;
 }
 .btn-google-signin:hover {
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.04) !important;
 }
 
 .login-footer {
