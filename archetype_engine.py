@@ -245,9 +245,9 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
             + creation["non_creator_finisher"] * scoring["interior_pressure"] / 100 * 1.5),
         "Playmaking Big": sf * (creation["secondary_playmaker"] * rim_raw * 1.5
             + creation["heliocentric_engine"] * rim_raw * 1.5),
-        "Rim Protector": sf * (rim_raw * (low_creation / 100) * 2),
-        "3&D Wing": versatile_raw * scoring["three_pt_pressure"] / 100 * (low_creation / 100) * 3,
-        "Defensive Wing": versatile_raw * (low_creation / 100) * 2 * (1 if usage == "low" else 0.5),
+        "Rim Protector": sf * (rim_raw * low_creation * 2),
+        "3&D Wing": versatile_raw * scoring["three_pt_pressure"] * (low_creation / 100) * 3,
+        "Defensive Wing": versatile_raw * low_creation * 2 * (1 if usage == "low" else 0.5),
         "Hybrid Offensive Big": sf * (hybrid * 4),
     }
     total = sum(raw.values()) or 1.0
