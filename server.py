@@ -109,6 +109,7 @@ SALARY_CAPS_M = {
     2025: 155.00, 2026: 170.00,
 }
 DATABASE_URL = os.environ["DATABASE_URL"]
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 
 # Connection pool: reuses TCP connections and hard-caps concurrent DB usage at
 # maxconn=5, well under Supabase free tier's 15-connection limit. Previously
@@ -384,8 +385,41 @@ class Handler(SimpleHTTPRequestHandler):
             password = body.get("password") or ""
             with get_conn() as conn:
                 row = q1(conn, "SELECT password_hash, password_salt FROM archive_users WHERE email = ?", (email,))
+            if row and row[0] is None:
+                return self.send_json({"error": "This account uses Google Sign-In. Use the 'Sign in with Google' button."}, status=400)
             if not row or not verify_password(password, row[1], row[0]):
                 return self.send_json({"error": "Incorrect email or password"}, status=401)
+            return self.send_json({"ok": True, "email": email})
+
+        if parsed.path == "/api/google-auth":
+            credential = (body.get("credential") or "").strip()
+            if not credential:
+                return self.send_json({"error": "credential required"}, status=400)
+            try:
+                req = urllib.request.Request(
+                    f"https://oauth2.googleapis.com/tokeninfo?id_token={credential}",
+                    headers={"Accept": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    token_data = json.loads(resp.read())
+            except Exception:
+                return self.send_json({"error": "Invalid Google credential"}, status=401)
+            if token_data.get("email_verified") != "true":
+                return self.send_json({"error": "Google account email not verified"}, status=401)
+            if GOOGLE_CLIENT_ID and token_data.get("aud") != GOOGLE_CLIENT_ID:
+                return self.send_json({"error": "Token audience mismatch"}, status=401)
+            email = (token_data.get("email") or "").lower()
+            if not email:
+                return self.send_json({"error": "No email in Google token"}, status=401)
+            with get_conn() as conn:
+                existing = q1(conn, "SELECT email FROM archive_users WHERE email = ?", (email,))
+                if not existing:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "INSERT INTO archive_users (email, auth_provider) VALUES (%s, %s)",
+                        (email, "google"),
+                    )
+                    conn.commit()
             return self.send_json({"ok": True, "email": email})
 
         if parsed.path == "/api/heartbeat":
@@ -1203,8 +1237,12 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
                 cur.execute("""
                     ALTER TABLE archive_users
                         ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ,
-                        ADD COLUMN IF NOT EXISTS total_active_seconds INTEGER NOT NULL DEFAULT 0
+                        ADD COLUMN IF NOT EXISTS total_active_seconds INTEGER NOT NULL DEFAULT 0,
+                        ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'email'
                 """)
+                # OAuth users have no password — make these columns nullable
+                cur.execute("ALTER TABLE archive_users ALTER COLUMN password_hash DROP NOT NULL")
+                cur.execute("ALTER TABLE archive_users ALTER COLUMN password_salt DROP NOT NULL")
                 conn.commit()
             return
         except Exception as exc:

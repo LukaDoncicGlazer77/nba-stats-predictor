@@ -14,6 +14,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" />
     <link rel="stylesheet" href="styles.css?v=20260627-dpfull" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
     <script>
@@ -161,6 +162,25 @@
           <button class="auth-tab active" id="tabSignIn">Sign In</button>
           <button class="auth-tab" id="tabCreateAccount">Create Account</button>
         </div>
+
+        <!-- Google Sign-In -->
+        <div id="googleAuthError" class="login-error hidden"></div>
+        <div id="g_id_onload"
+             data-client_id="YOUR_GOOGLE_CLIENT_ID"
+             data-callback="handleGoogleSignIn"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+             data-type="standard"
+             data-size="large"
+             data-theme="filled_black"
+             data-text="signin_with"
+             data-shape="rectangular"
+             data-logo_alignment="left"
+             data-width="340">
+        </div>
+
+        <div class="login-divider"><span>or use email</span></div>
 
         <!-- Sign In panel -->
         <div id="panelSignIn">
@@ -938,7 +958,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260630-ga-player"></script>
+    <script src="app.js?v=20260630-oauth"></script>
     <script>
       // ── Onboarding (first-time visitors only) ──────────────────────────────
       (function () {
@@ -974,7 +994,7 @@
       // ── Auth gate ──────────────────────────────────────────────────────────
       const SESSION_KEY = 'sf_session';
 
-      function showApp() {
+      function showApp(isNewLogin) {
         document.getElementById('authScreen').style.display = 'none';
 
         const loader   = document.getElementById('loadingScreen');
@@ -1007,9 +1027,9 @@
                 loader.style.transition = '';
                 document.getElementById('appShell').style.display = '';
                 const redirect = localStorage.getItem('sf_redirect');
-                if (redirect) {
-                  localStorage.removeItem('sf_redirect');
-                  if (typeof navigate === 'function' && isLoggedIn()) navigate(redirect);
+                localStorage.removeItem('sf_redirect');
+                if (redirect && isNewLogin && typeof isLoggedIn === 'function' && isLoggedIn()) {
+                  if (typeof navigate === 'function') navigate(redirect);
                 }
               }, 400);
             }, 300);
@@ -1023,8 +1043,10 @@
       }
       function clearError(id) { document.getElementById(id).classList.add('hidden'); }
 
-      // Always require sign in on load
-      localStorage.removeItem(SESSION_KEY);
+      // Auto-login returning users; new visitors see the auth screen (default state)
+      if (localStorage.getItem(SESSION_KEY)) {
+        showApp(false);
+      }
 
       // Tab switching
       function switchTab(active) {
@@ -1039,7 +1061,7 @@
       // Guest
       document.getElementById('loginGuestBtn').addEventListener('click', () => {
         localStorage.setItem(SESSION_KEY, 'guest');
-        showApp();
+        showApp(true);
       });
 
       // Sign in
@@ -1059,7 +1081,7 @@
           const data = await res.json();
           if (!res.ok) { showError('loginError', data.error || 'Incorrect email or password.'); return; }
           localStorage.setItem(SESSION_KEY, data.email);
-          showApp();
+          showApp(true);
         } catch {
           showError('loginError', 'Could not reach the server. Try again.');
         } finally {
@@ -1085,13 +1107,31 @@
           const data = await res.json();
           if (!res.ok) { showError('signupError', data.error || 'Could not create account.'); return; }
           localStorage.setItem(SESSION_KEY, data.email);
-          showApp();
+          showApp(true);
         } catch {
           showError('signupError', 'Could not reach the server. Try again.');
         } finally {
           btn.disabled = false;
         }
       });
+
+      // Google Sign-In callback (called by GIS library)
+      window.handleGoogleSignIn = async function(response) {
+        clearError('googleAuthError');
+        try {
+          const res = await fetch('/api/google-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credential: response.credential }),
+          });
+          const data = await res.json();
+          if (!res.ok) { showError('googleAuthError', data.error || 'Google sign-in failed.'); return; }
+          localStorage.setItem(SESSION_KEY, data.email);
+          showApp(true);
+        } catch {
+          showError('googleAuthError', 'Could not reach the server. Try again.');
+        }
+      };
     </script>
   </body>
 </html>
