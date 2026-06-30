@@ -2889,6 +2889,27 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   border-color: rgba(255,255,255,0.18);
 }
 
+.btn-google-signin {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-google-signin:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.18);
+}
+
 .login-footer {
   margin-top: 18px;
   text-align: center;
