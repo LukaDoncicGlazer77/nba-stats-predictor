@@ -184,3 +184,79 @@ Tag ID `G-WJMZDK5CEK` added to `<head>` in `index.html`. Data visible at analyti
 
 Project showed "unhealthy" status in Supabase dashboard; pooler returned `FATAL: (EAUTHQUERY) authentication query failed`. No incident on status.supabase.com. Resolved on its own (~few hours). No action taken on our end — data was never at risk. If this recurs: check status.supabase.com, then check the project card in the Supabase dashboard for "paused" or "unhealthy" badge before touching any credentials or connection strings.
 
+---
+
+## Session — 2026-06-29: Shot-zone integration, auth bug fix, draft weakness expansion
+
+### 1. R + cbbdata setup
+
+R 4.6.1 installed via CRAN `.pkg` installer (not Homebrew — gcc 16.1.0 fails to compile from source on macOS 12). `devtools` and `pak` installed via R, then `pak::pak("andreweatherman/cbbdata")`. Account registered at cbbdata: username `ameenfern`, email `ameenfern77@gmail.com`. API key is persisted by the R package; re-run `cbd_login(username='ameenfern', password='...')` in a terminal if a new R session needs it.
+
+`export_shot_zones.R` (in repo root of `statfuel-site/`) is the export script. It fetches `cbd_torvik_player_season()` for 2008–2026, selects rim/mid/3PT attempt and make columns, and writes `shot_zones.csv`. Re-run it if Barttorvik updates their historical data or if coverage years need to extend.
+
+### 2. Shot-zone data integration (`ba81e76`)
+
+**Data**: `shot_zones.csv` (85,766 rows, 2008–2025, bundled in repo). Columns: `player, team, year, rim_m, rim_a, rim_pct, mid_m, mid_a, mid_pct, three_m, three_a, three_pct, ftm, fta, ft_pct`. Year = end-year (e.g. 2024 = 2023-24 season). ~73k rows have valid rim/mid/3PT splits after filtering zero-FGA rows.
+
+**What it fixes**: `scoring_profile()` in the NBA archetype engine previously used `f_tr` (FTA/FGA) as an interior-pressure proxy. For college prospects in `archetype_adapter.py`, this was particularly inaccurate. Real shot-zone attempt rates are now used instead.
+
+**Implementation** (`draft_projection/archetype_adapter.py`):
+- `_load_shot_zones()` runs at module startup, builds `_SHOT_ZONES: dict[(normalized_name, year), {rim_att_rate, three_att_rate}]`
+- `rim_att_rate = rim_a / (rim_a + mid_a + three_a)`, same for `three_att_rate`
+- In `compute_archetype_mix()`, shot-zone rates are merged into each pool row before percentile ranking
+- `_add_shot_zone_percentiles()` ranks them separately from `PERCENTILE_COLS` — missing players stay `None` rather than defaulting to 0.5, so `scoring_profile()` can detect absence and fall back
+- `_row_to_archetype_input()` passes `rim_att_rate_pr` and `three_att_rate_pr` into the archetype input dict
+
+**`scoring_profile()` change** (`archetype_engine.py`):
+```python
+def scoring_profile(p):
+    rim_pr = p.get("rim_att_rate_pr")
+    three_pr = p.get("three_att_rate_pr")
+    if rim_pr is not None and three_pr is not None:
+        return _softmax({"three_pt_pressure": three_pr, "interior_pressure": rim_pr})
+    return _softmax({"three_pt_pressure": p["fg3a_rate_pr"], "interior_pressure": p["ft_rate_pr"]})
+```
+
+NBA players and pre-2008 college prospects fall back to the original formula. International prospects (e.g. Risacher) not in Barttorvik also fall back correctly — they're simply absent from `_SHOT_ZONES`.
+
+**Verified reference points**:
+- Zach Edey 2024: rim_att_rate=0.507, three_att_rate=0.004 → 71% interior / 29% three ✓
+- Max Abmas 2024: rim_att_rate=0.158, three_att_rate=0.557 → 71% three / 29% interior ✓
+- Dalton Knecht 2024: essentially 50/50 (balanced wing) ✓
+- Fallback path (None shot-zone data) correctly routes to fg3a_rate_pr/ft_rate_pr, no crash ✓
+
+### 3. TOV% as self-creation proxy — investigated, not implemented
+
+Investigated whether `tov_pct_pr` can distinguish self-creating ball-handlers from high-usage off-ball scorers in `creation_burden()`. Key finding: the signal is not clean enough.
+
+Three formulations tested against Chris Paul 2013, Carmelo Anthony 2013, Kyle Korver 2015, DeAndre Jordan 2013:
+- **F1 (tov_pr / usg_pr)**: broken — DeAndre Jordan (2.202) and Korver (3.179) rank as top "self-creators" because their moderate tov_pct is divided by very low usage
+- **F2 (tov_pr × ast_pr)**: closest to useful; Chris Paul scores 0.577, but Korver scores 0.394 (false positive — his moderate assist percentile inflates the signal despite being catch-and-shoot)
+- **F3 (tov_pr − (1−ast_pr))**: most directionally correct (Chris Paul +0.576, Carmelo −0.256) but still noisy for off-ball players with mid-range assist percentiles
+
+**Conclusion**: `ast_pct_pr` interacting with `usg_pct_pr` (already the core of `heliocentric_engine`) is the stronger signal. Adding `tov_pct` as a third multiplicative factor would correctly demote Carmelo-type gunners but risks wrongly demoting controlled ball-handlers. **Deferred until `unassisted_fg_pct` data is available** — that's the clean signal. Do not revisit `tov_pct` without that data.
+
+### 4. Post-login double-prompt bug fix (`3b9eea7`)
+
+**Bug**: Opening `statfuel.online/#draft-projection` as a logged-out user showed both the auth screen AND a "Members Only 🔒" modal floating on top of it. `navigate()` was calling `showLoginWall()` unconditionally even when `appShell` was hidden (i.e. the user hadn't passed the auth gate yet).
+
+**Fix** (`static/app.js`): one conditional — `showLoginWall()` only fires when `appShell` is already visible (guest user inside the app who hits a members-only nav item). When the auth screen is active (`appShell.style.display === 'none'`), `sf_redirect` is saved silently and the auth screen handles the rest. `showApp()` already consumed `sf_redirect` correctly after login — the redirect was never broken, just the display.
+
+### 5. Draft projection weakness expansion (`7df0534`)
+
+**Problem**: `explain.py`'s `weaknesses()` only fired on extreme red-flag thresholds (TS% < 50% on high volume, TOV% ≥ 22, FT% < 65%, age ≥ 22.5). Most prospects with ordinary profiles produced an empty "Weaknesses" section in the Scouting Notes UI.
+
+**Added position-aware signals** (`draft_projection/explain.py`):
+- **Guards/wings** (position_group < 2.5): 3PT% < 33% → spacing warning
+- **Guards** (position_group < 1.5) with usg_pct ≥ 22 AND ast_pct < 18: "creates volume but doesn't distribute"
+- **Forwards/Centers** (position_group > 1.5): DREB% < 14% → rebounding gap
+- **Centers** (position_group > 2.5): blocks/40 < 1.2 → rim protection gap
+- **All**: TOV% 17–22% → moderate turnover concern (below the red-flag threshold, still notable)
+- **All**: negative college BPM → net-negative all-around impact
+
+Verified: Cooper Flagg profile (elite numbers across the board) fires no weaknesses. Guards who can't shoot and soft centers fire the correct position-specific signals.
+
+### Current status (2026-06-29 end of session)
+
+Latest commits: `7df0534` (weakness expansion) → `3b9eea7` (auth bug) → `ba81e76` (shot-zone integration). All live on `statfuel.online`. No known instability at end of session.
+
