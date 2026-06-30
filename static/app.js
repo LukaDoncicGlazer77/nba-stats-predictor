@@ -155,6 +155,14 @@ function navigate(section) {
     renderDraftProjectionPage();
   }
   closeMobileNav();
+
+  if (typeof gtag === 'function') {
+    gtag('event', 'page_view', {
+      page_title: section,
+      page_location: location.href,
+      page_path: '/#' + section,
+    });
+  }
 }
 
 document.querySelectorAll(".nav-item").forEach((btn) => {
