@@ -684,7 +684,6 @@ function renderPlayerProfile() {
   renderProjectionsPane(player, projections);
   renderSeasonTable(player);
   renderPredictions(player, projections);
-  loadArchetypePanel(player);
   loadCollegeStatsPanel(player);
   syncControls();
   drawRadar(player);
@@ -697,6 +696,12 @@ function renderPlayerProfile() {
   document.querySelectorAll(".profile-pane").forEach((p) =>
     p.classList.toggle("hidden", p.id !== "pane-overview")
   );
+  // Reset archetype lazy-load flag so switching players reloads it
+  const archetypePanel = $("#archetypePanel");
+  if (archetypePanel) {
+    delete archetypePanel.dataset.loaded;
+    archetypePanel.innerHTML = `<p class="pcard-summary" style="color:var(--muted)">Select this tab to load archetype data&hellip;</p>`;
+  }
   // Update watchlist button
   const ids = getWatchlist();
   const btn = $("#profileWatchlistBtn");
@@ -1643,7 +1648,6 @@ document.querySelectorAll(".profile-tab").forEach((tab) => {
     tab.classList.add("active");
     const pane = $(`#pane-${tab.dataset.pane}`);
     if (pane) pane.classList.remove("hidden");
-    // Re-draw canvases when switching back to overview
     if (tab.dataset.pane === "overview" && playerState.player) {
       drawRadar(playerState.player);
       drawChart(playerState.player, projectPlayer(playerState.player), true);
@@ -1651,6 +1655,14 @@ document.querySelectorAll(".profile-tab").forEach((tab) => {
     }
     if (tab.dataset.pane === "projections" && playerState.player) {
       drawChart(playerState.player, projectPlayer(playerState.player), true, "projTrendChart", playerState.projMetric);
+    }
+    // Lazy-load archetype panel on first visit to the tab
+    if (tab.dataset.pane === "archetype" && playerState.player) {
+      const panel = $("#archetypePanel");
+      if (panel && !panel.dataset.loaded) {
+        loadArchetypePanel(playerState.player);
+        panel.dataset.loaded = "1";
+      }
     }
   });
 });

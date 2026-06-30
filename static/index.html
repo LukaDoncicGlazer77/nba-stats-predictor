@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260630-potgauge" />
+    <link rel="stylesheet" href="styles.css?v=20260630-archetypetab" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -470,6 +470,7 @@
               <button class="profile-tab active" data-pane="overview">Overview</button>
               <button class="profile-tab" data-pane="stats">Season Stats</button>
               <button class="profile-tab" data-pane="projections">Projections</button>
+              <button class="profile-tab" data-pane="archetype">Archetype &amp; Comps</button>
             </div>
             <button class="save-btn" id="profileWatchlistBtn">🔖 Save</button>
           </div>
@@ -553,17 +554,6 @@
               <div class="pred-grid" id="predGrid"></div>
             </div>
 
-            <!-- Archetype + Comp Engine -->
-            <div class="pcard" id="archetypeCard" style="margin-top:24px;">
-              <div class="pcard-head">
-                <h4>Archetype &amp; Comps</h4>
-                <span class="pcard-sub" id="archetypeSub"></span>
-              </div>
-              <div id="archetypePanel">
-                <p class="pcard-summary">Loading archetype model&hellip;</p>
-              </div>
-            </div>
-
             <!-- College Stats (hidden until a match is found) -->
             <div class="pcard hidden" id="collegeStatsCard" style="margin-top:24px;">
               <div class="pcard-head">
@@ -573,6 +563,19 @@
               <div class="table-wrap" id="collegeStatsPanel"></div>
             </div>
 
+          </div>
+
+          <!-- Archetype & Comps pane -->
+          <div class="profile-pane hidden" id="pane-archetype">
+            <div class="pcard" id="archetypeCard">
+              <div class="pcard-head">
+                <h4>Archetype &amp; Comps</h4>
+                <span class="pcard-sub" id="archetypeSub"></span>
+              </div>
+              <div id="archetypePanel">
+                <p class="pcard-summary" style="color:var(--muted)">Select this tab to load archetype data&hellip;</p>
+              </div>
+            </div>
           </div>
 
           <!-- Stats pane -->
@@ -958,7 +961,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260630-potgauge"></script>
+    <script src="app.js?v=20260630-archetypetab"></script>
     <script>
       // ── Onboarding (first-time visitors only) ──────────────────────────────
       (function () {
