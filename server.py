@@ -15,8 +15,11 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import contextlib
+
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 
 import archetype_engine
 
@@ -95,11 +98,8 @@ def _get_draft_projection_pool():
     with _draft_projection_pool_lock:
         if _draft_projection_pool is None:  # re-check: another thread may have finished while we waited for the lock
             import draft_projection.comp_engine as comp_engine
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 _draft_projection_pool = comp_engine.build_historical_pool(conn, q, current_season=2026)
-            finally:
-                conn.close()
             print(f"Draft projection historical pool built: {len(_draft_projection_pool)} players.")
     return _draft_projection_pool
 
@@ -110,9 +110,50 @@ SALARY_CAPS_M = {
 }
 DATABASE_URL = os.environ["DATABASE_URL"]
 
+# Connection pool: reuses TCP connections and hard-caps concurrent DB usage at
+# maxconn=5, well under Supabase free tier's 15-connection limit. Previously
+# every request opened a fresh psycopg2.connect(), so N concurrent requests =
+# N simultaneous connections; 16+ requests exhausted the pool with cryptic SSL
+# errors. PoolError (pool full) is caught at the do_GET/do_POST level → 503.
+_db_pool = None
+_db_pool_lock = threading.Lock()
 
-def connect():
-    return psycopg2.connect(DATABASE_URL, connect_timeout=10)
+
+def _init_pool():
+    global _db_pool
+    if _db_pool is not None:
+        return _db_pool
+    with _db_pool_lock:
+        if _db_pool is None:
+            _db_pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=1, maxconn=5,
+                dsn=DATABASE_URL,
+                connect_timeout=10,
+            )
+    return _db_pool
+
+
+@contextlib.contextmanager
+def get_conn():
+    pool = _init_pool()
+    conn = pool.getconn()
+    discard = False
+    try:
+        yield conn
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        # Connection-level failure — discard instead of returning to pool.
+        discard = True
+        raise
+    finally:
+        if not discard:
+            try:
+                conn.rollback()  # reset any open transaction before reuse
+            except Exception:
+                discard = True
+        try:
+            pool.putconn(conn, close=discard)
+        except Exception:
+            pass
 
 
 def q(conn, sql, params=()):
@@ -201,8 +242,7 @@ def _flush_heartbeats():
             snapshot = dict(_heartbeat_buffer)
             _heartbeat_buffer.clear()
         try:
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 cur = conn.cursor()
                 for email, data in snapshot.items():
                     cur.execute(
@@ -210,8 +250,6 @@ def _flush_heartbeats():
                         (data["last_seen"], data["delta_seconds"], email),
                     )
                 conn.commit()
-            finally:
-                conn.close()
         except Exception as exc:
             print(f"Heartbeat flush failed (non-fatal): {exc}")
 
@@ -287,6 +325,11 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         try:
             self._handle_post()
+        except psycopg2.pool.PoolError:
+            try:
+                self.send_json({"error": "Server busy, please retry"}, status=503)
+            except Exception:
+                pass
         except Exception as e:
             traceback.print_exc()
             try:
@@ -313,8 +356,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "Valid email required"}, status=400)
             if len(password) < 6:
                 return self.send_json({"error": "Password must be at least 6 characters"}, status=400)
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 if q1(conn, "SELECT 1 FROM archive_users WHERE email = ?", (email,)):
                     return self.send_json({"error": "An account with this email already exists"}, status=409)
                 pw_hash, salt = hash_password(password)
@@ -324,18 +366,13 @@ class Handler(SimpleHTTPRequestHandler):
                     (email, pw_hash, salt),
                 )
                 conn.commit()
-            finally:
-                conn.close()
             return self.send_json({"ok": True, "email": email})
 
         if parsed.path == "/api/login":
             email = (body.get("email") or "").strip().lower()
             password = body.get("password") or ""
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 row = q1(conn, "SELECT password_hash, password_salt FROM archive_users WHERE email = ?", (email,))
-            finally:
-                conn.close()
             if not row or not verify_password(password, row[1], row[0]):
                 return self.send_json({"error": "Incorrect email or password"}, status=401)
             return self.send_json({"ok": True, "email": email})
@@ -365,14 +402,11 @@ class Handler(SimpleHTTPRequestHandler):
             emails = [e.strip().lower() for e in body.get("emails", []) if e.strip()]
             if not emails:
                 return self.send_json({"error": "emails list required"}, status=400)
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 cur = conn.cursor()
                 cur.execute("DELETE FROM archive_users WHERE email = ANY(%s)", (emails,))
                 deleted = cur.rowcount
                 conn.commit()
-            finally:
-                conn.close()
             return self.send_json({"ok": True, "deleted": deleted})
 
         return self.send_json({"error": "Not found"}, status=404)
@@ -380,6 +414,11 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         try:
             self._handle()
+        except psycopg2.pool.PoolError:
+            try:
+                self.send_json({"error": "Server busy, please retry"}, status=503)
+            except Exception:
+                pass
         except Exception as e:
             traceback.print_exc()
             try:
@@ -398,22 +437,16 @@ class Handler(SimpleHTTPRequestHandler):
             admin_key = os.environ.get("ADMIN_KEY")
             if not admin_key or not hmac.compare_digest(params.get("key", [""])[0], admin_key):
                 return self.send_json({"error": "Not found"}, status=404)
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 row = q1(conn, "SELECT COUNT(*) FROM archive_users")
-            finally:
-                conn.close()
             return self.send_json({"user_count": row[0]})
 
         if parsed.path == "/api/admin/user-emails":
             admin_key = os.environ.get("ADMIN_KEY")
             if not admin_key or not hmac.compare_digest(params.get("key", [""])[0], admin_key):
                 return self.send_json({"error": "Not found"}, status=404)
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 rows = q(conn, "SELECT email, created_at, total_active_seconds FROM archive_users ORDER BY created_at")
-            finally:
-                conn.close()
             now = datetime.datetime.now(datetime.timezone.utc)
             def member_for(ts):
                 if ts is None:
@@ -454,8 +487,7 @@ class Handler(SimpleHTTPRequestHandler):
             cached = _seasons_cache_get()
             if cached is not None:
                 return self.send_json_rows(cached)
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 # Cast in Python rather than via the SQL safe_float()/safe_int()
                 # helpers -- those are PL/pgSQL functions with an EXCEPTION
                 # handler, and Postgres opens a subtransaction per call, which
@@ -493,8 +525,6 @@ class Handler(SimpleHTTPRequestHandler):
                     FROM archive_player_dashboard
                     ORDER BY player, season
                 """, ())
-            finally:
-                conn.close()
             result = [_cast_season_row(dict(r)) for r in rows]
             _seasons_cache_set(result)
             return self.send_json_rows(result)
@@ -521,11 +551,8 @@ class Handler(SimpleHTTPRequestHandler):
                 sql += " WHERE player ILIKE ?"
                 args.append(f"%{search}%")
             sql += " GROUP BY player_id, player ORDER BY seasons DESC, career_pts DESC, player LIMIT 200"
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 rows = q(conn, sql, args)
-            finally:
-                conn.close()
             return self.send_json_rows(rows)
 
         if parsed.path == "/api/dashboard":
@@ -537,8 +564,7 @@ class Handler(SimpleHTTPRequestHandler):
             if cached is not None:
                 return self.send_json(cached)
 
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 # Cache miss: discover available seasons from archive_team_summaries
                 # (small table, ~30 rows/season) and re-resolve the latest season.
                 ts_season_rows = q(conn, "SELECT DISTINCT season FROM archive_team_summaries WHERE season != ''", ())
@@ -662,8 +688,6 @@ class Handler(SimpleHTTPRequestHandler):
                     [_cast_standing(r) for r in raw_standings],
                     key=lambda r: r["w"] or 0, reverse=True
                 )
-            finally:
-                conn.close()
 
             result = {
                 "season": season,
@@ -679,8 +703,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/playoffs":
             season = (params.get("season", ["2026"])[0] or "2026").strip()
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 rows = q(conn, """
                     SELECT season, conference, round,
                            team1, team1_abbrev, team1_seed, team1_wins,
@@ -690,14 +713,11 @@ class Handler(SimpleHTTPRequestHandler):
                     WHERE season = ?
                     ORDER BY conference, round, team1_seed
                 """, (season,))
-            finally:
-                conn.close()
             return self.send_json_rows(rows)
 
         if parsed.path == "/api/draft":
             season = (params.get("season", ["2025"])[0] or "2025").strip()
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 rows = q(conn, """
                     SELECT d.season, d.overall_pick, d.round, d.tm AS team,
                            d.player, d.player_id, d.college,
@@ -715,8 +735,6 @@ class Handler(SimpleHTTPRequestHandler):
                     SELECT season FROM (SELECT DISTINCT season FROM archive_draft_pick_history WHERE season != '') t
                     ORDER BY season::int DESC
                 """)
-            finally:
-                conn.close()
             return self.send_json({
                 "season": season,
                 "picks": [dict(r) for r in rows],
@@ -724,23 +742,19 @@ class Handler(SimpleHTTPRequestHandler):
             })
 
         if parsed.path == "/api/prospects":
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 rows = q(conn, """
                     SELECT rank, name, pos, age, school, height, weight, status, country
                     FROM archive_draft_prospects_2026
                     ORDER BY NULLIF(NULLIF(rank, ''), 'NA')::int NULLS LAST
                 """)
-            finally:
-                conn.close()
             return self.send_json_rows(rows)
 
         if parsed.path == "/api/prospect-outcome":
             name = (params.get("name", [""])[0] or "").strip()
             if not name:
                 return self.send_json({"error": "name required"}, status=400)
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 prospect_rows = q(conn, """
                     SELECT rank, name, pos, age, school, height, weight, status, country
                     FROM archive_draft_prospects_2026 WHERE name = ?
@@ -782,8 +796,6 @@ class Handler(SimpleHTTPRequestHandler):
                     LEFT JOIN rookie_pos rp ON rp.player_id = d.player_id
                     WHERE d.overall_pick != ''
                 """)
-            finally:
-                conn.close()
 
             def pos_bucket(pos):
                 p = (pos or "").upper()
@@ -843,8 +855,7 @@ class Handler(SimpleHTTPRequestHandler):
             if cached and (_time.time() - cached[1]) < _DRAFT_PROJECTION_CACHE_TTL:
                 return self.send_json(cached[0])
 
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 if age_at_draft is None or overall_pick is None or college is None:
                     prospect_rows = q(conn, """
                         SELECT rank, age, school FROM archive_draft_prospects_2026 WHERE name = ?
@@ -874,8 +885,6 @@ class Handler(SimpleHTTPRequestHandler):
                     conn, q, pool, player_name=name, college=college,
                     age_at_draft=age_at_draft, overall_pick=overall_pick,
                 )
-            finally:
-                conn.close()
             _draft_projection_cache[cache_key] = (result, _time.time())
             return self.send_json(result)
 
@@ -883,8 +892,7 @@ class Handler(SimpleHTTPRequestHandler):
             name = (params.get("name", [""])[0] or "").strip()
             if not name:
                 return self.send_json({"error": "name required"}, status=400)
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 key = normalize_name_for_match(name)
                 try:
                     rows = q(conn, """
@@ -904,13 +912,10 @@ class Handler(SimpleHTTPRequestHandler):
                     # than a 500.
                     conn.rollback()
                     rows = []
-            finally:
-                conn.close()
             return self.send_json_rows(rows)
 
         if parsed.path == "/api/allstars":
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 rows = q(conn, """
                     SELECT player, player_id, team, season, lg, replaced
                     FROM archive_all_star_selections
@@ -918,8 +923,6 @@ class Handler(SimpleHTTPRequestHandler):
                     ORDER BY season::int DESC, player
                     LIMIT 100
                 """)
-            finally:
-                conn.close()
             return self.send_json_rows(rows)
 
         if parsed.path == "/api/archetype":
@@ -927,11 +930,8 @@ class Handler(SimpleHTTPRequestHandler):
             season = (params.get("season", [""])[0] or "").strip()
             if not player_id or not season:
                 return self.send_json({"error": "player_id and season required"}, status=400)
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 report = archetype_engine.build_player_report(conn, q, player_id, season)
-            finally:
-                conn.close()
             if report is None:
                 return self.send_json({"error": "No qualified season found for that player_id/season"}, status=404)
             return self.send_json(report)
@@ -943,8 +943,7 @@ class Handler(SimpleHTTPRequestHandler):
             bundle = _load_salary_model()
             if bundle is None:
                 return self.send_json({"error": "Model not available"}, status=503)
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 # Grab the player's most recent season stats
                 row = q(conn, """
                     SELECT
@@ -982,8 +981,6 @@ class Handler(SimpleHTTPRequestHandler):
                     ORDER BY safe_int(p.season) DESC
                     LIMIT 1
                 """, (player_id,))
-            finally:
-                conn.close()
 
             if not row:
                 return self.send_json({"error": "Player not found"}, status=404)
@@ -1034,8 +1031,7 @@ class Handler(SimpleHTTPRequestHandler):
             if bundle is None:
                 return self.send_json({"error": "Stats model not available"}, status=503)
 
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 rows = q(conn, """
                     SELECT
                         safe_float(p.age) AS age,
@@ -1072,8 +1068,6 @@ class Handler(SimpleHTTPRequestHandler):
                     ORDER BY safe_int(p.season) DESC
                     LIMIT 2
                 """, (player_id,))
-            finally:
-                conn.close()
 
             if not rows:
                 return self.send_json({"error": "Player not found"}, status=404)
@@ -1185,8 +1179,7 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
     over a one-time startup step unrelated to most requests."""
     for attempt in range(1, max_attempts + 1):
         try:
-            conn = connect()
-            try:
+            with get_conn() as conn:
                 cur = conn.cursor()
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS archive_users (
@@ -1202,9 +1195,7 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
                         ADD COLUMN IF NOT EXISTS total_active_seconds INTEGER NOT NULL DEFAULT 0
                 """)
                 conn.commit()
-                return
-            finally:
-                conn.close()
+            return
         except Exception as exc:
             print(f"ensure_users_table attempt {attempt}/{max_attempts} failed: {exc}")
             if attempt == max_attempts:
