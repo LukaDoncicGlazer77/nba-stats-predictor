@@ -34,6 +34,13 @@ log = logging.getLogger("draft_projection.service")
 TOP_N_COMPS_FOR_POOL_SCORING = 50  # comp-based probability estimator wants a wide pool
 TOP_N_COMPS_TO_RETURN = 10         # but the API/UI only show the closest 10
 
+# Nickname → official name as used in archive_cbb_player_stats.
+# Add entries whenever a well-known prospect has a nickname that differs from
+# the legal first name sports-reference.com/cbb uses.
+_NICKNAME_MAP: dict[str, str] = {
+    "ace bailey": "airious bailey",
+}
+
 USE_HIERARCHICAL_MODEL = True
 
 _model_bundle_cache = {"loaded": False, "bundle": None}
@@ -69,6 +76,9 @@ def _model_feature_names(model_bundle: dict) -> list:
 def build_draft_projection(conn, q, pool: HistoricalPool, *, player_name: str,
                             college: Optional[str] = None, age_at_draft: Optional[float] = None,
                             overall_pick: Optional[float] = None) -> dict:
+    # Resolve nickname → official name before any DB lookups
+    player_name = _NICKNAME_MAP.get(player_name.lower(), player_name)
+
     fv = build_feature_vector(
         conn, q, player_name=player_name, college=college,
         age_at_draft=age_at_draft, overall_pick=overall_pick,
