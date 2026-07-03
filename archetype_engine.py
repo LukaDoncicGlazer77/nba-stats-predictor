@@ -74,6 +74,12 @@ def load_pool(conn, q):
         FROM archive_player_per_game
     """)
     physical_rows = q(conn, "SELECT player_id, ht_in_in, wt FROM archive_player_career_info")
+    shooting_rows = q(conn, """
+        SELECT player_id, season, g,
+               percent_fga_from_x2p_range, percent_fga_from_x3p_range,
+               percent_assisted_x2p_fg, percent_assisted_x3p_fg
+        FROM archive_player_shooting
+    """)
 
     games_by_key = {}
     for r in games_rows:
@@ -85,6 +91,20 @@ def load_pool(conn, q):
                 "pts_pg": _to_float(r["pts_per_game"]),
                 "trb_pg": _to_float(r["trb_per_game"]),
             }
+
+    shooting_by_key = {}
+    for r in shooting_rows:
+        key = (r["player_id"], r["season"])
+        g = _to_float(r["g"]) or 0
+        x2p = _to_float(r["percent_fga_from_x2p_range"])
+        x3p = _to_float(r["percent_fga_from_x3p_range"])
+        ast2 = _to_float(r["percent_assisted_x2p_fg"])
+        ast3 = _to_float(r["percent_assisted_x3p_fg"])
+        if None in (x2p, x3p, ast2, ast3):
+            continue
+        sc = (1 - ast2) * x2p + (1 - ast3) * x3p
+        if key not in shooting_by_key or g > shooting_by_key[key]["games"]:
+            shooting_by_key[key] = {"games": g, "self_creation": sc}
 
     physical_by_player = {
         r["player_id"]: (_to_float(r["ht_in_in"]), _to_float(r["wt"])) for r in physical_rows
@@ -102,6 +122,7 @@ def load_pool(conn, q):
         if None in (usg, ast, blk, drb, stl) or games is None or games < MIN_GAMES_SEASON:
             continue
         ht_in, wt = physical_by_player.get(r["player_id"], (None, None))
+        shooting = shooting_by_key.get(key)
         pool.append({
             "player": r["player"], "player_id": r["player_id"],
             "season": int(r["season"]), "age": _to_float(r["age"]), "games": games,
@@ -115,6 +136,9 @@ def load_pool(conn, q):
             "bpm": _to_float(r["bpm"]), "obpm": _to_float(r["obpm"]), "vorp": _to_float(r["vorp"]),
             "pts_pg": per_game["pts_pg"], "trb_pg": per_game["trb_pg"],
             "ht_in": ht_in, "wt": wt,
+            # fraction of FGA that were self-created (unassisted), weighted by shot mix.
+            # None for pre-1997 seasons where archive_player_shooting has no data.
+            "self_creation": shooting["self_creation"] if shooting else None,
         })
 
     pool.sort(key=lambda p: (p["player_id"], p["season"]))
@@ -169,6 +193,23 @@ def add_efficiency_under_load(pool):
     return pool
 
 
+def add_self_creation_percentile(pool):
+    """Ranks self_creation (fraction of FGA that were unassisted) per season,
+    only among player-seasons where shooting data exists (1997+). Pre-1997
+    players have no self_creation value and get no _pr key, so creation_burden()
+    falls back to the plain usg*ast formula for them."""
+    by_season = defaultdict(list)
+    for p in pool:
+        if p.get("self_creation") is not None:
+            by_season[p["season"]].append(p)
+    for rows in by_season.values():
+        n = len(rows)
+        ordered = sorted(rows, key=lambda p: p["self_creation"])
+        for i, p in enumerate(ordered):
+            p["self_creation_pr"] = (i + 1) / n
+    return pool
+
+
 # ── archetype dimensions (same math as the prototype) ─────────────────────
 
 def _size_factor(ht_in) -> float:
@@ -188,8 +229,10 @@ def _softmax(scores: dict) -> dict:
 
 def creation_burden(p):
     usg, ast = p["usg_pct_pr"], p["ast_pct_pr"]
+    sc = p.get("self_creation_pr")
+    he_score = usg * ast * sc if sc is not None else usg * ast
     return _softmax({
-        "heliocentric_engine": usg * ast,
+        "heliocentric_engine": he_score,
         "secondary_playmaker": ast if 0.55 <= usg < 0.85 else 0.4 * ast,
         "off_ball_scorer": (1 - ast) * usg if usg >= 0.4 else 0.3,
         "non_creator_finisher": (1 - usg) * (1 - ast),
@@ -267,6 +310,7 @@ def development_stage(experience):
 def annotate(pool):
     add_percentiles(pool)
     add_efficiency_under_load(pool)
+    add_self_creation_percentile(pool)
     for p in pool:
         creation = creation_burden(p)
         defense = defensive_role(p)
