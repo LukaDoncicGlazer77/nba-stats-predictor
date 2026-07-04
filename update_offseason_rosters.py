@@ -208,11 +208,19 @@ def main():
         log.error("DATABASE_URL not set")
         sys.exit(1)
 
-    nba_map = fetch_nba_rosters()
+    try:
+        nba_map = fetch_nba_rosters()
+    except Exception as exc:
+        log.warning("NBA.com fetch failed (%s) — will rely on ESPN only", exc)
+        nba_map = {}
+
     try:
         espn_map = fetch_espn_rosters()
         roster_map = merge_roster_maps(nba_map, espn_map)
     except Exception as exc:
+        if not nba_map:
+            log.error("Both NBA.com and ESPN fetches failed — cannot update teams")
+            sys.exit(1)
         log.warning("ESPN fallback failed (%s) — using NBA.com only", exc)
         roster_map = nba_map
 
