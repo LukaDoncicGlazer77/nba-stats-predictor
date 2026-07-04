@@ -140,9 +140,7 @@ def get_shot_creation_data(conn, q, *, player_name: str) -> Optional[dict]:
     if not season_rows:
         return None
     academic_year = season_rows[0]["academic_year"]
-    # CBBD data ends at 2025; fall back one year for current-season prospects
-    entry = _SHOT_ZONES_AST.get((key_str, academic_year)) or \
-            _SHOT_ZONES_AST.get((key_str, academic_year - 1))
+    entry = _SHOT_ZONES_AST.get((key_str, academic_year))
     if not entry:
         return None
     def zone(prefix):
