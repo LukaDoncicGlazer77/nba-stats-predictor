@@ -23,8 +23,55 @@ used elsewhere in server.py -- no new tables, no writes.
 """
 from __future__ import annotations
 
+import csv
+import logging
 import math
+import os
+import re
 from collections import defaultdict
+
+_ae_log = logging.getLogger("archetype_engine")
+
+# (normalized_name, season) -> {rim_att_rate, three_att_rate}
+_NBA_SHOT_ZONES: dict[tuple, dict] = {}
+
+
+def _normalize_ae_name(name: str) -> str:
+    name = str(name or "").strip()
+    if "," in name:
+        last, first = name.split(",", 1)
+        name = f"{first.strip()} {last.strip()}"
+    return re.sub(r"[^a-z ]", "", name.lower()).strip()
+
+
+def _load_nba_shot_zones() -> None:
+    path = os.path.join(os.path.dirname(__file__), "nba_shot_zones.csv")
+    if not os.path.exists(path):
+        _ae_log.info("nba_shot_zones.csv not found — NBA shot zone signals disabled")
+        return
+    loaded = 0
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            try:
+                season = int(row["season"])
+            except (KeyError, ValueError):
+                continue
+            rim_a   = float(row.get("rim_a") or 0)
+            mid_a   = float(row.get("mid_a") or 0)
+            three_a = float(row.get("three_a") or 0)
+            total   = rim_a + mid_a + three_a
+            if total <= 0:
+                continue
+            key = (_normalize_ae_name(row.get("player", "")), season)
+            _NBA_SHOT_ZONES[key] = {
+                "rim_att_rate": rim_a / total,
+                "three_att_rate": three_a / total,
+            }
+            loaded += 1
+    _ae_log.info("Loaded %d NBA shot-zone records from nba_shot_zones.csv", loaded)
+
+
+_load_nba_shot_zones()
 
 MIN_GAMES_SEASON = 20  # garbage-time/injury-shortened-season filter (per_game table has no MP total column, g is the available volume signal)
 HIGH_USAGE_THRESHOLD = 30.0  # absolute usg_percent cutoff for "efficiency under load"
@@ -314,8 +361,41 @@ def development_stage(experience):
     return "established"
 
 
+def _merge_nba_shot_zones(pool) -> None:
+    """Injects rim_att_rate / three_att_rate from nba_shot_zones.csv into each
+    pool row. Missing → None; scoring_profile() falls back to ft_rate proxy."""
+    for p in pool:
+        key = (_normalize_ae_name(p.get("player", "")), p.get("season"))
+        sz = _NBA_SHOT_ZONES.get(key)
+        if sz:
+            p["rim_att_rate"]   = sz["rim_att_rate"]
+            p["three_att_rate"] = sz["three_att_rate"]
+        else:
+            p.setdefault("rim_att_rate", None)
+            p.setdefault("three_att_rate", None)
+
+
+def _add_shot_zone_percentiles_nba(pool) -> None:
+    """Ranks rim_att_rate / three_att_rate within each season among rows that
+    have the data. Players without coverage keep None → proxy fallback."""
+    by_season = defaultdict(list)
+    for p in pool:
+        by_season[p["season"]].append(p)
+    for season_rows in by_season.values():
+        for col in ("rim_att_rate", "three_att_rate"):
+            present = [p for p in season_rows if p.get(col) is not None]
+            n = len(present)
+            if n == 0:
+                continue
+            ordered = sorted(present, key=lambda p: p[col])
+            for i, p in enumerate(ordered):
+                p[f"{col}_pr"] = (i + 1) / n
+
+
 def annotate(pool):
+    _merge_nba_shot_zones(pool)
     add_percentiles(pool)
+    _add_shot_zone_percentiles_nba(pool)
     add_efficiency_under_load(pool)
     add_self_creation_percentile(pool)
     for p in pool:

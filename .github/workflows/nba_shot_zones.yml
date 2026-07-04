@@ -1,0 +1,56 @@
+name: NBA Shot Zone Data
+
+on:
+  # Full backfill + current season — run once at season end (June) and once at start (November)
+  schedule:
+    - cron: "0 8 1 6 *"   # June 1 — season just ended, pull full final stats
+    - cron: "0 8 1 11 *"  # Nov 1 — new season underway, add current year
+  workflow_dispatch:
+    inputs:
+      season:
+        description: "Season end-year to pull (blank = all missing)"
+        required: false
+      full_rebuild:
+        description: "Rebuild nba_shot_zones.csv from scratch"
+        required: false
+        default: "false"
+
+jobs:
+  pull-shot-zones:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install nba_api
+
+      - name: Pull NBA shot zone data
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.season }}" ]; then
+            ARGS="$ARGS --season ${{ github.event.inputs.season }}"
+          fi
+          if [ "${{ github.event.inputs.full_rebuild }}" = "true" ]; then
+            ARGS="$ARGS --full"
+          fi
+          python pull_nba_shot_zones.py $ARGS
+
+      - name: Commit updated CSV
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add nba_shot_zones.csv
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            ROWS=$(wc -l < nba_shot_zones.csv)
+            git commit -m "Update nba_shot_zones.csv (${ROWS} rows)"
+            git push
+          fi
