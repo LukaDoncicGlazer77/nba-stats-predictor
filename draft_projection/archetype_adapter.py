@@ -50,7 +50,7 @@ def _to_float(v):
 
 # (normalized_name, year) -> {rim_att_rate, three_att_rate}
 _SHOT_ZONES: dict[tuple, dict] = {}
-# (normalized_name, season) -> {rim_ast_pct, three_unast_pct}
+# (normalized_name, season) -> scoring signals + full display data
 _SHOT_ZONES_AST: dict[tuple, dict] = {}
 
 
@@ -91,11 +91,11 @@ def _load_shot_zones_assisted() -> None:
     loaded = 0
     with open(path, newline="") as f:
         for row in csv.DictReader(f):
-            rim_ast = _to_float(row.get("rim_ast_pct"))
+            rim_made    = _to_float(row.get("rim_made")) or 0
+            three_made  = _to_float(row.get("three_made")) or 0
+            mid_made    = _to_float(row.get("mid_made")) or 0
+            rim_ast     = _to_float(row.get("rim_ast_pct"))
             three_unast = _to_float(row.get("three_unast_pct"))
-            # Need at least one valid signal and enough rim makes to be reliable
-            rim_made = _to_float(row.get("rim_made")) or 0
-            three_made = _to_float(row.get("three_made")) or 0
             if rim_ast is None and three_unast is None:
                 continue
             try:
@@ -104,10 +104,21 @@ def _load_shot_zones_assisted() -> None:
                 continue
             key = (_normalize_btv_name(row.get("player", "")), season)
             entry = {}
+            # Scoring signals (used for percentile ranking)
             if rim_ast is not None and rim_made >= 10:
                 entry["rim_ast_pct"] = rim_ast
             if three_unast is not None and three_made >= 5:
                 entry["three_unast_pct"] = three_unast
+            # Full display data (all zones, counts + percentages)
+            for col in ("rim_made", "rim_assisted", "rim_unassisted",
+                        "rim_ast_pct", "rim_unast_pct",
+                        "mid_made", "mid_assisted", "mid_unassisted",
+                        "mid_ast_pct", "mid_unast_pct",
+                        "three_made", "three_assisted", "three_unassisted",
+                        "three_ast_pct", "three_unast_pct"):
+                v = _to_float(row.get(col))
+                if v is not None:
+                    entry[f"_disp_{col}"] = v
             if entry:
                 _SHOT_ZONES_AST[key] = entry
                 loaded += 1
@@ -116,6 +127,35 @@ def _load_shot_zones_assisted() -> None:
 
 _load_shot_zones()
 _load_shot_zones_assisted()
+
+
+def get_shot_creation_data(conn, q, *, player_name: str) -> Optional[dict]:
+    """Returns per-zone assisted/unassisted display data for a prospect, or None if unavailable."""
+    from server import normalize_name_for_match
+    key_str = normalize_name_for_match(player_name)
+    season_rows = q(conn, """
+        SELECT academic_year FROM archive_cbb_player_stats
+        WHERE name_key = ? ORDER BY academic_year DESC LIMIT 1
+    """, (key_str,))
+    if not season_rows:
+        return None
+    academic_year = season_rows[0]["academic_year"]
+    entry = _SHOT_ZONES_AST.get((key_str, academic_year))
+    if not entry:
+        return None
+    def zone(prefix):
+        made = entry.get(f"_disp_{prefix}_made")
+        if not made or made < 1:
+            return None
+        return {
+            "made":       int(made),
+            "assisted":   int(entry.get(f"_disp_{prefix}_assisted") or 0),
+            "unassisted": int(entry.get(f"_disp_{prefix}_unassisted") or 0),
+            "ast_pct":    round((entry.get(f"_disp_{prefix}_ast_pct") or 0) * 100, 1),
+            "unast_pct":  round((entry.get(f"_disp_{prefix}_unast_pct") or 0) * 100, 1),
+        }
+    result = {z: zone(z) for z in ("rim", "mid", "three")}
+    return result if any(v for v in result.values()) else None
 
 
 def _add_shot_zone_percentiles(rows: list[dict]) -> None:

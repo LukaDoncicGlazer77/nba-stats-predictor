@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from draft_projection.archetype_adapter import archetype_match_strength, compute_archetype_mix
+from draft_projection.archetype_adapter import archetype_match_strength, compute_archetype_mix, get_shot_creation_data
 from draft_projection.comp_engine import HistoricalPool, find_top_comps, explain_comp
 from draft_projection.explain import build_explainability
 from draft_projection.features import FEATURE_NAMES, build_feature_vector
@@ -104,6 +104,7 @@ def build_draft_projection(conn, q, pool: HistoricalPool, *, player_name: str,
     outcome_summary = expected_floor_ceiling(final_probs)
 
     prospect_mix = compute_archetype_mix(conn, q, player_name=player_name)
+    shot_creation = get_shot_creation_data(conn, q, player_name=player_name)
     comparables = []
     for c in top_comps:
         comp_mix = compute_archetype_mix(conn, q, player_name=c["player"])
@@ -140,6 +141,7 @@ def build_draft_projection(conn, q, pool: HistoricalPool, *, player_name: str,
         "archetype": {
             "mix": prospect_mix,
             "available": prospect_mix is not None,
+            "shot_creation": shot_creation,
         },
         "explainability": build_explainability(fv),
         "data_quality": {

@@ -2448,6 +2448,42 @@ function buildArchetypeMixBars(mix) {
   }).join("");
 }
 
+function buildShotCreationPanel(shotCreation) {
+  if (!shotCreation) return "";
+  const zones = [
+    { key: "rim",   label: "At the Rim" },
+    { key: "mid",   label: "Mid-Range"  },
+    { key: "three", label: "3PT"        },
+  ];
+  const rows = zones.map(({ key, label }) => {
+    const z = shotCreation[key];
+    if (!z || z.made < 1) return "";
+    const astW  = z.ast_pct;
+    const unastW = z.unast_pct;
+    return `
+    <div class="dp-sc-row">
+      <div class="dp-sc-label">${label}</div>
+      <div class="dp-sc-bar-wrap">
+        <div class="dp-sc-bar-ast"  style="width:${astW}%"  title="Assisted ${z.ast_pct}%"></div>
+        <div class="dp-sc-bar-unast" style="width:${unastW}%" title="Unassisted ${z.unast_pct}%"></div>
+      </div>
+      <div class="dp-sc-stats">
+        <span class="dp-sc-tag ast">AST ${z.ast_pct}% <span class="dp-sc-count">(${z.assisted}/${z.made})</span></span>
+        <span class="dp-sc-tag unast">UNAST ${z.unast_pct}% <span class="dp-sc-count">(${z.unassisted}/${z.made})</span></span>
+      </div>
+    </div>`;
+  }).join("");
+  if (!rows.trim()) return "";
+  return `
+  <div class="dp-sc-wrap">
+    <div class="dp-sc-legend">
+      <span><span class="dp-sc-swatch ast"></span>Assisted</span>
+      <span><span class="dp-sc-swatch unast"></span>Unassisted</span>
+    </div>
+    ${rows}
+  </div>`;
+}
+
 function buildExplainabilityLists(explainability) {
   const section = (title, items) => {
     if (!items || !items.length) return "";
@@ -2518,6 +2554,11 @@ async function renderDraftProjectionView(container, prospect) {
 
       <div class="cmp-pcard-title" style="margin-top:20px">College Archetype Profile</div>
       <div class="dp-prob-list">${buildArchetypeMixBars(data.archetype.mix)}</div>
+
+      ${data.archetype.shot_creation ? `
+      <div class="cmp-pcard-title" style="margin-top:20px">Shot Creation by Zone</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px">What % of made shots were self-created vs. assisted, by zone</div>
+      ${buildShotCreationPanel(data.archetype.shot_creation)}` : ""}
 
       <div class="cmp-pcard-title" style="margin-top:20px">Top Historical Comparables</div>
       ${data.comparables.length ? buildComparablesTable(data.comparables) : `<p style="color:var(--muted);font-size:0.85rem">No comparable historical draft picks found.</p>`}
