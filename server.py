@@ -977,6 +977,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "player_id and season required"}, status=400)
             with get_conn() as conn:
                 report = archetype_engine.build_player_report(conn, q, player_id, season)
+                if report is not None:
+                    from draft_projection.archetype_adapter import get_shot_creation_data
+                    report["college_shot_creation"] = get_shot_creation_data(conn, q, player_name=report["player"])
             if report is None:
                 return self.send_json({"error": "No qualified season found for that player_id/season"}, status=404)
             return self.send_json(report)

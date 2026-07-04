@@ -925,10 +925,18 @@ function renderArchetypePanel(report, player) {
     )
     .join("");
 
+  const shotCreationHtml = report.college_shot_creation ? `
+    <div style="margin-top:20px">
+      <p class="pcard-summary" style="margin-bottom:8px"><strong>College Shot Creation by Zone</strong> &mdash; most recent college season</p>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px">What % of made shots were self-created vs. assisted</div>
+      ${buildShotCreationPanel(report.college_shot_creation)}
+    </div>` : "";
+
   panel.innerHTML = `
     <div class="overview-top-row">
       <div class="profile-col">
         <div class="pfact-grid">${weightBars}</div>
+        ${shotCreationHtml}
       </div>
       <div class="profile-col">
         <p class="pcard-summary"><strong>Same-stage comps</strong> &mdash; strict &plusmn;2yr age/experience band, true statistical comparison:</p>
