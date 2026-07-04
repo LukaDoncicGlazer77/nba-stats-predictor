@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Updates current team for every active NBA player using NBA.com roster data
-via the nba_api package. Designed for the offseason (July–September) when
-Basketball-Reference has no current-season stats page to scrape.
+via the nba_api package, with ESPN as a fallback for trades NBA.com is slow
+to reflect. Designed for the offseason (July–September) when Basketball-
+Reference has no current-season stats page to scrape.
 
 Run daily via GitHub Actions alongside update_current_season.py.
 During the NBA season (Oct–Jun) this script exits immediately — the BR
@@ -12,11 +13,13 @@ Usage:
     DATABASE_URL=... python update_offseason_rosters.py [--dry-run]
 """
 import argparse
+import json
 import logging
 import os
 import sys
 import time
 import unicodedata
+import urllib.request
 from datetime import date
 
 import psycopg2
@@ -33,6 +36,18 @@ NBADOTCOM_TO_BR = {
     "BKN": "BRK",
     "CHA": "CHO",
     "PHX": "PHO",
+}
+
+# ESPN abbreviations that differ from Basketball-Reference
+ESPN_TO_BR = {
+    "BKN": "BRK",
+    "CHA": "CHO",
+    "PHX": "PHO",
+    "GS": "GSW",
+    "SA": "SAS",
+    "NY": "NYK",
+    "NO": "NOP",
+    "UTAH": "UTA",
 }
 
 
@@ -68,6 +83,58 @@ def fetch_nba_rosters() -> dict[str, str]:
             result[normalize(full_name)] = br_abbr
 
     return result
+
+
+def fetch_espn_rosters() -> dict[str, str]:
+    """Returns {normalized_player_name: br_team_abbreviation} by scraping all
+    30 ESPN team rosters. Used as a fallback/override over NBA.com, which is
+    often slow to reflect offseason trades."""
+    teams_url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams?limit=35"
+    with urllib.request.urlopen(teams_url, timeout=15) as r:
+        teams_data = json.loads(r.read())
+
+    teams = teams_data["sports"][0]["leagues"][0]["teams"]
+    log.info("ESPN: fetching rosters for %d teams...", len(teams))
+
+    result = {}
+    for t in teams:
+        tid = t["team"]["id"]
+        espn_abbr = t["team"]["abbreviation"]
+        br_abbr = ESPN_TO_BR.get(espn_abbr, espn_abbr)
+        roster_url = (
+            f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
+            f"/teams/{tid}/roster"
+        )
+        try:
+            with urllib.request.urlopen(roster_url, timeout=15) as r:
+                roster_data = json.loads(r.read())
+            for athlete in roster_data.get("athletes", []):
+                name = athlete.get("fullName", "")
+                if name:
+                    result[normalize(name)] = br_abbr
+        except Exception as exc:
+            log.warning("ESPN roster fetch failed for team %s: %s", espn_abbr, exc)
+        time.sleep(0.1)
+
+    log.info("ESPN: found %d active roster players", len(result))
+    return result
+
+
+def merge_roster_maps(nba_map: dict[str, str], espn_map: dict[str, str]) -> dict[str, str]:
+    """Merges NBA.com and ESPN roster maps. ESPN takes precedence — it tends to
+    reflect trades faster during the offseason. Logs any disagreements."""
+    merged = dict(nba_map)
+    disagreements = 0
+    for name, espn_team in espn_map.items():
+        nba_team = nba_map.get(name)
+        if nba_team and nba_team != espn_team:
+            log.info("  Source disagreement %-25s  NBA.com=%s  ESPN=%s  → using ESPN",
+                     name, nba_team, espn_team)
+            disagreements += 1
+        merged[name] = espn_team
+    if disagreements:
+        log.info("%d player(s) where ESPN overrode NBA.com", disagreements)
+    return merged
 
 
 def most_recent_season(conn) -> str:
@@ -141,7 +208,13 @@ def main():
         log.error("DATABASE_URL not set")
         sys.exit(1)
 
-    roster_map = fetch_nba_rosters()
+    nba_map = fetch_nba_rosters()
+    try:
+        espn_map = fetch_espn_rosters()
+        roster_map = merge_roster_maps(nba_map, espn_map)
+    except Exception as exc:
+        log.warning("ESPN fallback failed (%s) — using NBA.com only", exc)
+        roster_map = nba_map
 
     conn = psycopg2.connect(db_url, connect_timeout=10) if db_url else None
     try:
