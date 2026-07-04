@@ -304,6 +304,83 @@ def upsert_table(
     conn.commit()
 
 
+def build_dashboard_rows(pg_rows: list[dict], adv_rows: list[dict], season_year: int) -> list[dict]:
+    """Merges per-game and advanced rows into the archive_player_dashboard shape.
+    archive_player_dashboard is what /api/seasons reads from — keeping it in sync
+    is what makes team changes (trades, signings) visible in the player list."""
+    adv_by_key: dict[tuple, dict] = {}
+    for r in adv_rows:
+        # Trade-season dedup: prefer the row with the most games (same logic as the
+        # archetype engine).  The team column in that row is the player's last team.
+        key = (r["player_id"], r["season"])
+        g_new = r.get("g") or 0
+        existing = adv_by_key.get(key)
+        if existing is None or (existing.get("g") or 0) < g_new:
+            adv_by_key[key] = r
+
+    # Per-game rows already deduplicated the same way by BR (each trade stint is
+    # a separate row; TOT/2TM/3TM aggregates appear too — skip those here so
+    # each player has exactly one row per season, matching what we had before).
+    pg_seen: dict[tuple, dict] = {}
+    for r in pg_rows:
+        team = r.get("tm") or r.get("team") or ""
+        if team in ("TOT", "2TM", "3TM"):
+            continue
+        key = (r["player_id"], r["season"])
+        g_new = r.get("g") or 0
+        existing = pg_seen.get(key)
+        if existing is None or (existing.get("g") or 0) < g_new:
+            pg_seen[key] = r
+
+    out = []
+    for key, pg in pg_seen.items():
+        adv = adv_by_key.get(key, {})
+        team_val = pg.get("tm") or pg.get("team")
+        row = {
+            "season":         pg["season"],
+            "lg":             "NBA",
+            "player":         pg.get("player"),
+            "player_id":      pg["player_id"],
+            "age":            pg.get("age"),
+            "team":           team_val,
+            "pos":            pg.get("pos"),
+            "g":              pg.get("g"),
+            "gs":             pg.get("gs"),
+            "mp_per_game":    pg.get("mp_per_game"),
+            "fg_per_game":    pg.get("fg_per_game"),
+            "fga_per_game":   pg.get("fga_per_game"),
+            "fg_percent":     pg.get("fg_percent"),
+            "x3p_per_game":   pg.get("x3p_per_game"),
+            "x3pa_per_game":  pg.get("x3pa_per_game"),
+            "x3p_percent":    pg.get("x3p_percent"),
+            "ft_per_game":    pg.get("ft_per_game"),
+            "fta_per_game":   pg.get("fta_per_game"),
+            "ft_percent":     pg.get("ft_percent"),
+            "orb_per_game":   pg.get("orb_per_game"),
+            "drb_per_game":   pg.get("drb_per_game"),
+            "trb_per_game":   pg.get("trb_per_game"),
+            "ast_per_game":   pg.get("ast_per_game"),
+            "stl_per_game":   pg.get("stl_per_game"),
+            "blk_per_game":   pg.get("blk_per_game"),
+            "tov_per_game":   pg.get("tov_per_game"),
+            "pf_per_game":    pg.get("pf_per_game"),
+            "pts_per_game":   pg.get("pts_per_game"),
+            # Advanced columns joined in from archive_advanced
+            "per":            adv.get("per"),
+            "ts_percent":     adv.get("ts_percent"),
+            "usg_percent":    adv.get("usg_percent"),
+            "ows":            adv.get("ows"),
+            "dws":            adv.get("dws"),
+            "ws":             adv.get("ws"),
+            "obpm":           adv.get("obpm"),
+            "dbpm":           adv.get("dbpm"),
+            "bpm":            adv.get("bpm"),
+            "vorp":           adv.get("vorp"),
+        }
+        out.append(row)
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", type=int, help="Override season year (e.g. 2026)")
@@ -330,17 +407,21 @@ def main():
     adv_rows = build_advanced_rows(adv_raw, season_year)
     pg_rows = build_per_game_rows(pg_raw, season_year)
 
-    log.info("Built %d advanced rows, %d per-game rows", len(adv_rows), len(pg_rows))
+    dash_rows = build_dashboard_rows(pg_rows, adv_rows, season_year)
+    log.info("Built %d advanced rows, %d per-game rows, %d dashboard rows",
+             len(adv_rows), len(pg_rows), len(dash_rows))
 
     if args.dry_run:
         log.info("[DRY RUN] Sample advanced row: %s", adv_rows[0] if adv_rows else None)
         log.info("[DRY RUN] Sample per-game row: %s", pg_rows[0] if pg_rows else None)
+        log.info("[DRY RUN] Sample dashboard row: %s", dash_rows[0] if dash_rows else None)
         return
 
     conn = psycopg2.connect(db_url, connect_timeout=10)
     try:
         upsert_table(conn, "archive_advanced", adv_rows, season_year, dry_run=False)
         upsert_table(conn, "archive_player_per_game", pg_rows, season_year, dry_run=False)
+        upsert_table(conn, "archive_player_dashboard", dash_rows, season_year, dry_run=False)
     finally:
         conn.close()
 
