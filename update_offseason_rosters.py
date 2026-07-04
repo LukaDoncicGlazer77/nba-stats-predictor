@@ -146,9 +146,23 @@ def most_recent_season(conn) -> str:
         return str(cur.fetchone()[0])
 
 
+def _pg_team_col(conn) -> str:
+    """Returns the actual team column name in archive_player_per_game ('team' or 'tm')."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'archive_player_per_game'
+              AND column_name IN ('team', 'tm')
+            ORDER BY column_name  -- 'team' sorts before 'tm'
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+    return row[0] if row else "tm"
+
+
 def update_teams(conn, roster_map: dict[str, str], season: str, dry_run: bool) -> None:
-    """Updates the team column in archive_player_dashboard for all players
-    whose current team differs from what NBA.com reports."""
+    """Updates team in archive_player_per_game (the base table the dashboard view
+    reads from) for all players whose current team differs from what ESPN reports."""
     with conn.cursor() as cur:
         cur.execute(
             "SELECT player_id, player, team FROM archive_player_dashboard WHERE season = %s",
@@ -178,18 +192,24 @@ def update_teams(conn, roster_map: dict[str, str], season: str, dry_run: bool) -
         return
 
     if dry_run:
-        log.info("[DRY RUN] Would apply %d team updates to archive_player_dashboard", len(updates))
+        log.info("[DRY RUN] Would apply %d team updates to archive_player_per_game", len(updates))
         return
 
+    # archive_player_dashboard is a view — update the underlying per-game table.
+    # Exclude aggregate rows (2TM/3TM/TOT) so only real team stints are touched.
+    team_col = _pg_team_col(conn)
     with conn.cursor() as cur:
         psycopg2.extras.execute_batch(
             cur,
-            "UPDATE archive_player_dashboard SET team = %s WHERE player_id = %s AND season = %s",
+            f"""UPDATE archive_player_per_game
+                SET {team_col} = %s
+                WHERE player_id = %s AND season = %s
+                  AND {team_col} NOT IN ('TOT', '2TM', '3TM', '4TM')""",
             updates,
             page_size=200,
         )
     conn.commit()
-    log.info("Applied %d team updates.", len(updates))
+    log.info("Applied %d team updates to archive_player_per_game.", len(updates))
 
 
 def main():
