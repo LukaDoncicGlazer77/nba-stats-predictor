@@ -26,9 +26,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install scraper dependencies
-        run: pip install requests beautifulsoup4 psycopg2-binary
+        run: pip install requests beautifulsoup4 psycopg2-binary nba_api
 
-      - name: Run stats update
+      - name: Run in-season stats update (Oct–Jun)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -40,3 +40,13 @@ jobs:
             ARGS="$ARGS --dry-run"
           fi
           python update_current_season.py $ARGS
+
+      - name: Run offseason roster update (Jul–Sep)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          python update_offseason_rosters.py $ARGS

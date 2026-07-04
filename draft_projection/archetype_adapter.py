@@ -29,7 +29,8 @@ log = logging.getLogger("draft_projection.archetype_adapter")
 PERCENTILE_COLS = ["usg_pct", "ast_pct", "blk_pct", "dreb_pct", "stl_pct", "fg3a_rate", "ft_rate"]
 # Shot-zone cols are ranked separately — they stay None when absent so scoring_profile()
 # can fall back to fg3a_rate_pr / ft_rate_pr for players without Barttorvik coverage.
-SHOT_ZONE_COLS = ["rim_att_rate", "three_att_rate"]
+SHOT_ZONE_COLS = ["rim_att_rate", "three_att_rate",
+                  "rim_ast_pct", "three_unast_pct"]
 
 
 def _normalize_btv_name(name: str) -> str:
@@ -49,6 +50,9 @@ def _to_float(v):
 
 # (normalized_name, year) -> {rim_att_rate, three_att_rate}
 _SHOT_ZONES: dict[tuple, dict] = {}
+# (normalized_name, season) -> {rim_ast_pct, three_unast_pct}
+_SHOT_ZONES_AST: dict[tuple, dict] = {}
+
 
 def _load_shot_zones() -> None:
     path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shot_zones.csv")
@@ -78,7 +82,40 @@ def _load_shot_zones() -> None:
             loaded += 1
     log.info("Loaded %d shot-zone records from shot_zones.csv", loaded)
 
+
+def _load_shot_zones_assisted() -> None:
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shot_zones_assisted.csv")
+    if not os.path.exists(path):
+        log.warning("shot_zones_assisted.csv not found — assisted shot-zone signals disabled")
+        return
+    loaded = 0
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            rim_ast = _to_float(row.get("rim_ast_pct"))
+            three_unast = _to_float(row.get("three_unast_pct"))
+            # Need at least one valid signal and enough rim makes to be reliable
+            rim_made = _to_float(row.get("rim_made")) or 0
+            three_made = _to_float(row.get("three_made")) or 0
+            if rim_ast is None and three_unast is None:
+                continue
+            try:
+                season = int(row["season"])
+            except (KeyError, ValueError):
+                continue
+            key = (_normalize_btv_name(row.get("player", "")), season)
+            entry = {}
+            if rim_ast is not None and rim_made >= 10:
+                entry["rim_ast_pct"] = rim_ast
+            if three_unast is not None and three_made >= 5:
+                entry["three_unast_pct"] = three_unast
+            if entry:
+                _SHOT_ZONES_AST[key] = entry
+                loaded += 1
+    log.info("Loaded %d assisted shot-zone records from shot_zones_assisted.csv", loaded)
+
+
 _load_shot_zones()
+_load_shot_zones_assisted()
 
 
 def _add_shot_zone_percentiles(rows: list[dict]) -> None:
@@ -128,6 +165,8 @@ def _row_to_archetype_input(r: dict) -> dict:
         "ft_rate_pr": r["ft_rate_pr"],
         "rim_att_rate_pr": r.get("rim_att_rate_pr"),
         "three_att_rate_pr": r.get("three_att_rate_pr"),
+        "rim_ast_pct_pr": r.get("rim_ast_pct_pr"),
+        "three_unast_pct_pr": r.get("three_unast_pct_pr"),
         "dbpm": None,  # no NBA-style defensive BPM at the college level
         "ht_in": r.get("height_in"),  # feeds _size_factor() in named_archetype_mix
     }
@@ -171,6 +210,15 @@ def compute_archetype_mix(conn, q, *, player_name: str) -> Optional[dict]:
         else:
             r["rim_att_rate"] = None
             r["three_att_rate"] = None
+
+        # CBBD assisted% by zone. Same season convention (academic_year = season end year).
+        sza = _SHOT_ZONES_AST.get((r.get("name_key", ""), r.get("academic_year")))
+        if sza:
+            r["rim_ast_pct"] = sza.get("rim_ast_pct")
+            r["three_unast_pct"] = sza.get("three_unast_pct")
+        else:
+            r["rim_ast_pct"] = None
+            r["three_unast_pct"] = None
 
     _add_college_percentiles(rows)
     _add_shot_zone_percentiles(rows)

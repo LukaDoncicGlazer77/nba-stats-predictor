@@ -250,8 +250,19 @@ def defensive_role(p):
 def scoring_profile(p):
     rim_pr = p.get("rim_att_rate_pr")
     three_pr = p.get("three_att_rate_pr")
+    rim_ast_pr = p.get("rim_ast_pct_pr")      # high = finishes off others' creation
+    three_unast_pr = p.get("three_unast_pct_pr")  # high = self-created 3PT threat
+
     if rim_pr is not None and three_pr is not None:
-        return _softmax({"three_pt_pressure": three_pr, "interior_pressure": rim_pr})
+        interior = rim_pr
+        three_pt = three_pr
+        # Blend in self-creation signal when available: unassisted 3s lift three_pt
+        # pressure; high rim assisted% slightly dampens interior (finisher, not creator).
+        if three_unast_pr is not None:
+            three_pt = 0.7 * three_pr + 0.3 * three_unast_pr
+        if rim_ast_pr is not None:
+            interior = 0.8 * rim_pr + 0.2 * (1.0 - rim_ast_pr)
+        return _softmax({"three_pt_pressure": three_pt, "interior_pressure": interior})
     return _softmax({"three_pt_pressure": p["fg3a_rate_pr"], "interior_pressure": p["ft_rate_pr"]})
 
 

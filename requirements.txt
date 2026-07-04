@@ -4,3 +4,4 @@ xgboost
 joblib
 pandas
 numpy
+nba_api
