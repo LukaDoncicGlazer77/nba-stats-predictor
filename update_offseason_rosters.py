@@ -146,23 +146,22 @@ def most_recent_season(conn) -> str:
         return str(cur.fetchone()[0])
 
 
-def _pg_team_col(conn) -> str:
-    """Returns the actual team column name in archive_player_per_game ('team' or 'tm')."""
+def ensure_current_team_table(conn) -> None:
+    """Creates player_current_team if it doesn't exist yet."""
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name = 'archive_player_per_game'
-              AND column_name IN ('team', 'tm')
-            ORDER BY column_name  -- 'team' sorts before 'tm'
-            LIMIT 1
+            CREATE TABLE IF NOT EXISTS player_current_team (
+                player_id TEXT PRIMARY KEY,
+                team      TEXT NOT NULL,
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
         """)
-        row = cur.fetchone()
-    return row[0] if row else "tm"
+    conn.commit()
 
 
 def update_teams(conn, roster_map: dict[str, str], season: str, dry_run: bool) -> None:
-    """Updates team in archive_player_per_game (the base table the dashboard view
-    reads from) for all players whose current team differs from what ESPN reports."""
+    """Upserts current team into player_current_team — a dedicated table that
+    tracks where players are NOW without touching historical season stats."""
     with conn.cursor() as cur:
         cur.execute(
             "SELECT player_id, player, team FROM archive_player_dashboard WHERE season = %s",
@@ -170,7 +169,7 @@ def update_teams(conn, roster_map: dict[str, str], season: str, dry_run: bool) -
         )
         rows = cur.fetchall()
 
-    updates = []
+    upserts = []
     unmatched = []
     for player_id, player_name, current_team in rows:
         key = normalize(player_name or "")
@@ -179,37 +178,34 @@ def update_teams(conn, roster_map: dict[str, str], season: str, dry_run: bool) -
             unmatched.append(player_name)
             continue
         if new_team != current_team:
-            updates.append((new_team, player_id, season))
             log.info("  %-25s  %s → %s", player_name, current_team, new_team)
+        upserts.append((player_id, new_team))
 
-    log.info("%d team changes found, %d players unmatched (retired/two-way/G-League)",
-             len(updates), len(unmatched))
+    log.info("%d players matched, %d unmatched (retired/two-way/G-League)",
+             len(upserts), len(unmatched))
     if unmatched:
         log.debug("Unmatched: %s", unmatched[:20])
 
-    if not updates:
+    if not upserts:
         log.info("Nothing to update.")
         return
 
     if dry_run:
-        log.info("[DRY RUN] Would apply %d team updates to archive_player_per_game", len(updates))
+        log.info("[DRY RUN] Would upsert %d rows into player_current_team", len(upserts))
         return
 
-    # archive_player_dashboard is a view — update the underlying per-game table.
-    # Exclude aggregate rows (2TM/3TM/TOT) so only real team stints are touched.
-    team_col = _pg_team_col(conn)
     with conn.cursor() as cur:
         psycopg2.extras.execute_batch(
             cur,
-            f"""UPDATE archive_player_per_game
-                SET {team_col} = %s
-                WHERE player_id = %s AND season = %s
-                  AND {team_col} NOT IN ('TOT', '2TM', '3TM', '4TM')""",
-            updates,
+            """INSERT INTO player_current_team (player_id, team, updated_at)
+               VALUES (%s, %s, NOW())
+               ON CONFLICT (player_id) DO UPDATE
+                 SET team = EXCLUDED.team, updated_at = NOW()""",
+            upserts,
             page_size=200,
         )
     conn.commit()
-    log.info("Applied %d team updates to archive_player_per_game.", len(updates))
+    log.info("Upserted %d rows into player_current_team.", len(upserts))
 
 
 def main():
@@ -246,8 +242,9 @@ def main():
 
     conn = psycopg2.connect(db_url, connect_timeout=10) if db_url else None
     try:
+        ensure_current_team_table(conn)
         season = most_recent_season(conn)
-        log.info("Updating team column for season %s", season)
+        log.info("Updating current teams (season reference: %s)", season)
         update_teams(conn, roster_map, season, dry_run=args.dry_run)
     finally:
         if conn:

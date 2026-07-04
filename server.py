@@ -541,34 +541,36 @@ class Handler(SimpleHTTPRequestHandler):
                 # orders of magnitude faster.
                 rows = q(conn, """
                     SELECT
-                      player AS player_name,
-                      player_id,
-                      team AS team_abbreviation,
-                      pos,
-                      age,
-                      g AS gp,
-                      mp_per_game AS min,
-                      pts_per_game AS pts,
-                      trb_per_game AS reb,
-                      ast_per_game AS ast,
-                      x3p_per_game AS three,
-                      stl_per_game AS stl,
-                      blk_per_game AS blk,
-                      tov_per_game AS tov,
-                      fg_percent AS fg,
-                      x3p_percent AS three_pct,
-                      ft_percent AS ft_pct,
-                      bpm AS net_rating,
-                      usg_percent AS usg_pct,
-                      ts_percent AS ts_pct,
-                      per,
-                      vorp,
-                      ws,
-                      ows,
-                      dws,
-                      season
-                    FROM archive_player_dashboard
-                    ORDER BY player, season
+                      d.player AS player_name,
+                      d.player_id,
+                      d.team AS team_abbreviation,
+                      pct.team AS current_team,
+                      d.pos,
+                      d.age,
+                      d.g AS gp,
+                      d.mp_per_game AS min,
+                      d.pts_per_game AS pts,
+                      d.trb_per_game AS reb,
+                      d.ast_per_game AS ast,
+                      d.x3p_per_game AS three,
+                      d.stl_per_game AS stl,
+                      d.blk_per_game AS blk,
+                      d.tov_per_game AS tov,
+                      d.fg_percent AS fg,
+                      d.x3p_percent AS three_pct,
+                      d.ft_percent AS ft_pct,
+                      d.bpm AS net_rating,
+                      d.usg_percent AS usg_pct,
+                      d.ts_percent AS ts_pct,
+                      d.per,
+                      d.vorp,
+                      d.ws,
+                      d.ows,
+                      d.dws,
+                      d.season
+                    FROM archive_player_dashboard d
+                    LEFT JOIN player_current_team pct ON d.player_id = pct.player_id
+                    ORDER BY d.player, d.season
                 """, ())
             result = [_cast_season_row(dict(r)) for r in rows]
             _seasons_cache_set(result)

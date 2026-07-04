@@ -520,11 +520,14 @@ function buildPlayersFromRows(rows) {
       }))
       .filter((s) => s.season);
     const latest = seasons[seasons.length - 1];
+    // current_team comes from player_current_team (offseason moves); fall back
+    // to historical team from the latest season row.
+    const currentTeam = rowsForPlayer[rowsForPlayer.length - 1]?.current_team || latest.team;
     return {
       id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
       name,
       playerId: latest.playerId || null,
-      team: latest.team,
+      team: currentTeam,
       position: classifyPosition(latest),
       height: latest.heightCm ? `${Math.round(latest.heightCm)} cm` : "N/A",
       weight: latest.weightKg ? `${Math.round(latest.weightKg)} kg` : "N/A",
