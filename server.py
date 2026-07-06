@@ -10,6 +10,9 @@ import secrets
 import threading
 import time
 import traceback
+import smtplib
+import email.mime.multipart
+import email.mime.text
 import urllib.error
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -53,30 +56,16 @@ def send_reset_email(to_email: str, token: str) -> bool:
       <p style="color:#475569;font-size:13px;margin-top:24px">If you didn't request this, you can ignore this email.</p>
     </div>
     """
-    payload = json.dumps({
-        "from": "StatFuel <noreply@statfuel.online>",
-        "to": [to_email],
-        "subject": "Reset your StatFuel password",
-        "html": html,
-    }).encode()
-    req = urllib.request.Request(
-        "https://api.resend.com/emails",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
-            "Content-Type": "application/json",
-            "User-Agent": "statfuel/1.0",
-            "Accept": "application/json",
-        },
-        method="POST",
-    )
+    msg = email.mime.multipart.MIMEMultipart("alternative")
+    msg["Subject"] = "Reset your StatFuel password"
+    msg["From"] = "StatFuel <noreply@statfuel.online>"
+    msg["To"] = to_email
+    msg.attach(email.mime.text.MIMEText(html, "html"))
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status < 300
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        print(f"send_reset_email failed: {exc.code} {body}")
-        return False
+        with smtplib.SMTP_SSL("smtp.resend.com", 465, timeout=10) as server:
+            server.login("resend", RESEND_API_KEY)
+            server.sendmail("noreply@statfuel.online", [to_email], msg.as_string())
+        return True
     except Exception as exc:
         print(f"send_reset_email failed: {exc}")
         return False
