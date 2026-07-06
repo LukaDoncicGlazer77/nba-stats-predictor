@@ -10,6 +10,7 @@ import secrets
 import threading
 import time
 import traceback
+import urllib.error
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -70,6 +71,10 @@ def send_reset_email(to_email: str, token: str) -> bool:
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status < 300
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        print(f"send_reset_email failed: {exc.code} {body}")
+        return False
     except Exception as exc:
         print(f"send_reset_email failed: {exc}")
         return False
