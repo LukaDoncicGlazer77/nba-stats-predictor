@@ -1112,12 +1112,14 @@
         const btn = e.target.querySelector('button[type="submit"]');
         btn.disabled = true;
         try {
-          await fetch('/api/forgot-password', {
+          const res = await fetch('/api/forgot-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
           });
-          document.getElementById('forgotSuccess').textContent = 'If that email exists, a reset link is on its way.';
+          const data = await res.json();
+          if (!res.ok) { showError('forgotError', data.error || 'Something went wrong.'); return; }
+          document.getElementById('forgotSuccess').textContent = 'Reset link sent — check your inbox.';
           document.getElementById('forgotSuccess').classList.remove('hidden');
           document.getElementById('forgotForm').reset();
         } catch {

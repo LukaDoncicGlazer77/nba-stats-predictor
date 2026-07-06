@@ -466,16 +466,15 @@ class Handler(SimpleHTTPRequestHandler):
             expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
             with get_conn() as conn:
                 row = q1(conn, "SELECT email FROM archive_users WHERE email = %s", (email,))
-                if row:
-                    cur = conn.cursor()
-                    cur.execute(
-                        "UPDATE archive_users SET reset_token = %s, reset_token_expires = %s WHERE email = %s",
-                        (token, expires, email),
-                    )
-                    conn.commit()
-            # Always return ok — don't reveal whether email exists
-            if row:
-                send_reset_email(email, token)
+                if not row:
+                    return self.send_json({"error": "No account found with that email address"}, status=404)
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE archive_users SET reset_token = %s, reset_token_expires = %s WHERE email = %s",
+                    (token, expires, email),
+                )
+                conn.commit()
+            send_reset_email(email, token)
             return self.send_json({"ok": True})
 
         if parsed.path == "/api/reset-password":
