@@ -65,6 +65,8 @@ def send_reset_email(to_email: str, token: str) -> bool:
         headers={
             "Authorization": f"Bearer {RESEND_API_KEY}",
             "Content-Type": "application/json",
+            "User-Agent": "statfuel/1.0",
+            "Accept": "application/json",
         },
         method="POST",
     )
