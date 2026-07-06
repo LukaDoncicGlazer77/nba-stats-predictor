@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260706-josefin" />
+    <link rel="stylesheet" href="styles.css?v=20260706-pwreset" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -195,6 +195,38 @@
               <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required />
             </div>
             <button type="submit" class="login-btn">Sign In</button>
+          </form>
+          <div style="text-align:center;margin-top:12px">
+            <button type="button" class="forgot-link" id="forgotPasswordLink">Forgot password?</button>
+          </div>
+        </div>
+
+        <!-- Forgot Password panel -->
+        <div id="panelForgotPassword" style="display:none">
+          <div id="forgotError" class="login-error hidden"></div>
+          <div id="forgotSuccess" class="login-success hidden"></div>
+          <form id="forgotForm">
+            <div class="login-field">
+              <label for="forgotEmail">Email</label>
+              <input type="email" id="forgotEmail" placeholder="you@example.com" autocomplete="email" required />
+            </div>
+            <button type="submit" class="login-btn">Send Reset Link</button>
+          </form>
+          <div style="text-align:center;margin-top:12px">
+            <button type="button" class="forgot-link" id="backToSignIn">Back to Sign In</button>
+          </div>
+        </div>
+
+        <!-- Reset Password panel -->
+        <div id="panelResetPassword" style="display:none">
+          <div id="resetError" class="login-error hidden"></div>
+          <div id="resetSuccess" class="login-success hidden"></div>
+          <form id="resetForm">
+            <div class="login-field">
+              <label for="resetPassword">New Password</label>
+              <input type="password" id="resetPassword" placeholder="Min. 6 characters" autocomplete="new-password" required />
+            </div>
+            <button type="submit" class="login-btn">Set New Password</button>
           </form>
         </div>
 
@@ -1057,9 +1089,90 @@
         document.getElementById('tabCreateAccount').classList.toggle('active', active === 'create');
         document.getElementById('panelSignIn').style.display = active === 'signin' ? '' : 'none';
         document.getElementById('panelCreateAccount').style.display = active === 'create' ? '' : 'none';
+        document.getElementById('panelForgotPassword').style.display = 'none';
+        document.getElementById('panelResetPassword').style.display = 'none';
       }
       document.getElementById('tabSignIn').addEventListener('click', () => switchTab('signin'));
       document.getElementById('tabCreateAccount').addEventListener('click', () => switchTab('create'));
+
+      // Show forgot password panel
+      document.getElementById('forgotPasswordLink').addEventListener('click', () => {
+        document.getElementById('panelSignIn').style.display = 'none';
+        document.getElementById('panelForgotPassword').style.display = '';
+        document.getElementById('tabSignIn').classList.remove('active');
+      });
+      document.getElementById('backToSignIn').addEventListener('click', () => switchTab('signin'));
+
+      // Forgot password form
+      document.getElementById('forgotForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        clearError('forgotError');
+        document.getElementById('forgotSuccess').classList.add('hidden');
+        const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+          await fetch('/api/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          document.getElementById('forgotSuccess').textContent = 'If that email exists, a reset link is on its way.';
+          document.getElementById('forgotSuccess').classList.remove('hidden');
+          document.getElementById('forgotForm').reset();
+        } catch {
+          showError('forgotError', 'Could not reach the server. Try again.');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // Check for reset token in URL on load
+      (function() {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('reset_token');
+        if (token) {
+          document.getElementById('panelSignIn').style.display = 'none';
+          document.getElementById('panelForgotPassword').style.display = 'none';
+          document.getElementById('panelResetPassword').style.display = '';
+          document.getElementById('panelResetPassword').dataset.token = token;
+          // Hide tabs and guest button while resetting
+          document.querySelector('.auth-tabs').style.display = 'none';
+          document.getElementById('loginGuestBtn').style.display = 'none';
+          document.querySelector('.login-divider').style.display = 'none';
+        }
+      })();
+
+      // Reset password form
+      document.getElementById('resetForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        clearError('resetError');
+        document.getElementById('resetSuccess').classList.add('hidden');
+        const token = document.getElementById('panelResetPassword').dataset.token;
+        const password = document.getElementById('resetPassword').value;
+        if (password.length < 6) { showError('resetError', 'Password must be at least 6 characters.'); return; }
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+          const res = await fetch('/api/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, password }),
+          });
+          const data = await res.json();
+          if (!res.ok) { showError('resetError', data.error || 'Reset failed.'); return; }
+          document.getElementById('resetSuccess').textContent = 'Password updated! Signing you in…';
+          document.getElementById('resetSuccess').classList.remove('hidden');
+          document.getElementById('resetForm').style.display = 'none';
+          localStorage.setItem(SESSION_KEY, data.email);
+          window.history.replaceState({}, '', '/');
+          setTimeout(() => showApp(true), 1200);
+        } catch {
+          showError('resetError', 'Could not reach the server. Try again.');
+        } finally {
+          btn.disabled = false;
+        }
+      });
 
       // Guest
       document.getElementById('loginGuestBtn').addEventListener('click', () => {

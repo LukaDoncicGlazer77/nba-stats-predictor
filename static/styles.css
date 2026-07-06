@@ -3040,6 +3040,29 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   margin-bottom: 16px;
 }
 
+.login-success {
+  background: rgba(52,211,153,0.12);
+  border: 1px solid rgba(52,211,153,0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.84rem;
+  color: #34d399;
+  margin-bottom: 16px;
+}
+
+.forgot-link {
+  background: none;
+  border: none;
+  color: var(--accent-2);
+  font-size: 0.84rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.8;
+}
+.forgot-link:hover { opacity: 1; }
+
 /* ── Loading Screen ─────────────────────────────────────────────────────── */
 #loadingScreen {
   position: fixed;

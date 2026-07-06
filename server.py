@@ -38,6 +38,42 @@ def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), PBKDF2_ITERATIONS)
     return hmac.compare_digest(digest.hex(), hash_hex)
 
+
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+
+
+def send_reset_email(to_email: str, token: str) -> bool:
+    reset_url = f"https://statfuel.online/?reset_token={token}"
+    html = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0d0d1a;color:#e2e8f0;border-radius:12px">
+      <h2 style="color:#a78bfa;margin-bottom:8px">Reset your StatFuel password</h2>
+      <p style="color:#94a3b8;margin-bottom:24px">Click the button below to set a new password. This link expires in 1 hour.</p>
+      <a href="{reset_url}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600">Reset Password</a>
+      <p style="color:#475569;font-size:13px;margin-top:24px">If you didn't request this, you can ignore this email.</p>
+    </div>
+    """
+    payload = json.dumps({
+        "from": "StatFuel <noreply@statfuel.online>",
+        "to": [to_email],
+        "subject": "Reset your StatFuel password",
+        "html": html,
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status < 300
+    except Exception as exc:
+        print(f"send_reset_email failed: {exc}")
+        return False
+
 # ── Salary model (loaded once at startup) ──────────────────────────────────
 _salary_model = None
 def _load_salary_model():
@@ -420,6 +456,51 @@ class Handler(SimpleHTTPRequestHandler):
                         (email, "google"),
                     )
                     conn.commit()
+            return self.send_json({"ok": True, "email": email})
+
+        if parsed.path == "/api/forgot-password":
+            email = (body.get("email") or "").strip().lower()
+            if not email or "@" not in email:
+                return self.send_json({"error": "Valid email required"}, status=400)
+            token = secrets.token_urlsafe(32)
+            expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+            with get_conn() as conn:
+                row = q1(conn, "SELECT email FROM archive_users WHERE email = %s", (email,))
+                if row:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "UPDATE archive_users SET reset_token = %s, reset_token_expires = %s WHERE email = %s",
+                        (token, expires, email),
+                    )
+                    conn.commit()
+            # Always return ok — don't reveal whether email exists
+            if row:
+                send_reset_email(email, token)
+            return self.send_json({"ok": True})
+
+        if parsed.path == "/api/reset-password":
+            token = (body.get("token") or "").strip()
+            new_password = body.get("password") or ""
+            if not token:
+                return self.send_json({"error": "Reset token required"}, status=400)
+            if len(new_password) < 6:
+                return self.send_json({"error": "Password must be at least 6 characters"}, status=400)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            with get_conn() as conn:
+                row = q1(conn, "SELECT email, reset_token_expires FROM archive_users WHERE reset_token = %s", (token,))
+                if not row:
+                    return self.send_json({"error": "Invalid or expired reset link"}, status=400)
+                email, expires = row[0], row[1]
+                if expires is None or (expires.tzinfo is None and now.replace(tzinfo=None) > expires) or \
+                   (expires.tzinfo is not None and now > expires):
+                    return self.send_json({"error": "Reset link has expired"}, status=400)
+                pw_hash, salt = hash_password(new_password)
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE archive_users SET password_hash = %s, password_salt = %s, reset_token = NULL, reset_token_expires = NULL WHERE email = %s",
+                    (pw_hash, salt, email),
+                )
+                conn.commit()
             return self.send_json({"ok": True, "email": email})
 
         if parsed.path == "/api/heartbeat":
@@ -1248,6 +1329,8 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
                 # OAuth users have no password — make these columns nullable
                 cur.execute("ALTER TABLE archive_users ALTER COLUMN password_hash DROP NOT NULL")
                 cur.execute("ALTER TABLE archive_users ALTER COLUMN password_salt DROP NOT NULL")
+                cur.execute("ALTER TABLE archive_users ADD COLUMN IF NOT EXISTS reset_token TEXT")
+                cur.execute("ALTER TABLE archive_users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ")
                 conn.commit()
             return
         except Exception as exc:
