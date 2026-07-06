@@ -699,16 +699,18 @@ def projected_engine_comps(target, pool, top_n=5):
         results.append({
             "player": cand["player"], "season": cand["season"],
             "engine_similarity": round(raw_score, 1), "_raw_score": raw_score,
+            "_obpm_pr": cand.get("obpm_pr") or 0.0,
             "dominant_engine": cand["dominant_engine"], "breakdown": breakdown,
             "explanation": explain_comp(target, cand, breakdown),
         })
-    results.sort(key=lambda r: -r["_raw_score"])
+    results.sort(key=lambda r: (-r["_raw_score"], -r["_obpm_pr"]))
     seen, out = set(), []
     for r in results:
         if r["player"] in seen:
             continue
         seen.add(r["player"])
         del r["_raw_score"]
+        del r["_obpm_pr"]
         out.append(r)
         if len(out) == top_n:
             break
