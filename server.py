@@ -62,7 +62,8 @@ def send_reset_email(to_email: str, token: str) -> bool:
     msg["To"] = to_email
     msg.attach(email.mime.text.MIMEText(html, "html"))
     try:
-        with smtplib.SMTP_SSL("smtp.resend.com", 465, timeout=10) as server:
+        with smtplib.SMTP("smtp.resend.com", 587, timeout=10) as server:
+            server.starttls()
             server.login("resend", RESEND_API_KEY)
             server.sendmail("noreply@statfuel.online", [to_email], msg.as_string())
         return True
