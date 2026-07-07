@@ -43,7 +43,7 @@ def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
     return hmac.compare_digest(digest.hex(), hash_hex)
 
 
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
 
 
 def send_reset_email(to_email: str, token: str) -> bool:
@@ -56,17 +56,28 @@ def send_reset_email(to_email: str, token: str) -> bool:
       <p style="color:#475569;font-size:13px;margin-top:24px">If you didn't request this, you can ignore this email.</p>
     </div>
     """
-    msg = email.mime.multipart.MIMEMultipart("alternative")
-    msg["Subject"] = "Reset your StatFuel password"
-    msg["From"] = "StatFuel <noreply@statfuel.online>"
-    msg["To"] = to_email
-    msg.attach(email.mime.text.MIMEText(html, "html"))
+    payload = json.dumps({
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": "noreply@statfuel.online", "name": "StatFuel"},
+        "subject": "Reset your StatFuel password",
+        "content": [{"type": "text/html", "value": html}],
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {SENDGRID_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
     try:
-        with smtplib.SMTP("smtp.resend.com", 587, timeout=10) as server:
-            server.starttls()
-            server.login("resend", RESEND_API_KEY)
-            server.sendmail("noreply@statfuel.online", [to_email], msg.as_string())
-        return True
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status < 300
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        print(f"send_reset_email failed: {exc.code} {body}")
+        return False
     except Exception as exc:
         print(f"send_reset_email failed: {exc}")
         return False
