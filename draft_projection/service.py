@@ -41,6 +41,20 @@ _NICKNAME_MAP: dict[str, str] = {
     "ace bailey": "airious bailey",
 }
 
+# Draft context for players already picked in previous classes — they're not in
+# archive_draft_prospects_2026 so age/pick/college would all be None without this.
+# Add a row whenever a queryable player was drafted in a past class.
+_KNOWN_PICKS: dict[str, dict] = {
+    # 2025 NBA Draft
+    "cooper flagg":    {"overall_pick": 1.0,  "age_at_draft": 19.0, "college": "Duke"},
+    "dylan harper":    {"overall_pick": 2.0,  "age_at_draft": 19.0, "college": "Rutgers"},
+    "airious bailey":  {"overall_pick": 3.0,  "age_at_draft": 19.0, "college": "Rutgers"},
+    "vj edgecombe":    {"overall_pick": 5.0,  "age_at_draft": 20.0, "college": "Baylor"},
+    "derik queen":     {"overall_pick": 4.0,  "age_at_draft": 20.0, "college": "Maryland"},
+    "kon knueppel":    {"overall_pick": 6.0,  "age_at_draft": 21.0, "college": "Duke"},
+    "khaman maluach":  {"overall_pick": 9.0,  "age_at_draft": 19.0, "college": "Duke"},
+}
+
 USE_HIERARCHICAL_MODEL = True
 
 _model_bundle_cache = {"loaded": False, "bundle": None}
@@ -78,6 +92,15 @@ def build_draft_projection(conn, q, pool: HistoricalPool, *, player_name: str,
                             overall_pick: Optional[float] = None) -> dict:
     # Resolve nickname → official name before any DB lookups
     player_name = _NICKNAME_MAP.get(player_name.lower(), player_name)
+
+    # Fill in draft context for players from past classes not in archive_draft_prospects_2026
+    known = _KNOWN_PICKS.get(player_name.lower(), {})
+    if age_at_draft is None and "age_at_draft" in known:
+        age_at_draft = known["age_at_draft"]
+    if overall_pick is None and "overall_pick" in known:
+        overall_pick = known["overall_pick"]
+    if college is None and "college" in known:
+        college = known["college"]
 
     fv = build_feature_vector(
         conn, q, player_name=player_name, college=college,
