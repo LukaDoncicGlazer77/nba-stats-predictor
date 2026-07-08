@@ -32,7 +32,10 @@ from draft_projection.predict import (
 log = logging.getLogger("draft_projection.service")
 
 TOP_N_COMPS_FOR_POOL_SCORING = 50  # comp-based probability estimator wants a wide pool
-TOP_N_COMPS_TO_RETURN = 10         # but the API/UI only show the closest 10
+TOP_N_COMPS_TO_RETURN = 10         # final displayed comps
+TOP_N_FOR_ARCH_BLEND = 20          # compute arch_match on this many before re-sorting
+
+ARCH_BLEND_WEIGHT = 0.40           # weight of arch_match in final sim; rest goes to raw comp sim
 
 # Nickname → official name as used in archive_cbb_player_stats.
 # Add entries whenever a well-known prospect has a nickname that differs from
@@ -128,17 +131,28 @@ def build_draft_projection(conn, q, pool: HistoricalPool, *, player_name: str,
 
     prospect_mix = compute_archetype_mix(conn, q, player_name=player_name)
     shot_creation = get_shot_creation_data(conn, q, player_name=player_name)
-    comparables = []
-    for c in top_comps:
+
+    # Compute arch_match for a wider candidate pool, then re-sort by a blended score
+    # so role-similar players (e.g. Mobley for Flagg) rank above pick-slot-only matches.
+    arch_candidates = all_comps[:TOP_N_FOR_ARCH_BLEND]
+    candidates_with_arch = []
+    for c in arch_candidates:
         comp_mix = compute_archetype_mix(conn, q, player_name=c["player"])
+        am = archetype_match_strength(prospect_mix, comp_mix)
+        blended = (1 - ARCH_BLEND_WEIGHT) * c["similarity"] + ARCH_BLEND_WEIGHT * am if am is not None else c["similarity"]
+        candidates_with_arch.append((blended, c, am))
+    candidates_with_arch.sort(key=lambda x: -x[0])
+
+    comparables = []
+    for blended_sim, c, am in candidates_with_arch[:TOP_N_COMPS_TO_RETURN]:
         comparables.append({
             "player": c["player"],
             "draft_season": c["draft_season"],
             "overall_pick": c["overall_pick"],
             "college": c["college"],
-            "similarity": c["similarity"],
+            "similarity": round(blended_sim, 1),
             "actual_outcome": c["tier_label"],
-            "archetype_match": archetype_match_strength(prospect_mix, comp_mix),
+            "archetype_match": am,
             "explanation": explain_comp(player_name, c),
         })
 
