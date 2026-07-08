@@ -57,10 +57,16 @@ def pull_season(end_year: int, existing: set) -> list[dict]:
         resp = LeagueDashPlayerShotLocations(
             season=season_str(end_year),
             season_type_all_star="Regular Season",
-            per_mode_simple="Totals",
+            per_mode_detailed="Totals",
             timeout=60,
         )
         df = resp.get_data_frames()[0]
+        # Flatten MultiIndex columns: ("Restricted Area", "FGA") -> "Restricted Area_FGA"
+        if hasattr(df.columns, "levels"):
+            df.columns = [
+                f"{a}_{b}".strip("_") if a and str(a).strip() else str(b)
+                for a, b in df.columns
+            ]
     except Exception as e:
         print(f"    ERROR: {e}")
         return []
@@ -81,9 +87,9 @@ def pull_season(end_year: int, existing: set) -> list[dict]:
             except (TypeError, ValueError):
                 return default
 
-        rim_a   = g("RESTRICTED_AREA_FGA") + g("IN_THE_PAINT_NON_RA_FGA")
-        mid_a   = g("MID_RANGE_FGA")
-        three_a = g("LEFT_CORNER_3_FGA") + g("RIGHT_CORNER_3_FGA") + g("ABOVE_THE_BREAK_3_FGA")
+        rim_a   = g("Restricted Area_FGA") + g("In The Paint (Non-RA)_FGA")
+        mid_a   = g("Mid-Range_FGA")
+        three_a = g("Left Corner 3_FGA") + g("Right Corner 3_FGA") + g("Above the Break 3_FGA")
 
         if rim_a + mid_a + three_a == 0:
             continue
