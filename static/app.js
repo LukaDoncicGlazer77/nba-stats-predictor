@@ -935,10 +935,51 @@ function renderArchetypePanel(report, player) {
       ${buildShotCreationPanel(report.college_shot_creation)}
     </div>` : "";
 
+  const cs = report.creation_signals || {};
+  const creationSignalsHtml = (cs.self_creation_pct != null) ? (() => {
+    const rimAst = cs.rim_assisted_pct != null ? cs.rim_assisted_pct : null;
+    const threeUnast = cs.three_unassisted_pct != null ? cs.three_unassisted_pct : null;
+    const rimUnast = rimAst != null ? (100 - rimAst).toFixed(1) : null;
+    const threeAst = threeUnast != null ? (100 - threeUnast).toFixed(1) : null;
+
+    const rows = [
+      rimUnast != null ? `
+        <div class="cs-row">
+          <span class="cs-label">2P (rim/mid)</span>
+          <div class="cs-bar-wrap">
+            <div class="cs-bar cs-bar-unast" style="width:${rimUnast}%" title="${rimUnast}% self-created"></div>
+            <div class="cs-bar cs-bar-ast" style="width:${rimAst}%" title="${rimAst}% assisted"></div>
+          </div>
+          <span class="cs-nums">${rimUnast}% self / ${rimAst}% ast</span>
+        </div>` : "",
+      threeAst != null ? `
+        <div class="cs-row">
+          <span class="cs-label">3PT</span>
+          <div class="cs-bar-wrap">
+            <div class="cs-bar cs-bar-unast" style="width:${threeUnast}%" title="${threeUnast}% self-created (pull-up)"></div>
+            <div class="cs-bar cs-bar-ast" style="width:${threeAst}%" title="${threeAst}% catch-and-shoot"></div>
+          </div>
+          <span class="cs-nums">${threeUnast}% pull-up / ${threeAst}% C&amp;S</span>
+        </div>` : "",
+    ].join("");
+
+    return `
+      <div class="cs-panel" style="margin-top:18px">
+        <p class="pcard-summary" style="margin-bottom:6px"><strong>Shot Creation</strong> &mdash; self-created vs. assisted</p>
+        <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px">Overall self-creation rate: <strong>${cs.self_creation_pct}%</strong></div>
+        ${rows}
+        <div class="cs-legend">
+          <span><span class="cs-swatch cs-bar-unast"></span>Self-created</span>
+          <span><span class="cs-swatch cs-bar-ast"></span>Assisted</span>
+        </div>
+      </div>`;
+  })() : "";
+
   panel.innerHTML = `
     <div class="overview-top-row">
       <div class="profile-col">
         <div class="pfact-grid">${weightBars}</div>
+        ${creationSignalsHtml}
         ${shotCreationHtml}
       </div>
       <div class="profile-col">

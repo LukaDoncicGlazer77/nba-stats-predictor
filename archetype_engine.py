@@ -151,7 +151,11 @@ def load_pool(conn, q):
             continue
         sc = (1 - ast2) * x2p + (1 - ast3) * x3p
         if key not in shooting_by_key or g > shooting_by_key[key]["games"]:
-            shooting_by_key[key] = {"games": g, "self_creation": sc}
+            shooting_by_key[key] = {
+                "games": g, "self_creation": sc,
+                "rim_ast_pct": ast2,          # % of 2P FGs that were assisted
+                "three_unast_pct": 1.0 - ast3, # % of 3P FGs that were unassisted
+            }
 
     physical_by_player = {
         r["player_id"]: (_to_float(r["ht_in_in"]), _to_float(r["wt"])) for r in physical_rows
@@ -184,6 +188,8 @@ def load_pool(conn, q):
             "pts_pg": per_game["pts_pg"], "trb_pg": per_game["trb_pg"],
             "ht_in": ht_in, "wt": wt,
             "self_creation": shooting["self_creation"] if shooting else None,
+            "rim_ast_pct": shooting["rim_ast_pct"] if shooting else None,
+            "three_unast_pct": shooting["three_unast_pct"] if shooting else None,
         })
 
     pool.sort(key=lambda p: (p["player_id"], p["season"]))
@@ -239,17 +245,21 @@ def add_efficiency_under_load(pool):
 
 
 def add_self_creation_percentile(pool):
-    """Ranks self_creation (unassisted-FGA fraction) per season among player-seasons
-    with shooting data (1997+). Pre-1997 players have no _pr key; creation_burden()
-    falls back to plain usg*ast for them."""
-    by_season = defaultdict(list)
+    """Ranks self_creation, rim_ast_pct, and three_unast_pct per season (1997+).
+    Pre-1997 players have no _pr keys; callers fall back to proxies for them.
+    rim_ast_pct_pr and three_unast_pct_pr activate the blending logic already
+    written in scoring_profile()."""
+    by_season: dict[int, list] = defaultdict(list)
     for p in pool:
-        if p.get("self_creation") is not None:
-            by_season[p["season"]].append(p)
+        by_season[p["season"]].append(p)
     for rows in by_season.values():
-        n = len(rows)
-        for i, p in enumerate(sorted(rows, key=lambda x: x["self_creation"])):
-            p["self_creation_pr"] = (i + 1) / n
+        for col in ("self_creation", "rim_ast_pct", "three_unast_pct"):
+            present = [p for p in rows if p.get(col) is not None]
+            n = len(present)
+            if n == 0:
+                continue
+            for i, p in enumerate(sorted(present, key=lambda x: x[col])):
+                p[f"{col}_pr"] = (i + 1) / n
     return pool
 
 
@@ -333,6 +343,10 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
     rim_raw = defense["rim_protector_raw"]
     versatile_raw = defense["versatile_defender_raw"]
     sf = _size_factor(p.get("ht_in"))
+    # 3&D Wing prefers catch-and-shoot 3s (low three_unast_pct_pr). Factor ranges
+    # 0.75 (all pull-up) → 1.0 (all catch-and-shoot). Falls back to neutral (0.875)
+    # when shooting data is unavailable (pre-1997 players).
+    three_d_cs = 0.75 + 0.25 * (1.0 - p.get("three_unast_pct_pr", 0.5))
 
     raw = {
         "Heliocentric Engine": creation["heliocentric_engine"],
@@ -343,7 +357,7 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
         "Playmaking Big": sf * (creation["secondary_playmaker"] * rim_raw * 1.5
             + creation["heliocentric_engine"] * rim_raw * 1.5),
         "Rim Protector": sf * (rim_raw * low_creation * 2),
-        "3&D Wing": versatile_raw * scoring["three_pt_pressure"] * (low_creation / 100) * 3,
+        "3&D Wing": versatile_raw * scoring["three_pt_pressure"] * (low_creation / 100) * 3 * three_d_cs,
         "Defensive Wing": versatile_raw * low_creation * 2 * (1 if usage == "low" else 0.5),
         "Hybrid Offensive Big": sf * (hybrid * 4),
     }
@@ -780,6 +794,10 @@ def build_player_report(conn, q, player_id, season):
         return None
 
     curves = build_age_curves(pool)
+
+    def _pct(val):
+        return round(val * 100, 1) if val is not None else None
+
     return {
         "player": target["player"],
         "season": target["season"],
@@ -788,6 +806,13 @@ def build_player_report(conn, q, player_id, season):
         "age": target["age"],
         "dominant_engine": target["dominant_engine"],
         "archetype_weights": target["named_mix"],
+        # Shot-creation signals: how self-generated vs. assisted each scoring
+        # zone is. Available for 1997+ seasons only; None for earlier eras.
+        "creation_signals": {
+            "self_creation_pct": _pct(target.get("self_creation")),
+            "rim_assisted_pct": _pct(target.get("rim_ast_pct")),
+            "three_unassisted_pct": _pct(target.get("three_unast_pct")),
+        },
         "same_stage_comps": same_stage_comps(target, pool),
         "projected_engine_comps": projected_engine_comps(target, pool),
         "next_season_projection": project_next_season(target, curves),

@@ -4480,6 +4480,18 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .dp-sc-tag.unast { color: #6ad0f0; }
 .dp-sc-count { font-weight: 400; opacity: 0.7; }
 
+/* Archetype panel: NBA shot creation signals */
+.cs-panel { display: flex; flex-direction: column; gap: 8px; }
+.cs-row { display: grid; grid-template-columns: 60px 1fr auto; align-items: center; gap: 8px; }
+.cs-label { font-size: 0.75rem; font-weight: 600; color: rgba(220,232,255,0.85); }
+.cs-bar-wrap { display: flex; height: 8px; border-radius: 6px; overflow: hidden; background: rgba(255,255,255,0.07); }
+.cs-bar { height: 100%; transition: width 0.3s ease; }
+.cs-bar-unast { background: #4eb8e0; }
+.cs-bar-ast   { background: #7e6ee0; }
+.cs-nums { font-size: 0.70rem; color: var(--muted); white-space: nowrap; }
+.cs-legend { display: flex; gap: 14px; font-size: 0.70rem; color: var(--muted); margin-top: 4px; align-items: center; }
+.cs-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 3px; vertical-align: middle; }
+
 .dp-explain-block { margin-bottom: 14px; }
 .dp-explain-title {
   font-size: 0.72rem;
