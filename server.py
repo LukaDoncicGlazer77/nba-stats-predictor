@@ -553,9 +553,9 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception:
                 pass
         except Exception as e:
-            tb = traceback.format_exc()
+            traceback.print_exc()
             try:
-                self.send_json({"error": str(e), "traceback": tb}, status=500)
+                self.send_json({"error": str(e)}, status=500)
             except Exception:
                 pass
 

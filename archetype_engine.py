@@ -353,7 +353,8 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
     # 3&D Wing prefers catch-and-shoot 3s (low three_unast_pct_pr). Factor ranges
     # 0.75 (all pull-up) → 1.0 (all catch-and-shoot). Falls back to neutral (0.875)
     # when shooting data is unavailable (pre-1997 players).
-    three_d_cs = 0.75 + 0.25 * (1.0 - p.get("three_unast_pct_pr", 0.5))
+    _three_unast = p.get("three_unast_pct_pr")
+    three_d_cs = 0.75 + 0.25 * (1.0 - (_three_unast if _three_unast is not None else 0.5))
 
     raw = {
         "Heliocentric Engine": creation["heliocentric_engine"],
