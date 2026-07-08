@@ -83,16 +83,23 @@ C_KEYS = ["three_pt_pressure", "interior_pressure"]
 # Per-season percentile columns. The "_pr" suffix on each is added by add_percentiles().
 PERCENTILE_COLS = [
     "usg_pct", "ast_pct", "blk_pct", "drb_pct", "stl_pct", "fg3a_rate", "ft_rate",
-    "ts_pct", "tov_pct", "bpm", "obpm", "vorp", "pts_pg", "trb_pg", "ht_in", "wt",
+    "ts_pct", "tov_pct", "bpm", "obpm", "dbpm", "vorp", "pts_pg", "trb_pg", "ht_in", "wt",
 ]
 
-# Final comp score = weighted combination of four embeddings: how a player generates
-# offense (playstyle), how much they produce once you discount empty volume
-# (efficiency-adjusted stats), broader two-way impact (advanced metrics), and body
-# profile (physical). This replaces a single raw usage/assist vector specifically so
-# that two high-usage, high-assist players with very different efficiency and
-# turnover profiles don't read as comps just because their box scores rhyme.
-COMP_WEIGHTS = {"playstyle": 0.40, "stats": 0.30, "advanced": 0.20, "physical": 0.10}
+# Stable ordering for archetype_vec — must match named_archetype_mix() keys.
+_ARCH_ORDER = [
+    "Heliocentric Engine", "Secondary Playmaker", "Off-Ball Scorer",
+    "Scoring Big", "Playmaking Big", "Rim Protector",
+    "3&D Wing", "Defensive Wing", "Hybrid Offensive Big",
+]
+
+# Final comp score = weighted combination of five embeddings:
+#   playstyle  — how offense is generated + shot profile (creation style, location)
+#   stats      — efficiency-adjusted production volume
+#   advanced   — two-way impact (offense + defense separately via obpm/dbpm)
+#   archetype  — holistic named-role distribution match (9-dim softmax mix)
+#   physical   — frame; dropped when missing rather than scored as 0
+COMP_WEIGHTS = {"playstyle": 0.35, "stats": 0.25, "advanced": 0.15, "archetype": 0.15, "physical": 0.10}
 
 
 # ── data loading ─────────────────────────────────────────────────────────
@@ -439,6 +446,10 @@ def annotate(pool):
             creation["off_ball_scorer"] / 100, creation["non_creator_finisher"] / 100,
             scoring["three_pt_pressure"] / 100, scoring["interior_pressure"] / 100,
             p["ball_security"], p["efficiency_signal"], p["usage_efficiency"],
+            # Shot profile + creation style (fall back to neutral 0.5 pre-1997 when unavailable)
+            p.get("self_creation_pr", 0.5),
+            p.get("rim_att_rate_pr", 0.5),
+            p.get("three_att_rate_pr", 0.5),
         ]
         # efficiency-adjusted production volume: raw counting stats discounted (not
         # zeroed) by how efficiently they were produced, so a high-usage/low-efficiency
@@ -448,7 +459,10 @@ def annotate(pool):
             p["pts_pg_pr"] * eff_mult, p["ast_pct_pr"] * eff_mult,
             p["trb_pg_pr"], p["stl_pct_pr"], p["blk_pct_pr"],
         ]
-        p["advanced_vec"] = [p["bpm_pr"], p["obpm_pr"], p["vorp_pr"]]
+        # dbpm_pr ranks defensive impact within each season; pre-dbpm seasons fall back to 0.5.
+        p["advanced_vec"] = [p["bpm_pr"], p["obpm_pr"], p["dbpm_pr"], p["vorp_pr"]]
+        # Holistic role distribution: same 9-archetype softmax used for display.
+        p["archetype_vec"] = [p["named_mix"].get(k, 0) / 100 for k in _ARCH_ORDER]
         p["physical_vec"] = [p["ht_in_pr"], p["wt_pr"]] if p["ht_in"] is not None and p["wt"] is not None else None
     return pool
 
@@ -476,13 +490,14 @@ def _composite_similarity(a, b):
     playstyle_sim = _cosine(a["playstyle_vec"], b["playstyle_vec"])
     stats_sim = _cosine(a["stats_vec"], b["stats_vec"])
     advanced_sim = _cosine(a["advanced_vec"], b["advanced_vec"])
+    archetype_sim = _cosine(a["archetype_vec"], b["archetype_vec"])
     physical_sim = (
         _cosine(a["physical_vec"], b["physical_vec"])
         if a["physical_vec"] is not None and b["physical_vec"] is not None else None
     )
 
     terms = [(COMP_WEIGHTS["playstyle"], playstyle_sim), (COMP_WEIGHTS["stats"], stats_sim),
-             (COMP_WEIGHTS["advanced"], advanced_sim)]
+             (COMP_WEIGHTS["advanced"], advanced_sim), (COMP_WEIGHTS["archetype"], archetype_sim)]
     if physical_sim is not None:
         terms.append((COMP_WEIGHTS["physical"], physical_sim))
     total_w = sum(w for w, _ in terms)
@@ -508,6 +523,7 @@ def _composite_similarity(a, b):
         "playstyle_similarity": round(100 * playstyle_sim, 1),
         "efficiency_adjusted_stats_similarity": round(100 * stats_sim, 1),
         "advanced_metrics_similarity": round(100 * advanced_sim, 1),
+        "archetype_similarity": round(100 * archetype_sim, 1),
         "physical_similarity": round(100 * physical_sim, 1) if physical_sim is not None else None,
         "efficiency_divergence": round(100 * efficiency_divergence, 1),
     }
