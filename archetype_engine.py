@@ -354,8 +354,7 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
         "Off-Ball Scorer": creation["off_ball_scorer"] * scoring["three_pt_pressure"] / 100 * 2,
         "Scoring Big": sf * (creation["off_ball_scorer"] * scoring["interior_pressure"] / 100 * 2
             + creation["non_creator_finisher"] * scoring["interior_pressure"] / 100 * 1.5),
-        "Playmaking Big": sf * (creation["secondary_playmaker"] * rim_raw * 1.5
-            + creation["heliocentric_engine"] * rim_raw * 1.5),
+        "Playmaking Big": sf * (creation["secondary_playmaker"] + creation["heliocentric_engine"]) * (rim_raw ** 2) * 2,
         "Rim Protector": sf * (rim_raw * low_creation * 2),
         "3&D Wing": versatile_raw * scoring["three_pt_pressure"] * (low_creation / 100) * 3 * three_d_cs,
         "Defensive Wing": versatile_raw * low_creation * 2 * (1 if usage == "low" else 0.5),
