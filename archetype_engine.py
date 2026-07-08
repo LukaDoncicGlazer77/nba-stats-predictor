@@ -358,7 +358,11 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
     #   • both missing → pre-Barttorvik era, truly unknown → neutral 0.5
     _three_unast = p.get("three_unast_pct_pr")
     if _three_unast is None:
-        _three_att = p.get("three_att_rate_pr")
+        # Prefer Barttorvik shot-zone volume as proxy; fall back to fg3a_rate_pr
+        # (always present from archive_cbb_player_stats / archive_advanced).
+        # Low volume → invert as penalty; true unknown (both None) → neutral 0.5.
+        _three_att = p.get("three_att_rate_pr") if p.get("three_att_rate_pr") is not None \
+            else p.get("fg3a_rate_pr")
         _three_unast = max(0.5, 1.0 - _three_att) if _three_att is not None else 0.5
     three_d_cs = 0.75 + 0.25 * (1.0 - _three_unast)
 
