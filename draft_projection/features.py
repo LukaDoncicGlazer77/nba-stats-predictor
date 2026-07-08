@@ -443,6 +443,23 @@ def _raw_to_vector(raw: dict, age_at_draft: Optional[float], overall_pick: Optio
     raw = dict(raw)
     if age_at_draft is not None:
         raw["age_at_draft"] = age_at_draft
+
+    # If age_at_draft is still missing but we have class_year, estimate it.
+    # A freshman entering college is ~18; add class_year to get typical draft age.
+    # This prevents the age_at_draft_missing flag (41% feature importance in stage1)
+    # from dominating the bust prediction for all current prospects.
+    if raw.get("age_at_draft") is None:
+        cy = raw.get("class_year_numeric")
+        if cy is not None and not (isinstance(cy, float) and cy != cy):
+            raw["age_at_draft"] = 18.0 + float(cy)
+
+    # Similarly, if weight_lb is missing but we have real college stats,
+    # use the median rather than marking it missing — weight_lb_missing has
+    # 32% importance in stage1 and was a label-leak during training.
+    has_college_signal = raw.get("pts_per40") is not None or raw.get("ast_per40") is not None
+    if raw.get("weight_lb") is None and has_college_signal:
+        raw["weight_lb"] = FEATURE_DEFAULT["weight_lb"]
+
     raw["draft_slot_tier"] = draft_slot_to_tier(overall_pick)
 
     values, missing = {}, {}
