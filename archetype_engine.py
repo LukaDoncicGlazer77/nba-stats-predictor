@@ -351,10 +351,16 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
     versatile_raw = defense["versatile_defender_raw"]
     sf = _size_factor(p.get("ht_in"))
     # 3&D Wing prefers catch-and-shoot 3s (low three_unast_pct_pr). Factor ranges
-    # 0.75 (all pull-up) → 1.0 (all catch-and-shoot). Falls back to neutral (0.875)
-    # when shooting data is unavailable (pre-1997 players).
+    # 0.75 (all pull-up) → 1.0 (all catch-and-shoot).
+    # When three_unast_pct_pr is missing, distinguish two cases:
+    #   • three_att_rate_pr available and low → player is a known non-shooter (e.g. Simmons)
+    #     → invert the volume percentile as a penalty proxy
+    #   • both missing → pre-Barttorvik era, truly unknown → neutral 0.5
     _three_unast = p.get("three_unast_pct_pr")
-    three_d_cs = 0.75 + 0.25 * (1.0 - (_three_unast if _three_unast is not None else 0.5))
+    if _three_unast is None:
+        _three_att = p.get("three_att_rate_pr")
+        _three_unast = max(0.5, 1.0 - _three_att) if _three_att is not None else 0.5
+    three_d_cs = 0.75 + 0.25 * (1.0 - _three_unast)
 
     raw = {
         "Heliocentric Engine": creation["heliocentric_engine"],
