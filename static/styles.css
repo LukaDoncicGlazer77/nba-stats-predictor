@@ -2485,22 +2485,21 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   filter: blur(60px);
   pointer-events: none;
   will-change: transform;
-  transition: transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 .login-orb-1 {
   width: 600px; height: 600px;
   top: -80px; left: -100px;
-  background: radial-gradient(circle, rgba(124,92,255,0.55), transparent 65%);
+  background: radial-gradient(circle, rgba(124,92,255,0.65), transparent 65%);
 }
 .login-orb-2 {
   width: 500px; height: 500px;
   bottom: -80px; right: -60px;
-  background: radial-gradient(circle, rgba(30,160,220,0.45), transparent 65%);
+  background: radial-gradient(circle, rgba(30,160,220,0.55), transparent 65%);
 }
 .login-orb-3 {
   width: 360px; height: 360px;
   top: 35%; left: 50%;
-  background: radial-gradient(circle, rgba(200,80,255,0.35), transparent 65%);
+  background: radial-gradient(circle, rgba(200,80,255,0.45), transparent 65%);
 }
 
 .login-card {
