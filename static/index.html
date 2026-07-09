@@ -19,6 +19,56 @@
     <meta name="twitter:title" content="StatFuel" />
     <meta name="twitter:description" content="Explore NBA player stats, career trends, draft prospects, and award history." />
     <meta name="twitter:image" content="https://statfuel.online/og-image.png" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://statfuel.online/#website",
+          "url": "https://statfuel.online",
+          "name": "StatFuel",
+          "description": "NBA player stats, career projections, draft prospects, and archetype analysis.",
+          "publisher": { "@id": "https://statfuel.online/#organization" },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://statfuel.online/?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://statfuel.online/#organization",
+          "name": "StatFuel",
+          "url": "https://statfuel.online",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://statfuel.online/og-image.png",
+            "width": 1200,
+            "height": 630
+          },
+          "sameAs": []
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://statfuel.online/#app",
+          "name": "StatFuel",
+          "url": "https://statfuel.online",
+          "applicationCategory": "SportsApplication",
+          "operatingSystem": "Web",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "description": "Explore NBA player stats, career trends, draft prospects, archetype breakdowns, and historical comparisons for every player since 1947."
+        }
+      ]
+    }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
