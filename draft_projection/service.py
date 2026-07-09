@@ -77,6 +77,8 @@ _KNOWN_PICKS: dict[str, dict] = {
     "derik queen":     {"overall_pick": 4.0,  "age_at_draft": 20.0, "college": "Maryland"},
     "kon knueppel":    {"overall_pick": 6.0,  "age_at_draft": 21.0, "college": "Duke"},
     "khaman maluach":  {"overall_pick": 9.0,  "age_at_draft": 19.0, "college": "Duke"},
+    # 2026 NBA Draft
+    "cameron carr":    {"overall_pick": 24.0, "age_at_draft": 21.0, "college": "Baylor"},
 }
 
 USE_HIERARCHICAL_MODEL = True
