@@ -37,11 +37,32 @@ TOP_N_FOR_ARCH_BLEND = 20          # compute arch_match on this many before re-s
 
 ARCH_BLEND_WEIGHT = 0.40           # weight of arch_match in final sim; rest goes to raw comp sim
 
-# Nickname → official name as used in archive_cbb_player_stats.
-# Add entries whenever a well-known prospect has a nickname that differs from
-# the legal first name sports-reference.com/cbb uses.
+# Nickname / alias → canonical name as used in archive_cbb_player_stats.
+# Keys are lowercased; values must match the exact CBB name (also lowercased at lookup).
+# Covers: legal-name vs. nickname, Jr./Sr. suffix mismatches, common misspellings.
 _NICKNAME_MAP: dict[str, str] = {
-    "ace bailey": "airious bailey",
+    # Nickname → legal first name
+    "ace bailey":          "airious bailey",
+    "ace bailey jr.":      "airious bailey",   # typed with suffix
+    "airious bailey jr.":  "airious bailey",   # suffix not in CBB
+    "cam boozer":          "cameron boozer",
+    "cam carr":            "cameron carr",
+    "ced coward":          "cedric coward",
+
+    # Jr. present in CBB but omitted by user
+    "mikel brown":         "mikel brown jr.",
+
+    # Jr. absent in CBB but user types it
+    "labaron philon jr.":  "labaron philon",
+    "derik queen jr.":     "derik queen",
+    "kevin zabo jr.":      "kevin zabo",
+    "michael ajayi jr.":   "michael ajayi",
+
+    # Nickname → full legal name in CBB
+    "nate bittle":         "nathan bittle",
+
+    # Common misspelling
+    "isaiah harwell":      "isiah harwell",
 }
 
 # Draft context for players already picked in previous classes — they're not in
