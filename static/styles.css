@@ -2479,6 +2479,30 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   pointer-events: none;
 }
 
+.login-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  will-change: transform;
+  transition: transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.login-orb-1 {
+  width: 500px; height: 500px;
+  top: -140px; left: -160px;
+  background: radial-gradient(circle, rgba(124,92,255,0.28), transparent 70%);
+}
+.login-orb-2 {
+  width: 420px; height: 420px;
+  bottom: -120px; right: -100px;
+  background: radial-gradient(circle, rgba(30,160,220,0.22), transparent 70%);
+}
+.login-orb-3 {
+  width: 300px; height: 300px;
+  top: 40%; left: 55%;
+  background: radial-gradient(circle, rgba(180,80,255,0.15), transparent 70%);
+}
+
 .login-card {
   position: relative;
   z-index: 1;

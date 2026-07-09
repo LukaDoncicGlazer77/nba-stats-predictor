@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260708-creation-signals" />
+    <link rel="stylesheet" href="styles.css?v=20260709-parallax" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -193,6 +193,9 @@
     <!-- Auth Screen (single card, tabbed) -->
     <div id="authScreen">
       <div class="login-bg-glow"></div>
+      <div class="login-orb login-orb-1"></div>
+      <div class="login-orb login-orb-2"></div>
+      <div class="login-orb login-orb-3"></div>
       <div class="login-card">
 
         <!-- Logo -->
@@ -1323,6 +1326,31 @@
           showError('googleAuthError', 'Could not reach the server. Try again.');
         }
       };
+    </script>
+
+    <script>
+      (function () {
+        const orb1 = document.querySelector('.login-orb-1');
+        const orb2 = document.querySelector('.login-orb-2');
+        const orb3 = document.querySelector('.login-orb-3');
+        const card = document.querySelector('.login-card');
+
+        document.addEventListener('mousemove', function (e) {
+          const authScreen = document.getElementById('authScreen');
+          if (!authScreen || authScreen.style.display === 'none') return;
+
+          // Normalise mouse to -1..1 from screen centre
+          const cx = e.clientX / window.innerWidth  - 0.5;
+          const cy = e.clientY / window.innerHeight - 0.5;
+
+          // Deeper orbs move more (larger multiplier = more parallax depth)
+          if (orb1) orb1.style.transform = `translate(${cx * 40}px, ${cy * 30}px)`;
+          if (orb2) orb2.style.transform = `translate(${cx * -30}px, ${cy * -24}px)`;
+          if (orb3) orb3.style.transform = `translate(${cx * 20}px, ${cy * 18}px)`;
+          // Card floats the opposite direction very slightly — creates foreground depth
+          if (card) card.style.transform = `translate(${cx * -6}px, ${cy * -5}px)`;
+        });
+      })();
     </script>
   </body>
 </html>
