@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260709-parallax3" />
+    <link rel="stylesheet" href="styles.css?v=20260709-parallax4" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -1358,13 +1358,13 @@
           x2  = lerp(x2,  tx * -75,  E); y2  = lerp(y2,  ty * -58,  E);
           x3  = lerp(x3,  tx *  55,  E); y3  = lerp(y3,  ty *  45,  E);
           xC  = lerp(xC,  tx * -16,  E); yC  = lerp(yC,  ty * -12,  E);
-          ryC = lerp(ryC, tx *   7,  E); rxC = lerp(rxC, -ty *  5,  E);
+          ryC = lerp(ryC, tx *  16,  E); rxC = lerp(rxC, -ty * 11,  E);
 
           if (orb1) orb1.style.transform = `translate(${x1}px, ${y1}px)`;
           if (orb2) orb2.style.transform = `translate(${x2}px, ${y2}px)`;
           if (orb3) orb3.style.transform = `translate(${x3}px, ${y3}px)`;
           if (card) card.style.transform =
-            `perspective(900px) translate(${xC}px, ${yC}px) rotateY(${ryC}deg) rotateX(${rxC}deg)`;
+            `perspective(600px) translate(${xC}px, ${yC}px) rotateY(${ryC}deg) rotateX(${rxC}deg)`;
         })();
       })();
     </script>
