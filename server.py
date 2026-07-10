@@ -46,6 +46,43 @@ def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
 
 
+def send_verification_email(to_email: str, token: str) -> bool:
+    verify_url = f"https://statfuel.online/?verify_token={token}"
+    html = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0d0d1a;color:#e2e8f0;border-radius:12px">
+      <h2 style="color:#a78bfa;margin-bottom:8px">Verify your StatFuel email</h2>
+      <p style="color:#94a3b8;margin-bottom:24px">Click the button below to verify your email and activate your account. This link expires in 24 hours.</p>
+      <a href="{verify_url}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600">Verify Email</a>
+      <p style="color:#475569;font-size:13px;margin-top:24px">If you didn't create a StatFuel account, you can ignore this email.</p>
+    </div>
+    """
+    payload = json.dumps({
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": "noreply@statfuel.online", "name": "StatFuel"},
+        "subject": "Verify your StatFuel email",
+        "content": [{"type": "text/html", "value": html}],
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {SENDGRID_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status < 300
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        print(f"send_verification_email failed: {exc.code} {body}")
+        return False
+    except Exception as exc:
+        print(f"send_verification_email failed: {exc}")
+        return False
+
+
 def send_reset_email(to_email: str, token: str) -> bool:
     reset_url = f"https://statfuel.online/?reset_token={token}"
     html = f"""
@@ -413,27 +450,84 @@ class Handler(SimpleHTTPRequestHandler):
             if len(password) < 6:
                 return self.send_json({"error": "Password must be at least 6 characters"}, status=400)
             with get_conn() as conn:
-                if q1(conn, "SELECT 1 FROM archive_users WHERE email = ?", (email,)):
+                existing = q1(conn, "SELECT email_verified FROM archive_users WHERE email = %s", (email,))
+                if existing:
+                    if existing[0] is False:
+                        # Resend verification for unverified account
+                        token = secrets.token_urlsafe(32)
+                        expires = datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+                        cur = conn.cursor()
+                        cur.execute(
+                            "UPDATE archive_users SET verification_token = %s, verification_token_expires = %s WHERE email = %s",
+                            (token, expires, email),
+                        )
+                        conn.commit()
+                        send_verification_email(email, token)
+                        return self.send_json({"ok": True, "needs_verification": True, "email": email})
                     return self.send_json({"error": "An account with this email already exists"}, status=409)
                 pw_hash, salt = hash_password(password)
+                token = secrets.token_urlsafe(32)
+                expires = datetime.datetime.utcnow() + datetime.timedelta(hours=24)
                 cur = conn.cursor()
                 cur.execute(
-                    "INSERT INTO archive_users (email, password_hash, password_salt) VALUES (%s, %s, %s)",
-                    (email, pw_hash, salt),
+                    "INSERT INTO archive_users (email, password_hash, password_salt, email_verified, verification_token, verification_token_expires) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (email, pw_hash, salt, False, token, expires),
                 )
                 conn.commit()
-            return self.send_json({"ok": True, "email": email})
+            send_verification_email(email, token)
+            return self.send_json({"ok": True, "needs_verification": True, "email": email})
 
         if parsed.path == "/api/login":
             email = (body.get("email") or "").strip().lower()
             password = body.get("password") or ""
             with get_conn() as conn:
-                row = q1(conn, "SELECT password_hash, password_salt FROM archive_users WHERE email = ?", (email,))
+                row = q1(conn, "SELECT password_hash, password_salt, email_verified FROM archive_users WHERE email = %s", (email,))
             if row and row[0] is None:
                 return self.send_json({"error": "This account uses Google Sign-In. Use the 'Sign in with Google' button."}, status=400)
             if not row or not verify_password(password, row[1], row[0]):
                 return self.send_json({"error": "Incorrect email or password"}, status=401)
+            if row[2] is False:
+                return self.send_json({"error": "Please verify your email before signing in.", "needs_verification": True, "email": email}, status=403)
             return self.send_json({"ok": True, "email": email})
+
+        if parsed.path == "/api/verify-email":
+            token = (body.get("token") or "").strip()
+            if not token:
+                return self.send_json({"error": "Verification token required"}, status=400)
+            with get_conn() as conn:
+                row = q1(conn, "SELECT email, verification_token_expires FROM archive_users WHERE verification_token = %s", (token,))
+                if not row:
+                    return self.send_json({"error": "Invalid or expired verification link"}, status=400)
+                if datetime.datetime.utcnow() > row[1].replace(tzinfo=None):
+                    return self.send_json({"error": "Verification link has expired. Please sign up again to get a new one."}, status=400)
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE archive_users SET email_verified = TRUE, verification_token = NULL, verification_token_expires = NULL WHERE verification_token = %s",
+                    (token,),
+                )
+                conn.commit()
+            return self.send_json({"ok": True, "email": row[0]})
+
+        if parsed.path == "/api/resend-verification":
+            email = (body.get("email") or "").strip().lower()
+            if not email:
+                return self.send_json({"error": "Email required"}, status=400)
+            with get_conn() as conn:
+                row = q1(conn, "SELECT email_verified FROM archive_users WHERE email = %s", (email,))
+                if not row:
+                    return self.send_json({"ok": True})  # Don't reveal non-existence
+                if row[0] is True:
+                    return self.send_json({"error": "This account is already verified"}, status=400)
+                token = secrets.token_urlsafe(32)
+                expires = datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE archive_users SET verification_token = %s, verification_token_expires = %s WHERE email = %s",
+                    (token, expires, email),
+                )
+                conn.commit()
+            send_verification_email(email, token)
+            return self.send_json({"ok": True})
 
         if parsed.path == "/api/google-auth":
             credential = (body.get("credential") or "").strip()
@@ -1338,6 +1432,9 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
                 cur.execute("ALTER TABLE archive_users ALTER COLUMN password_salt DROP NOT NULL")
                 cur.execute("ALTER TABLE archive_users ADD COLUMN IF NOT EXISTS reset_token TEXT")
                 cur.execute("ALTER TABLE archive_users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ")
+                cur.execute("ALTER TABLE archive_users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE")
+                cur.execute("ALTER TABLE archive_users ADD COLUMN IF NOT EXISTS verification_token TEXT")
+                cur.execute("ALTER TABLE archive_users ADD COLUMN IF NOT EXISTS verification_token_expires TIMESTAMPTZ")
                 conn.commit()
             return
         except Exception as exc:

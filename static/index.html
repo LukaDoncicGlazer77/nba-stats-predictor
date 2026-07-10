@@ -308,6 +308,18 @@
           </form>
         </div>
 
+        <!-- Verify Email panel -->
+        <div id="panelVerifyEmail" style="display:none">
+          <div style="text-align:center;padding:12px 0 8px">
+            <div style="font-size:36px;margin-bottom:12px">📬</div>
+            <h3 style="color:#e2e8f0;margin:0 0 8px;font-size:18px">Check your email</h3>
+            <p style="color:#94a3b8;font-size:14px;margin:0 0 20px" id="verifyEmailHint">We sent a verification link to your email. Click it to activate your account.</p>
+            <div id="verifyResendMsg" class="login-success hidden"></div>
+            <button class="login-btn" id="resendVerifyBtn" style="margin-bottom:8px">Resend verification email</button>
+            <button class="login-guest-btn" style="width:100%;margin-top:4px" onclick="showPanel('panelSignIn')">Back to Sign In</button>
+          </div>
+        </div>
+
         <div class="login-divider"><span>or</span></div>
         <button class="login-guest-btn" id="loginGuestBtn">Continue as Guest</button>
 
@@ -1145,6 +1157,14 @@
         showApp(false);
       }
 
+      let _pendingVerifyEmail = '';
+
+      function showPanel(id) {
+        ['panelSignIn','panelCreateAccount','panelForgotPassword','panelResetPassword','panelVerifyEmail'].forEach(p => {
+          document.getElementById(p).style.display = p === id ? '' : 'none';
+        });
+      }
+
       // Tab switching
       function switchTab(active) {
         document.getElementById('tabSignIn').classList.toggle('active', active === 'signin');
@@ -1153,6 +1173,7 @@
         document.getElementById('panelCreateAccount').style.display = active === 'create' ? '' : 'none';
         document.getElementById('panelForgotPassword').style.display = 'none';
         document.getElementById('panelResetPassword').style.display = 'none';
+        document.getElementById('panelVerifyEmail').style.display = 'none';
       }
       document.getElementById('tabSignIn').addEventListener('click', () => switchTab('signin'));
       document.getElementById('tabCreateAccount').addEventListener('click', () => switchTab('create'));
@@ -1200,12 +1221,58 @@
           document.getElementById('panelForgotPassword').style.display = 'none';
           document.getElementById('panelResetPassword').style.display = '';
           document.getElementById('panelResetPassword').dataset.token = token;
-          // Hide tabs and guest button while resetting
           document.querySelector('.auth-tabs').style.display = 'none';
           document.getElementById('loginGuestBtn').style.display = 'none';
           document.querySelector('.login-divider').style.display = 'none';
         }
+
+        const verifyToken = params.get('verify_token');
+        if (verifyToken) {
+          // Auto-verify on page load when user clicks the email link
+          (async () => {
+            try {
+              const res = await fetch('/api/verify-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: verifyToken }),
+              });
+              const data = await res.json();
+              if (res.ok) {
+                localStorage.setItem(SESSION_KEY, data.email);
+                window.history.replaceState({}, '', '/');
+                showApp(true);
+              } else {
+                showPanel('panelSignIn');
+                showError('loginError', data.error || 'Verification failed. Please try again.');
+              }
+            } catch {
+              showPanel('panelSignIn');
+              showError('loginError', 'Could not reach the server. Try again.');
+            }
+          })();
+        }
       })();
+
+      // Resend verification email
+      document.getElementById('resendVerifyBtn').addEventListener('click', async function() {
+        this.disabled = true;
+        const msg = document.getElementById('verifyResendMsg');
+        msg.classList.add('hidden');
+        try {
+          await fetch('/api/resend-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: _pendingVerifyEmail }),
+          });
+          msg.textContent = 'Verification email resent! Check your inbox.';
+          msg.classList.remove('hidden');
+        } catch {
+          msg.textContent = 'Could not resend. Try again.';
+          msg.classList.remove('hidden');
+        } finally {
+          setTimeout(() => { this.disabled = false; }, 5000);
+        }
+      });
 
       // Reset password form
       document.getElementById('resetForm').addEventListener('submit', async e => {
@@ -1259,7 +1326,19 @@
             body: JSON.stringify({ email, password: pass }),
           });
           const data = await res.json();
-          if (!res.ok) { showError('loginError', data.error || 'Incorrect email or password.'); return; }
+          if (!res.ok) {
+            if (data.needs_verification) {
+              _pendingVerifyEmail = data.email || email;
+              document.getElementById('verifyEmailHint').textContent = `Please verify ${_pendingVerifyEmail} before signing in.`;
+              showPanel('panelVerifyEmail');
+              document.querySelector('.auth-tabs').style.display = 'none';
+              document.getElementById('loginGuestBtn').style.display = 'none';
+              document.querySelector('.login-divider').style.display = 'none';
+              return;
+            }
+            showError('loginError', data.error || 'Incorrect email or password.');
+            return;
+          }
           localStorage.setItem(SESSION_KEY, data.email);
           showApp(true);
         } catch {
@@ -1286,6 +1365,15 @@
           });
           const data = await res.json();
           if (!res.ok) { showError('signupError', data.error || 'Could not create account.'); return; }
+          if (data.needs_verification) {
+            _pendingVerifyEmail = data.email;
+            document.getElementById('verifyEmailHint').textContent = `We sent a verification link to ${data.email}. Click it to activate your account.`;
+            showPanel('panelVerifyEmail');
+            document.querySelector('.auth-tabs').style.display = 'none';
+            document.getElementById('loginGuestBtn').style.display = 'none';
+            document.querySelector('.login-divider').style.display = 'none';
+            return;
+          }
           localStorage.setItem(SESSION_KEY, data.email);
           showApp(true);
         } catch {
