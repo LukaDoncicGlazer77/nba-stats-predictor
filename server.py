@@ -993,66 +993,57 @@ class Handler(SimpleHTTPRequestHandler):
                 prospect = dict(prospect_rows[0])
                 rank = safe_int_py(prospect.get("rank")) or 30
 
-                picks = q(conn, """
-                    WITH season_rows AS (
-                        SELECT DISTINCT ON (player_id, season)
-                               player_id, season, pos, pts_per_game, trb_per_game, ast_per_game
-                        FROM archive_player_per_game
-                        WHERE season != ''
-                        ORDER BY player_id, season,
-                                 CASE WHEN team ~ 'TM$' THEN 0 ELSE 1 END
-                    ),
-                    rookie_pos AS (
-                        SELECT DISTINCT ON (player_id) player_id, pos
-                        FROM season_rows
-                        ORDER BY player_id, season::int ASC
-                    ),
-                    career AS (
+                # Use the real comp engine (CBB stats + physical + draft context)
+                pool = _get_draft_projection_pool()
+                raw_comps = comp_engine.find_top_comps(
+                    conn, q, pool,
+                    player_name=name,
+                    college=prospect.get("school"),
+                    age_at_draft=safe_float_py(prospect.get("age")),
+                    overall_pick=float(rank),
+                    top_n=8,
+                )
+
+                # Enrich comps with career stats from archive tables
+                comp_ids = [c["player_id"] for c in raw_comps if c.get("player_id")]
+                career_by_id = {}
+                if comp_ids:
+                    career_rows = q(conn, """
+                        WITH season_rows AS (
+                            SELECT DISTINCT ON (player_id, season)
+                                   player_id, season, pts_per_game, trb_per_game, ast_per_game
+                            FROM archive_player_per_game
+                            WHERE season != '' AND player_id = ANY(%s)
+                            ORDER BY player_id, season,
+                                     CASE WHEN team ~ 'TM$' THEN 0 ELSE 1 END
+                        )
                         SELECT player_id,
-                               ROUND(AVG(NULLIF(NULLIF(pts_per_game, ''), 'NA')::float)::numeric, 1) AS career_pts,
-                               ROUND(AVG(NULLIF(NULLIF(trb_per_game, ''), 'NA')::float)::numeric, 1) AS career_reb,
-                               ROUND(AVG(NULLIF(NULLIF(ast_per_game, ''), 'NA')::float)::numeric, 1) AS career_ast,
+                               ROUND(AVG(NULLIF(NULLIF(pts_per_game,''),'NA')::float)::numeric,1) AS career_pts,
+                               ROUND(AVG(NULLIF(NULLIF(trb_per_game,''),'NA')::float)::numeric,1) AS career_reb,
+                               ROUND(AVG(NULLIF(NULLIF(ast_per_game,''),'NA')::float)::numeric,1) AS career_ast,
                                COUNT(season) AS seasons_played,
-                               ROUND(MAX(NULLIF(NULLIF(pts_per_game, ''), 'NA')::float)::numeric, 1) AS peak_pts
-                        FROM season_rows
-                        GROUP BY player_id
-                    )
-                    SELECT d.player, d.player_id, d.season AS draft_season, d.overall_pick, d.college,
-                           rp.pos AS rookie_pos,
-                           c.career_pts, c.career_reb, c.career_ast, c.seasons_played, c.peak_pts
-                    FROM archive_draft_pick_history d
-                    JOIN career c ON c.player_id = d.player_id
-                    LEFT JOIN rookie_pos rp ON rp.player_id = d.player_id
-                    WHERE d.overall_pick != ''
-                """)
+                               ROUND(MAX(NULLIF(NULLIF(pts_per_game,''),'NA')::float)::numeric,1) AS peak_pts
+                        FROM season_rows GROUP BY player_id
+                    """, (comp_ids,))
+                    career_by_id = {r["player_id"]: dict(r) for r in career_rows}
 
-            def pos_bucket(pos):
-                p = (pos or "").upper()
-                bucket = set()
-                if "G" in p:
-                    bucket.add("G")
-                if "F" in p:
-                    bucket.add("F")
-                if "C" in p:
-                    bucket.add("C")
-                return bucket
-
-            prospect_buckets = pos_bucket(prospect.get("pos"))
-            scored = []
-            for row in picks:
-                r = dict(row)
-                pick = safe_int_py(r.get("overall_pick"))
-                if pick is None:
-                    continue
-                position_match = bool(prospect_buckets & pos_bucket(r.get("rookie_pos")))
-                pick_distance = abs(pick - rank)
-                draft_season = safe_int_py(r.get("draft_season")) or 0
-                r["pick_distance"] = pick_distance
-                r["position_match"] = position_match
-                scored.append((pick_distance - (8 if position_match else 0), -draft_season, r))
-
-            scored.sort(key=lambda triple: triple[:2])
-            comps = [r for *_, r in scored[:8]]
+            comps = []
+            for c in raw_comps:
+                career = career_by_id.get(c.get("player_id"), {})
+                comps.append({
+                    "player": c["player"],
+                    "player_id": c.get("player_id"),
+                    "draft_season": c.get("draft_season"),
+                    "overall_pick": c.get("overall_pick"),
+                    "college": c.get("college"),
+                    "similarity": c.get("similarity"),
+                    "tier_label": c.get("tier_label"),
+                    "career_pts": career.get("career_pts"),
+                    "career_reb": career.get("career_reb"),
+                    "career_ast": career.get("career_ast"),
+                    "seasons_played": career.get("seasons_played"),
+                    "peak_pts": career.get("peak_pts"),
+                })
 
             def avg(key):
                 vals = [float(c[key]) for c in comps if c.get(key) is not None]
