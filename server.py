@@ -994,6 +994,7 @@ class Handler(SimpleHTTPRequestHandler):
                 rank = safe_int_py(prospect.get("rank")) or 30
 
                 # Use the real comp engine (CBB stats + physical + draft context)
+                import draft_projection.comp_engine as comp_engine
                 pool = _get_draft_projection_pool()
                 raw_comps = comp_engine.find_top_comps(
                     conn, q, pool,
