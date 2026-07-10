@@ -327,6 +327,7 @@ button, input, select { font: inherit; }
   color: var(--ink);
   box-shadow: none;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  -webkit-appearance: none;
 }
 
 .global-search::placeholder { color: rgba(255,255,255,0.22); }
@@ -379,9 +380,10 @@ button, input, select { font: inherit; }
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  z-index: 200;
+  z-index: 9999;
   max-height: 300px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .global-search-results.hidden { display: none; }
@@ -399,6 +401,8 @@ button, input, select { font: inherit; }
   cursor: pointer;
   border-bottom: 1px solid var(--line);
   font-size: 0.84rem;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(124,92,255,0.15);
 }
 
 .search-result-item:last-child { border-bottom: none; }
@@ -4579,6 +4583,18 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .page { padding: 14px 12px; }
   .topbar-search-wrap { max-width: none; }
   .topbar-user { display: none; }
+  /* Prevent iOS auto-zoom on input focus — must be ≥16px */
+  .global-search { font-size: 16px; }
+  /* Dropdown escapes topbar stacking context on mobile by going fixed */
+  .global-search-results {
+    position: fixed;
+    top: auto;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: 50vh;
+    border-radius: 12px;
+  }
   .player-avatar-hero { width: 76px; height: 76px; font-size: 1.5rem; }
   .profile-hero-main { gap: 14px; }
   .cmp-player-bar { grid-template-columns: 1fr; }

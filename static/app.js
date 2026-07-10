@@ -2963,6 +2963,12 @@ $("#clearWatchlist").addEventListener("click", () => { saveWatchlist([]); render
 const globalSearch = $("#globalSearch");
 const globalResults = $("#globalSearchResults");
 
+function positionSearchResults() {
+  if (window.innerWidth > 480) return;
+  const rect = globalSearch.getBoundingClientRect();
+  globalResults.style.top = (rect.bottom + 6) + "px";
+}
+
 globalSearch.addEventListener("input", () => {
   const q = globalSearch.value.toLowerCase().trim();
   if (!q || players.length === 0) { globalResults.classList.add("hidden"); return; }
@@ -2977,16 +2983,19 @@ globalSearch.addEventListener("input", () => {
       <span><strong>${p.name}</strong><span>${l.team || "—"} · ${p.position} · ${fmt(l.pts,"pts")} PPG</span></span>
     </div>`;
   }).join("");
+  positionSearchResults();
   globalResults.classList.remove("hidden");
   globalResults.querySelectorAll(".search-result-item").forEach((item) => {
-    item.addEventListener("click", () => {
+    const select = () => {
       const player = players.find((p) => p.id === item.dataset.id);
       if (player) {
         globalSearch.value = "";
         globalResults.classList.add("hidden");
         openPlayerProfile(player);
       }
-    });
+    };
+    item.addEventListener("click", select);
+    item.addEventListener("touchend", (e) => { e.preventDefault(); select(); });
   });
 });
 
@@ -2995,6 +3004,12 @@ document.addEventListener("click", (e) => {
     globalResults.classList.add("hidden");
   }
 });
+
+document.addEventListener("touchstart", (e) => {
+  if (!globalSearch.contains(e.target) && !globalResults.contains(e.target)) {
+    globalResults.classList.add("hidden");
+  }
+}, { passive: true });
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
