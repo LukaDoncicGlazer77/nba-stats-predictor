@@ -2848,7 +2848,7 @@ function renderSimilarTab(container, active) {
   container.innerHTML=`
     <div class="cmp-pcard cmp-full">
       <div class="cmp-pcard-title">Similar Players · <span style="color:var(--sidebar-active);text-transform:none;letter-spacing:0">${anchor.name}</span></div>
-      <div id="cmpSimilarContent" style="color:var(--muted);font-size:0.85rem;padding:16px 0">Loading from comparison engine...</div>
+      <div id="cmpSimilarContent" class="loading-state"><div class="sf-spinner"></div><span>Loading from comparison engine&hellip;</span></div>
     </div>`;
   fetchSimilarTab(anchor);
 }
