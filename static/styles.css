@@ -1602,6 +1602,57 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .save-btn:hover { color: #fff; border-color: rgba(255,255,255,0.35); }
 .save-btn.saved { color: var(--gold); border-color: var(--gold); }
 
+.share-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.share-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.share-btn:hover { color: #fff; border-color: rgba(255,255,255,0.35); }
+
+.share-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--dropdown-bg);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  z-index: 9999;
+  min-width: 160px;
+  overflow: hidden;
+}
+
+.share-option {
+  display: block;
+  width: 100%;
+  padding: 11px 16px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  text-align: left;
+  font-size: 0.84rem;
+  color: rgba(255,255,255,0.75);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  touch-action: manipulation;
+}
+.share-option:last-child { border-bottom: none; }
+.share-option:hover { background: rgba(255,255,255,0.06); color: #fff; }
+
 /* Hero */
 .profile-hero-dark {
   background: linear-gradient(160deg, #0a1628 0%, #0d2040 55%, #091420 100%);

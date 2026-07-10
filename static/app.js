@@ -560,6 +560,7 @@ async function initPlayers() {
     dataSource = "no data";
   }
   renderPlayerGrid();
+  document.dispatchEvent(new Event("sf:playersLoaded"));
 }
 
 function weightedAverage(values) {
@@ -671,7 +672,64 @@ function renderPlayerGrid() {
 function openPlayerProfile(player) {
   playerState.player = player;
   navigate("player-profile");
+  history.replaceState(null, '', `#player-profile?id=${encodeURIComponent(player.playerId || player.id)}`);
 }
+
+function playerShareUrl(player) {
+  return `https://statfuel.online/#player-profile?id=${encodeURIComponent(player.playerId || player.id)}`;
+}
+
+(function initShareBtn() {
+  const btn = $("#profileShareBtn");
+  const dropdown = $("#shareDropdown");
+  if (!btn || !dropdown) return;
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const player = playerState.player;
+    if (!player) return;
+
+    if (navigator.share) {
+      const l = latestSeason(player);
+      navigator.share({
+        title: `${player.name} — StatFuel`,
+        text: `Check out ${player.name}'s stats and archetype breakdown on StatFuel — ${fmt(l.pts,"pts")} PPG · ${fmt(l.ast,"ast")} APG · ${fmt(l.reb,"reb")} RPG`,
+        url: playerShareUrl(player),
+      }).catch(() => {});
+      return;
+    }
+    dropdown.classList.toggle("hidden");
+  });
+
+  $("#shareTwitter").addEventListener("click", () => {
+    const player = playerState.player; if (!player) return;
+    const l = latestSeason(player);
+    const text = `${player.name} — ${fmt(l.pts,"pts")} PPG · ${fmt(l.ast,"ast")} APG · ${fmt(l.reb,"reb")} RPG\n\nFull breakdown on StatFuel 👇`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(playerShareUrl(player))}`, "_blank");
+    dropdown.classList.add("hidden");
+  });
+
+  $("#shareReddit").addEventListener("click", () => {
+    const player = playerState.player; if (!player) return;
+    const l = latestSeason(player);
+    const title = `${player.name} stats & archetype breakdown — ${fmt(l.pts,"pts")} PPG · ${fmt(l.ast,"ast")} APG · ${fmt(l.reb,"reb")} RPG (StatFuel)`;
+    window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(playerShareUrl(player))}&title=${encodeURIComponent(title)}`, "_blank");
+    dropdown.classList.add("hidden");
+  });
+
+  $("#shareCopy").addEventListener("click", async () => {
+    const player = playerState.player; if (!player) return;
+    await navigator.clipboard.writeText(playerShareUrl(player));
+    const orig = $("#shareCopy").textContent;
+    $("#shareCopy").textContent = "✓ Copied!";
+    setTimeout(() => { if ($("#shareCopy")) $("#shareCopy").textContent = orig; }, 1800);
+    dropdown.classList.add("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!$("#shareWrap")?.contains(e.target)) dropdown.classList.add("hidden");
+  });
+})();
 
 function renderPlayerProfile() {
   if (!playerState.player) return;
@@ -3035,8 +3093,25 @@ document.addEventListener("touchstart", (e) => {
 })();
 
 loadDashboard();
-const _initialSection = (location.hash.slice(1) || "dashboard");
-navigate(_initialSection);
+const _initialHash = location.hash.slice(1) || "dashboard";
+const _hashParts = _initialHash.split("?");
+const _initialSection = _hashParts[0];
+const _initialParams = new URLSearchParams(_hashParts[1] || "");
+const _deepLinkId = _initialParams.get("id");
+
+if (_initialSection === "player-profile" && _deepLinkId) {
+  // Shared player link — wait for players to load then open the profile
+  navigate("players");
+  const _openDeepLink = () => {
+    const player = players.find(p => (p.playerId || p.id) === _deepLinkId);
+    if (player) openPlayerProfile(player);
+    else navigate("players");
+  };
+  if (players.length) _openDeepLink();
+  else document.addEventListener("sf:playersLoaded", _openDeepLink, { once: true });
+} else {
+  navigate(_initialSection);
+}
 
 // Heartbeat: ping every 60s to track active time for logged-in users
 (function startHeartbeat() {
