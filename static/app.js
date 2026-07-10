@@ -893,7 +893,7 @@ async function loadArchetypePanel(player) {
     panel.innerHTML = "<p class='pcard-summary'>Archetype data unavailable for this player.</p>";
     return;
   }
-  panel.innerHTML = "<p class='pcard-summary'>Loading archetype model&hellip;</p>";
+  panel.innerHTML = `<div class="loading-state"><div class="sf-spinner"></div><span>Loading archetype model&hellip;</span></div>`;
   try {
     const url = `/api/archetype?player_id=${encodeURIComponent(last.playerId)}&season=${encodeURIComponent(last.season)}`;
     const report = await fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));

@@ -1435,10 +1435,28 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 
 /* ── Loading State ── */
 .loading-state {
-  padding: 20px;
+  padding: 40px 20px;
   text-align: center;
   color: var(--muted);
   font-size: 0.84rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.sf-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(124,92,255,0.15);
+  border-top-color: #7c5cff;
+  animation: sf-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes sf-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Coming Soon Pages ── */
