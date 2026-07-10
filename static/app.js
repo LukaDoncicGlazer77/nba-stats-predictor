@@ -675,14 +675,12 @@ function openPlayerProfile(player) {
   history.replaceState(null, '', `#player-profile?id=${encodeURIComponent(player.playerId || player.id)}`);
 }
 
-function playerShareUrl(player) {
-  return `https://statfuel.online/#player-profile?id=${encodeURIComponent(player.playerId || player.id)}`;
-}
-
 (function initShareBtn() {
   const btn = $("#profileShareBtn");
   const dropdown = $("#shareDropdown");
   if (!btn || !dropdown) return;
+
+  const shareUrl = () => window.location.href;
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -693,8 +691,8 @@ function playerShareUrl(player) {
       const l = latestSeason(player);
       navigator.share({
         title: `${player.name} — StatFuel`,
-        text: `Check out ${player.name}'s stats and archetype breakdown on StatFuel — ${fmt(l.pts,"pts")} PPG · ${fmt(l.ast,"ast")} APG · ${fmt(l.reb,"reb")} RPG`,
-        url: playerShareUrl(player),
+        text: `${player.name} — ${fmt(l.pts,"pts")} PPG · ${fmt(l.ast,"ast")} APG · ${fmt(l.reb,"reb")} RPG`,
+        url: shareUrl(),
       }).catch(() => {});
       return;
     }
@@ -705,7 +703,7 @@ function playerShareUrl(player) {
     const player = playerState.player; if (!player) return;
     const l = latestSeason(player);
     const text = `${player.name} — ${fmt(l.pts,"pts")} PPG · ${fmt(l.ast,"ast")} APG · ${fmt(l.reb,"reb")} RPG\n\nFull breakdown on StatFuel 👇`;
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(playerShareUrl(player))}`, "_blank");
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl())}`, "_blank");
     dropdown.classList.add("hidden");
   });
 
@@ -713,15 +711,15 @@ function playerShareUrl(player) {
     const player = playerState.player; if (!player) return;
     const l = latestSeason(player);
     const title = `${player.name} stats & archetype breakdown — ${fmt(l.pts,"pts")} PPG · ${fmt(l.ast,"ast")} APG · ${fmt(l.reb,"reb")} RPG (StatFuel)`;
-    window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(playerShareUrl(player))}&title=${encodeURIComponent(title)}`, "_blank");
+    window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl())}&title=${encodeURIComponent(title)}`, "_blank");
     dropdown.classList.add("hidden");
   });
 
   $("#shareCopy").addEventListener("click", async () => {
-    const player = playerState.player; if (!player) return;
-    await navigator.clipboard.writeText(playerShareUrl(player));
-    const orig = $("#shareCopy").textContent;
-    $("#shareCopy").textContent = "✓ Copied!";
+    await navigator.clipboard.writeText(shareUrl());
+    const el = $("#shareCopy");
+    const orig = el.textContent;
+    el.textContent = "✓ Copied!";
     setTimeout(() => { if ($("#shareCopy")) $("#shareCopy").textContent = orig; }, 1800);
     dropdown.classList.add("hidden");
   });
