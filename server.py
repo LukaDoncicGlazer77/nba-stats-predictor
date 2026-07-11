@@ -44,6 +44,28 @@ def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
 
 
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+MAILERLITE_API_KEY = os.environ.get("MAILERLITE_API_KEY", "")
+MAILERLITE_GROUP_ID = "192664572701705325"
+
+
+def add_to_mailerlite(email_addr):
+    if not MAILERLITE_API_KEY:
+        return
+    try:
+        payload = json.dumps({"email": email_addr, "groups": [MAILERLITE_GROUP_ID]}).encode()
+        req = urllib.request.Request(
+            "https://connect.mailerlite.com/api/subscribers",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {MAILERLITE_API_KEY}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
 
 
 def send_verification_email(to_email: str, token: str) -> bool:
@@ -475,6 +497,7 @@ class Handler(SimpleHTTPRequestHandler):
                 )
                 conn.commit()
             send_verification_email(email, token)
+            add_to_mailerlite(email)
             return self.send_json({"ok": True, "needs_verification": True, "email": email})
 
         if parsed.path == "/api/login":
