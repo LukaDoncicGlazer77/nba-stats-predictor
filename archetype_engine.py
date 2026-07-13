@@ -281,6 +281,15 @@ def _size_factor(ht_in) -> float:
     return 1.0 / (1.0 + math.exp(-1.5 * (ht_in - 78)))
 
 
+def _rim_dreb_dampener(ht_in) -> float:
+    """Scales down rim/dreb signals for guards so a guard who crashes the glass
+    doesn't inflate Rim Protector scores. Sigmoid centered on 76" (6-4):
+    ~0.27 at 6-2, ~0.5 at 6-4, ~0.73 at 6-6, ~0.88 at 6-8. Unknown height → 0.75."""
+    if ht_in is None:
+        return 0.75
+    return 1.0 / (1.0 + math.exp(-1.5 * (ht_in - 76)))
+
+
 def _softmax(scores: dict) -> dict:
     exps = {k: math.exp(1.5 * v) for k, v in scores.items()}
     total = sum(exps.values()) or 1.0
@@ -300,7 +309,8 @@ def creation_burden(p):
 
 
 def defensive_role(p):
-    rim = 0.6 * p["blk_pct_pr"] + 0.4 * p["drb_pct_pr"]
+    dampener = _rim_dreb_dampener(p.get("ht_in"))
+    rim = dampener * (0.6 * p["blk_pct_pr"] + 0.4 * p["drb_pct_pr"])
     versatile = p["stl_pct_pr"] if p["dbpm"] is None else 0.5 * p["stl_pct_pr"] + 0.5 * max(p["dbpm"], 0) / 5
     softmaxed = _softmax({"rim_protector": rim, "versatile_defender": versatile})
     return {
