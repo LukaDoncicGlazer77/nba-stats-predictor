@@ -207,7 +207,7 @@ def _row_to_archetype_input(r: dict) -> dict:
         "three_att_rate_pr": r.get("three_att_rate_pr"),
         "rim_ast_pct_pr": r.get("rim_ast_pct_pr"),
         "three_unast_pct_pr": r.get("three_unast_pct_pr"),
-        "dbpm": None,  # no NBA-style defensive BPM at the college level
+        "dbpm": r.get("dbpm"),  # college DBPM from sports-reference.com/cbb
         "ht_in": r.get("height_in"),  # feeds _size_factor() in named_archetype_mix
     }
 
@@ -230,7 +230,7 @@ def compute_archetype_mix(conn, q, *, player_name: str) -> Optional[dict]:
 
     pool_rows = q(conn, """
         SELECT name_key, academic_year, height_in,
-               usg_pct, ast_pct, blk_pct, dreb_pct, stl_pct, fg3a_rate, ft_rate
+               usg_pct, ast_pct, blk_pct, dreb_pct, stl_pct, fg3a_rate, ft_rate, dbpm
         FROM archive_cbb_player_stats
         WHERE academic_year = ?
     """, (academic_year,))
