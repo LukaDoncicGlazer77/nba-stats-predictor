@@ -133,16 +133,24 @@ def load_pool(conn, q):
     # pct_plusminus: opponent FG% vs their season average when guarded by this player.
     # Negative = forces misses. NULL for pre-2013-14 seasons → falls back to dbpm in defensive_role().
     defended_rows = q(conn, """
-        SELECT player_id, season, pct_plusminus, d_fga, gp
+        SELECT player_name, season, pct_plusminus, d_fga, gp
         FROM archive_nba_defended_fg
     """) if _table_exists(conn, q, "archive_nba_defended_fg") else []
-    # Key on (player_name, season) — archive_nba_defended_fg uses NBA.com numeric IDs
-    # which don't match BBRef player_ids in archive_advanced.
-    defended_by_key = {
-        (r["player_name"], r["season"]): _to_float(r["pct_plusminus"])
-        for r in defended_rows
-        if r.get("d_fga") and float(r["d_fga"]) >= 3.0 and r.get("gp") and int(r["gp"]) >= 20
-    }
+    # Key on (player_name, end_year_int) — season stored as '2013-14', convert to int 2013
+    # to match archive_advanced which uses end-year integers.
+    def _def_season_to_int(s):
+        try:
+            return int(str(s).split("-")[0]) + 1  # '2013-14' -> 2014
+        except (ValueError, IndexError):
+            return None
+    defended_by_key = {}
+    for r in defended_rows:
+        if not (r.get("d_fga") and float(r["d_fga"]) >= 3.0 and r.get("gp") and int(r["gp"]) >= 20):
+            continue
+        yr = _def_season_to_int(r["season"])
+        if yr is None:
+            continue
+        defended_by_key[(r["player_name"], yr)] = _to_float(r["pct_plusminus"])
     games_rows = q(conn, """
         SELECT player_id, season, g, pts_per_game, trb_per_game
         FROM archive_player_per_game
@@ -418,7 +426,7 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
         "Scoring Big": sf * (creation["off_ball_scorer"] * scoring["interior_pressure"] / 100 * 2
             + creation["non_creator_finisher"] * scoring["interior_pressure"] / 100 * 1.5),
         "Playmaking Big": sf * (p["ast_pct_pr"] ** 2) * p["usg_pct_pr"] * p["drb_pct_pr"] * 12,
-        "Rim Protector": sf * (rim_raw ** 1.5) * 2.5,
+        "Rim Protector": sf * defense["rim_protector"] * 0.8,
         "3&D Wing": versatile_raw * scoring["three_pt_pressure"] * (low_creation / 100) * 3 * three_d_cs,
         "Defensive Wing": versatile_raw * low_creation * 2 * (1 if usage == "low" else 0.5),
         "Hybrid Offensive Big": sf * (hybrid * 4),
