@@ -40,6 +40,8 @@ FEATURE_SPECS = [
     ("ast_per40", "production", 0.0),
     ("stl_per40", "production", 0.0),
     ("blk_per40", "production", 0.0),
+    ("stl_pct", "production", 0.0),
+    ("blk_pct", "production", 0.0),
     ("tov_per40", "production", 0.0),
     ("fg_pct", "production", 0.0),
     ("fg3_pct", "production", 0.0),
@@ -55,6 +57,7 @@ FEATURE_SPECS = [
     ("dreb_pct", "role", 0.0),
     ("class_year_numeric", "role", 1.0),
     ("position_group", "role", 2.0),
+    ("conf_strength", "role", 1.0),
 
     # Real PER/Win-Shares/BPM-style college advanced metrics -- only
     # possible once a source publishes them (stats.ncaa.org explicitly
@@ -75,6 +78,147 @@ FEATURE_SPECS = [
 FEATURE_NAMES = [f[0] for f in FEATURE_SPECS]
 FEATURE_CATEGORY = {f[0]: f[1] for f in FEATURE_SPECS}
 FEATURE_DEFAULT = {f[0]: f[2] for f in FEATURE_SPECS}
+
+# ── Conference strength ──────────────────────────────────────────────────────
+# Tier multiplier applied as a feature so the model learns that identical
+# production in a stronger conference is a stronger signal. Values tuned to
+# roughly match KenPom's historical conference-strength rankings.
+_CONF_STRENGTH = {
+    "ACC": 1.15, "Big 12": 1.15, "Big Ten": 1.15, "SEC": 1.15, "Big East": 1.15,
+    "Pac-12": 1.12, "Pac-10": 1.12,
+    "AAC": 1.07, "Atlantic 10": 1.07, "Mountain West": 1.07, "WCC": 1.07,
+    "MVC": 1.04, "CAA": 1.03, "MAC": 1.02, "MAAC": 1.01, "WAC": 1.00,
+    "Horizon": 1.00, "Sun Belt": 0.98, "CUSA": 0.97, "A-Sun": 0.95,
+    "Big Sky": 0.93, "America East": 0.92, "Patriot": 0.92, "OVC": 0.91,
+    "NEC": 0.90, "Southland": 0.90, "SWAC": 0.88, "MEAC": 0.88,
+    "Ivy": 0.94, "Summit": 0.93, "SoCon": 0.95, "Southern": 0.95,
+}
+
+_TEAM_CONF: dict[str, str] = {
+    # ACC
+    "Duke": "ACC", "North Carolina": "ACC", "Virginia": "ACC", "Syracuse": "ACC",
+    "Louisville": "ACC", "Miami (FL)": "ACC", "Florida State": "ACC", "NC State": "ACC",
+    "Clemson": "ACC", "Georgia Tech": "ACC", "Notre Dame": "ACC", "Pittsburgh": "ACC",
+    "Wake Forest": "ACC", "Boston College": "ACC", "Virginia Tech": "ACC",
+    "California": "ACC", "Stanford": "ACC", "SMU": "ACC", "Southern Methodist": "ACC",
+    # Big Ten
+    "Michigan State": "Big Ten", "Michigan": "Big Ten", "Indiana": "Big Ten",
+    "Illinois": "Big Ten", "Ohio State": "Big Ten", "Purdue": "Big Ten",
+    "Iowa": "Big Ten", "Wisconsin": "Big Ten", "Minnesota": "Big Ten",
+    "Penn State": "Big Ten", "Northwestern": "Big Ten", "Nebraska": "Big Ten",
+    "Maryland": "Big Ten", "Rutgers": "Big Ten", "UCLA": "Big Ten",
+    "USC": "Big Ten", "Washington": "Big Ten", "Oregon": "Big Ten",
+    "Michigan State": "Big Ten",
+    # Big 12
+    "Kansas": "Big 12", "Texas": "Big 12", "Baylor": "Big 12",
+    "Oklahoma State": "Big 12", "Oklahoma": "Big 12", "TCU": "Big 12",
+    "Texas Tech": "Big 12", "West Virginia": "Big 12", "Iowa State": "Big 12",
+    "Kansas State": "Big 12", "Cincinnati": "Big 12", "Houston": "Big 12",
+    "UCF": "Big 12", "BYU": "Big 12", "Brigham Young": "Big 12",
+    "Utah": "Big 12", "Arizona": "Big 12", "Arizona State": "Big 12",
+    "Colorado": "Big 12",
+    # SEC
+    "Kentucky": "SEC", "Duke": "ACC", "Alabama": "SEC", "Auburn": "SEC",
+    "Florida": "SEC", "Georgia": "SEC", "LSU": "SEC", "Mississippi State": "SEC",
+    "Ole Miss": "SEC", "South Carolina": "SEC", "Tennessee": "SEC",
+    "Vanderbilt": "SEC", "Arkansas": "SEC", "Missouri": "SEC",
+    "Mississippi": "SEC", "Texas A&M": "SEC", "Oklahoma": "SEC", "Texas": "SEC",
+    # Big East
+    "Georgetown": "Big East", "Connecticut": "Big East", "UConn": "Big East",
+    "Villanova": "Big East", "Marquette": "Big East", "St. John's": "Big East",
+    "Providence": "Big East", "Seton Hall": "Big East", "DePaul": "Big East",
+    "Butler": "Big East", "Xavier": "Big East", "Creighton": "Big East",
+    # Pac-12 (historical)
+    "Arizona": "Pac-12", "UCLA": "Pac-12", "USC": "Pac-12",
+    "Stanford": "Pac-12", "California": "Pac-12", "Oregon": "Pac-12",
+    "Washington": "Pac-12", "Utah": "Pac-12", "Colorado": "Pac-12",
+    "Arizona State": "Pac-12", "Oregon State": "Pac-12", "Washington State": "Pac-12",
+    # AAC
+    "Memphis": "AAC", "Wichita State": "AAC", "Temple": "AAC",
+    "Tulsa": "AAC", "South Florida": "AAC", "Tulane": "AAC",
+    "East Carolina": "AAC", "North Texas": "AAC", "UTSA": "AAC",
+    # Atlantic 10
+    "Saint Louis": "Atlantic 10", "VCU": "Atlantic 10", "Richmond": "Atlantic 10",
+    "Dayton": "Atlantic 10", "Rhode Island": "Atlantic 10", "George Mason": "Atlantic 10",
+    "La Salle": "Atlantic 10", "Fordham": "Atlantic 10", "George Washington": "Atlantic 10",
+    "Massachusetts": "Atlantic 10", "UMass": "Atlantic 10", "Davidson": "Atlantic 10",
+    "Saint Joseph's": "Atlantic 10", "Duquesne": "Atlantic 10",
+    # Mountain West
+    "UNLV": "Mountain West", "San Diego State": "Mountain West",
+    "New Mexico": "Mountain West", "Utah State": "Mountain West",
+    "Fresno State": "Mountain West", "Nevada": "Mountain West",
+    "Colorado State": "Mountain West", "Wyoming": "Mountain West",
+    "Boise State": "Mountain West", "Air Force": "Mountain West",
+    # WCC
+    "Gonzaga": "WCC", "Saint Mary's": "WCC", "San Francisco": "WCC",
+    "Pepperdine": "WCC", "Loyola Marymount": "WCC", "Portland": "WCC",
+    "Pacific": "WCC", "San Diego": "WCC", "BYU": "WCC",
+    # MVC
+    "Wichita State": "MVC", "Illinois State": "MVC", "Indiana State": "MVC",
+    "Drake": "MVC", "Bradley": "MVC", "Evansville": "MVC",
+    "Northern Iowa": "MVC", "Southern Illinois": "MVC",
+    # MAC
+    "Akron": "MAC", "Toledo": "MAC", "Ohio": "MAC", "Miami (OH)": "MAC",
+    "Ball State": "MAC", "Central Michigan": "MAC", "Eastern Michigan": "MAC",
+    "Kent State": "MAC", "Western Michigan": "MAC", "Bowling Green": "MAC",
+    "Buffalo": "MAC", "Northern Illinois": "MAC",
+    # Sun Belt
+    "Arkansas State": "Sun Belt", "Troy": "Sun Belt", "Georgia Southern": "Sun Belt",
+    "Louisiana": "Sun Belt", "South Alabama": "Sun Belt", "Texas State": "Sun Belt",
+    "App State": "Sun Belt", "Appalachian State": "Sun Belt",
+    "Georgia State": "Sun Belt", "Little Rock": "Sun Belt",
+    # Ivy
+    "Harvard": "Ivy", "Princeton": "Ivy", "Yale": "Ivy", "Penn": "Ivy",
+    "Columbia": "Ivy", "Cornell": "Ivy", "Dartmouth": "Ivy", "Brown": "Ivy",
+    # SoCon / Southern
+    "Furman": "SoCon", "Wofford": "SoCon", "Samford": "SoCon",
+    "Mercer": "SoCon", "The Citadel": "SoCon", "VMI": "SoCon",
+    "Western Carolina": "SoCon", "East Tennessee State": "SoCon",
+    "ETSU": "SoCon", "Chattanooga": "SoCon", "UNC Greensboro": "SoCon",
+    # SWAC
+    "Southern": "SWAC", "Grambling": "SWAC", "Jackson State": "SWAC",
+    "Prairie View": "SWAC", "Alcorn State": "SWAC", "Alabama A&M": "SWAC",
+    "Alabama State": "SWAC", "Texas Southern": "SWAC", "Bethune-Cookman": "SWAC",
+    # MEAC
+    "Howard": "MEAC", "Morgan State": "MEAC", "Norfolk State": "MEAC",
+    "North Carolina A&T": "MEAC", "Coppin State": "MEAC", "UMES": "MEAC",
+    "Maryland-Eastern Shore": "MEAC", "Delaware State": "MEAC",
+    "South Carolina State": "MEAC",
+    # Big Sky
+    "Montana": "Big Sky", "Weber State": "Big Sky", "Eastern Washington": "Big Sky",
+    "Idaho": "Big Sky", "Northern Colorado": "Big Sky", "Sacramento State": "Big Sky",
+    "Montana State": "Big Sky", "North Dakota": "Big Sky", "Northern Arizona": "Big Sky",
+    "Portland State": "Big Sky", "Idaho State": "Big Sky", "Southern Utah": "Big Sky",
+    # Horizon
+    "Milwaukee": "Horizon", "Wright State": "Horizon", "Oakland": "Horizon",
+    "IUPUI": "Horizon", "Green Bay": "Horizon", "Cleveland State": "Horizon",
+    "Detroit Mercy": "Horizon", "Robert Morris": "Horizon", "Northern Kentucky": "Horizon",
+    # CAA
+    "Delaware": "CAA", "Hofstra": "CAA", "James Madison": "CAA",
+    "Northeastern": "CAA", "Drexel": "CAA", "Towson": "CAA",
+    "Stony Brook": "CAA", "UNCW": "CAA", "William & Mary": "CAA",
+    "Elon": "CAA", "Hampton": "CAA",
+    # America East
+    "Vermont": "America East", "Albany (NY)": "America East",
+    "Binghamton": "America East", "Hartford": "America East",
+    "Maine": "America East", "Maryland-Baltimore County": "America East",
+    "UMBC": "America East", "New Hampshire": "America East",
+}
+
+
+def _team_conf_strength(team: Optional[str]) -> float:
+    if not team:
+        return 1.0
+    conf = _TEAM_CONF.get(team)
+    if conf:
+        return _CONF_STRENGTH.get(conf, 1.0)
+    # Fuzzy fallback: check if any known team name is a substring
+    team_lower = team.lower()
+    for known_team, conf in _TEAM_CONF.items():
+        if known_team.lower() in team_lower or team_lower in known_team.lower():
+            return _CONF_STRENGTH.get(conf, 1.0)
+    return 1.0
+
 
 CLASS_YEAR_MAP = {"FR": 1, "SO": 2, "JR": 3, "SR": 4}
 POSITION_GROUP_MAP = {"G": 1, "F": 2, "C": 3}
@@ -249,12 +393,14 @@ class NCAAStatsProvider:
 _CBB_RAW_COLS = [
     "pts_per40", "reb_per40", "ast_per40", "stl_per40", "blk_per40", "tov_per40",
     "fg_pct", "fg3_pct", "ft_pct", "ts_pct", "efg_pct", "ast_pct", "tov_pct", "oreb_pct",
-    "dreb_pct", "usg_pct", "per", "ws_per40", "obpm", "dbpm", "bpm",
+    "dreb_pct", "usg_pct", "stl_pct", "blk_pct",
+    "per", "ws_per40", "obpm", "dbpm", "bpm",
 ]
+_CBB_ADVANCED = {"per", "ws_per40", "obpm", "dbpm", "bpm"}
 
 
 def _cbb_row_to_features(r: dict) -> dict:
-    out = {k: r.get(k) for k in _CBB_RAW_COLS if k not in ("per", "ws_per40", "obpm", "dbpm", "bpm")}
+    out = {k: r.get(k) for k in _CBB_RAW_COLS if k not in _CBB_ADVANCED}
     out["college_per"] = r.get("per")
     out["college_ws_per40"] = r.get("ws_per40")
     out["college_obpm"] = r.get("obpm")
@@ -264,6 +410,7 @@ def _cbb_row_to_features(r: dict) -> dict:
     out["weight_lb"] = r.get("weight_lb")
     out["class_year_numeric"] = class_year_to_numeric(r.get("class_year"))
     out["position_group"] = position_to_group(r.get("position"))
+    out["conf_strength"] = _team_conf_strength(r.get("team"))
     return out
 
 
@@ -282,7 +429,7 @@ class SportsReferenceCBBProvider:
         key = normalize_name_for_match(player_name)
         try:
             rows = q(conn, f"""
-                SELECT {", ".join(_CBB_RAW_COLS)}, class_year, position, height_in, weight_lb, academic_year
+                SELECT {", ".join(_CBB_RAW_COLS)}, class_year, position, height_in, weight_lb, team, academic_year
                 FROM archive_cbb_player_stats
                 WHERE name_key = ?
                 ORDER BY academic_year DESC
@@ -306,7 +453,7 @@ class SportsReferenceCBBProvider:
             if name_keys:
                 rows = q(conn, f"""
                     SELECT name_key, {", ".join(_CBB_RAW_COLS)}, class_year, position,
-                           height_in, weight_lb, academic_year
+                           height_in, weight_lb, team, academic_year
                     FROM archive_cbb_player_stats
                     WHERE name_key = ANY(%s)
                     ORDER BY name_key, academic_year DESC
@@ -314,7 +461,7 @@ class SportsReferenceCBBProvider:
             else:
                 rows = q(conn, f"""
                     SELECT name_key, {", ".join(_CBB_RAW_COLS)}, class_year, position,
-                           height_in, weight_lb, academic_year
+                           height_in, weight_lb, team, academic_year
                     FROM archive_cbb_player_stats
                     ORDER BY name_key, academic_year DESC
                 """)
