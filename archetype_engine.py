@@ -84,6 +84,7 @@ C_KEYS = ["three_pt_pressure", "interior_pressure"]
 PERCENTILE_COLS = [
     "usg_pct", "ast_pct", "blk_pct", "drb_pct", "stl_pct", "fg3a_rate", "ft_rate",
     "ts_pct", "tov_pct", "bpm", "obpm", "dbpm", "vorp", "pts_pg", "trb_pg", "ht_in", "wt",
+    "def_fg_plusminus",
 ]
 
 # Stable ordering for archetype_vec — must match named_archetype_mix() keys.
@@ -111,6 +112,11 @@ def _to_float(v):
         return None
 
 
+def _table_exists(conn, q, table_name: str) -> bool:
+    rows = q(conn, "SELECT 1 FROM information_schema.tables WHERE table_name = %s AND table_schema = 'public'", (table_name,))
+    return bool(rows)
+
+
 def load_pool(conn, q):
     """One row per (player_id, season): merges archive_advanced with games
     played from archive_player_per_game (multi-team trade seasons collapse
@@ -123,6 +129,18 @@ def load_pool(conn, q):
                ts_percent, tov_percent, bpm, obpm, vorp
         FROM archive_advanced
     """)
+    # Defended FG% tracking — available from 2013-14 onward only (NBA.com player tracking).
+    # pct_plusminus: opponent FG% vs their season average when guarded by this player.
+    # Negative = forces misses. NULL for pre-2013-14 seasons → falls back to dbpm in defensive_role().
+    defended_rows = q(conn, """
+        SELECT player_id, season, pct_plusminus, d_fga, gp
+        FROM archive_nba_defended_fg
+    """) if _table_exists(conn, q, "archive_nba_defended_fg") else []
+    defended_by_key = {
+        (r["player_id"], r["season"]): _to_float(r["pct_plusminus"])
+        for r in defended_rows
+        if r.get("d_fga") and float(r["d_fga"]) >= 3.0 and r.get("gp") and int(r["gp"]) >= 20
+    }
     games_rows = q(conn, """
         SELECT player_id, season, g, pts_per_game, trb_per_game
         FROM archive_player_per_game
@@ -197,6 +215,7 @@ def load_pool(conn, q):
             "self_creation": shooting["self_creation"] if shooting else None,
             "rim_ast_pct": shooting["rim_ast_pct"] if shooting else None,
             "three_unast_pct": shooting["three_unast_pct"] if shooting else None,
+            "def_fg_plusminus": defended_by_key.get((r["player_id"], int(r["season"]))),
         })
 
     pool.sort(key=lambda p: (p["player_id"], p["season"]))
@@ -311,7 +330,18 @@ def creation_burden(p):
 def defensive_role(p):
     dampener = _rim_dreb_dampener(p.get("ht_in"))
     rim = dampener * (0.6 * p["blk_pct_pr"] + 0.4 * p["drb_pct_pr"])
-    versatile = p["stl_pct_pr"] if p["dbpm"] is None else 0.5 * p["stl_pct_pr"] + 0.5 * max(p["dbpm"], 0) / 5
+    # def_fg_plusminus_pr: percentile of pct_plusminus (lower = better defender).
+    # Invert so higher = better, then blend into versatile signal when available.
+    def_fg_pr = p.get("def_fg_plusminus_pr")
+    def_fg_inv = (1.0 - def_fg_pr) if def_fg_pr is not None else None
+    if p["dbpm"] is None and def_fg_inv is None:
+        versatile = p["stl_pct_pr"]
+    elif def_fg_inv is not None:
+        # Blend: 40% stl%, 30% dbpm (if present), 30% defended FG%
+        dbpm_term = (0.5 * max(p["dbpm"], 0) / 5) if p["dbpm"] is not None else 0.0
+        versatile = 0.4 * p["stl_pct_pr"] + 0.3 * dbpm_term * 2 + 0.3 * def_fg_inv
+    else:
+        versatile = 0.5 * p["stl_pct_pr"] + 0.5 * max(p["dbpm"], 0) / 5
     softmaxed = _softmax({"rim_protector": rim, "versatile_defender": versatile})
     return {
         "rim_protector": softmaxed["rim_protector"],
