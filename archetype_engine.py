@@ -136,8 +136,10 @@ def load_pool(conn, q):
         SELECT player_id, season, pct_plusminus, d_fga, gp
         FROM archive_nba_defended_fg
     """) if _table_exists(conn, q, "archive_nba_defended_fg") else []
+    # Key on (player_name, season) — archive_nba_defended_fg uses NBA.com numeric IDs
+    # which don't match BBRef player_ids in archive_advanced.
     defended_by_key = {
-        (r["player_id"], r["season"]): _to_float(r["pct_plusminus"])
+        (r["player_name"], r["season"]): _to_float(r["pct_plusminus"])
         for r in defended_rows
         if r.get("d_fga") and float(r["d_fga"]) >= 3.0 and r.get("gp") and int(r["gp"]) >= 20
     }
@@ -215,7 +217,7 @@ def load_pool(conn, q):
             "self_creation": shooting["self_creation"] if shooting else None,
             "rim_ast_pct": shooting["rim_ast_pct"] if shooting else None,
             "three_unast_pct": shooting["three_unast_pct"] if shooting else None,
-            "def_fg_plusminus": defended_by_key.get((r["player_id"], int(r["season"]))),
+            "def_fg_plusminus": defended_by_key.get((r["player"], int(r["season"]))),
         })
 
     pool.sort(key=lambda p: (p["player_id"], p["season"]))
@@ -334,14 +336,17 @@ def defensive_role(p):
     # Invert so higher = better, then blend into versatile signal when available.
     def_fg_pr = p.get("def_fg_plusminus_pr")
     def_fg_inv = (1.0 - def_fg_pr) if def_fg_pr is not None else None
+    def _dbpm_to_unit(dbpm):
+        # Normalize DBPM to [0,1]: clamp to [-3, 8] range then scale. Elite ~8, average ~0, bad ~-3.
+        return min(max((dbpm + 3) / 11, 0.0), 1.0)
+
     if p["dbpm"] is None and def_fg_inv is None:
         versatile = p["stl_pct_pr"]
     elif def_fg_inv is not None:
-        # Blend: 40% stl%, 30% dbpm (if present), 30% defended FG%
-        dbpm_term = (0.5 * max(p["dbpm"], 0) / 5) if p["dbpm"] is not None else 0.0
-        versatile = 0.4 * p["stl_pct_pr"] + 0.3 * dbpm_term * 2 + 0.3 * def_fg_inv
+        dbpm_term = _dbpm_to_unit(p["dbpm"]) if p["dbpm"] is not None else 0.27  # neutral default
+        versatile = 0.4 * p["stl_pct_pr"] + 0.3 * dbpm_term + 0.3 * def_fg_inv
     else:
-        versatile = 0.5 * p["stl_pct_pr"] + 0.5 * max(p["dbpm"], 0) / 5
+        versatile = 0.5 * p["stl_pct_pr"] + 0.5 * _dbpm_to_unit(p["dbpm"])
     softmaxed = _softmax({"rim_protector": rim, "versatile_defender": versatile})
     return {
         "rim_protector": softmaxed["rim_protector"],
