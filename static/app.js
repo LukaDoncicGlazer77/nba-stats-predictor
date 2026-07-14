@@ -761,6 +761,11 @@ function renderPlayerProfile() {
     delete archetypePanel.dataset.loaded;
     archetypePanel.innerHTML = `<p class="pcard-summary" style="color:var(--muted)">Select this tab to load archetype data&hellip;</p>`;
   }
+  const teamFitPanel = $("#teamFitPanel");
+  if (teamFitPanel) {
+    delete teamFitPanel.dataset.loaded;
+    teamFitPanel.innerHTML = `<p class="pcard-summary" style="color:var(--muted)">Select this tab to load team fit data&hellip;</p>`;
+  }
   // Update watchlist button
   const ids = getWatchlist();
   const btn = $("#profileWatchlistBtn");
@@ -1046,6 +1051,72 @@ function renderArchetypePanel(report, player) {
       </div>
     </div>
   `;
+}
+
+async function loadTeamFitPanel(player) {
+  const panel = $("#teamFitPanel");
+  const sub = $("#teamFitSub");
+  if (!panel) return;
+  const last = latestSeason(player);
+  if (!last || !last.playerId || !last.season) {
+    panel.innerHTML = "<p class='pcard-summary'>Team fit data unavailable for this player.</p>";
+    return;
+  }
+  panel.innerHTML = `<div class="loading-state"><div class="sf-spinner"></div><span>Analyzing team fit&hellip;</span></div>`;
+  try {
+    const url = `/api/team-fit?player_id=${encodeURIComponent(last.playerId)}&season=${encodeURIComponent(last.season)}`;
+    const data = await fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    if (sub) sub.textContent = `${data.season} season · based on archetype profile`;
+    renderTeamFitPanel(data, panel);
+  } catch (e) {
+    panel.innerHTML = "<p class='pcard-summary'>Team fit analysis unavailable for this player/season.</p>";
+  }
+}
+
+function renderTeamFitPanel(data, panel) {
+  const fits = data.fits || [];
+  if (!fits.length) {
+    panel.innerHTML = "<p class='pcard-summary'>No team fit data available.</p>";
+    return;
+  }
+
+  const teamLogos = {
+    ATL: "🦅", BOS: "🍀", BRK: "🕸️", CHI: "🐂", CHO: "🐝",
+    CLE: "⚔️", DAL: "🤠", DEN: "⛰️", DET: "🔧", GSW: "🌁",
+    HOU: "🚀", IND: "🏎️", LAC: "⚡", LAL: "💜", MEM: "🐻",
+    MIA: "🌴", MIL: "🦌", MIN: "🐺", NOP: "🎷", NYK: "🗽",
+    OKC: "🌪️", ORL: "🎢", PHI: "🔔", PHO: "☀️", POR: "🌹",
+    SAC: "👑", SAS: "🪖", TOR: "🦕", UTA: "🏔️", WAS: "🦅",
+  };
+
+  const scoreColor = (s) => s >= 80 ? "#4eb8e0" : s >= 65 ? "#7c5cff" : "#a0a0b0";
+
+  const cards = fits.map((f, i) => {
+    const rank = i + 1;
+    const logo = teamLogos[f.team] || "🏀";
+    const color = scoreColor(f.fit_score);
+    const needs = f.team_needs.length
+      ? `<div class="tf-needs">Team needs: ${f.team_needs.map(n => `<span class="tf-need-chip">${n}</span>`).join("")}</div>`
+      : "";
+    return `
+      <div class="tf-card ${rank === 1 ? "tf-card-top" : ""}">
+        <div class="tf-rank">${rank}</div>
+        <div class="tf-logo">${logo}</div>
+        <div class="tf-info">
+          <div class="tf-team-name">${f.city} <strong>${f.name}</strong></div>
+          <div class="tf-reason">${escapeHtml(f.reason)}</div>
+          ${needs}
+        </div>
+        <div class="tf-score" style="color:${color}">${f.fit_score}</div>
+      </div>`;
+  }).join("");
+
+  panel.innerHTML = `
+    <div class="tf-header">
+      <span class="tf-primary-label">Primary archetype: <strong>${escapeHtml(fits[0].player_primary)}</strong></span>
+    </div>
+    <div class="tf-list">${cards}</div>
+    <p class="tf-footnote">Fit score based on roster archetype gaps and complementarity. Higher = player fills a greater need.</p>`;
 }
 
 async function renderPredictions(player, projections = []) {
@@ -1769,6 +1840,14 @@ document.querySelectorAll(".profile-tab").forEach((tab) => {
       const panel = $("#archetypePanel");
       if (panel && !panel.dataset.loaded) {
         loadArchetypePanel(playerState.player);
+        panel.dataset.loaded = "1";
+      }
+    }
+    // Lazy-load team fit panel on first visit to the tab
+    if (tab.dataset.pane === "teamfit" && playerState.player) {
+      const panel = $("#teamFitPanel");
+      if (panel && !panel.dataset.loaded) {
+        loadTeamFitPanel(playerState.player);
         panel.dataset.loaded = "1";
       }
     }

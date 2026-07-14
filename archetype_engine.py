@@ -124,7 +124,7 @@ def load_pool(conn, q):
     representative when an aggregate "TOT"-style row isn't guaranteed to
     exist in this dataset)."""
     adv_rows = q(conn, """
-        SELECT player, player_id, season, age, usg_percent, ast_percent,
+        SELECT player, player_id, season, age, team, usg_percent, ast_percent,
                blk_percent, drb_percent, stl_percent, x3p_ar, f_tr, dbpm,
                ts_percent, tov_percent, bpm, obpm, vorp
         FROM archive_advanced
@@ -212,6 +212,7 @@ def load_pool(conn, q):
         pool.append({
             "player": r["player"], "player_id": r["player_id"],
             "season": int(r["season"]), "age": _to_float(r["age"]), "games": games,
+            "team": r.get("team"),
             "usg_pct": usg, "ast_pct": ast, "blk_pct": blk, "drb_pct": drb, "stl_pct": stl,
             "fg3a_rate": _to_float(r["x3p_ar"]) or 0.0, "ft_rate": _to_float(r["f_tr"]) or 0.0,
             "dbpm": _to_float(r["dbpm"]),

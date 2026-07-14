@@ -4699,3 +4699,35 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .proj-verdict { flex-wrap: wrap; }
   .proj-verdict-conf { border-left: none; border-top: 1px solid var(--card-border); width: 100%; padding-top: 10px; }
 }
+
+/* ── Team Fit Panel ──────────────────────────────────────────────────────── */
+.tf-header { margin-bottom: 16px; }
+.tf-primary-label { font-size: 0.85rem; color: var(--muted); }
+.tf-primary-label strong { color: var(--text); }
+
+.tf-list { display: flex; flex-direction: column; gap: 10px; }
+
+.tf-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card-bg); border: 1px solid var(--card-border);
+  border-radius: 10px; padding: 14px 16px;
+  transition: border-color 0.15s;
+}
+.tf-card:hover { border-color: rgba(124,92,255,0.4); }
+.tf-card-top { border-color: rgba(78,184,224,0.35); background: rgba(78,184,224,0.05); }
+
+.tf-rank { font-size: 1.1rem; font-weight: 700; color: var(--muted); min-width: 22px; text-align: center; }
+.tf-card-top .tf-rank { color: #4eb8e0; }
+.tf-logo { font-size: 1.5rem; min-width: 32px; text-align: center; }
+.tf-info { flex: 1; min-width: 0; }
+.tf-team-name { font-size: 0.95rem; color: var(--text); margin-bottom: 3px; }
+.tf-reason { font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; }
+.tf-needs { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.tf-needs { font-size: 0.75rem; color: var(--muted); }
+.tf-need-chip {
+  background: rgba(124,92,255,0.12); border: 1px solid rgba(124,92,255,0.25);
+  border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; color: #9a8de0;
+}
+.tf-score { font-size: 1.3rem; font-weight: 700; min-width: 44px; text-align: right; }
+
+.tf-footnote { font-size: 0.73rem; color: var(--muted); margin-top: 14px; opacity: 0.7; }
