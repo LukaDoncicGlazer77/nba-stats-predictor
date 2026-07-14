@@ -110,9 +110,15 @@ def _dominant_archetype(mix: dict) -> str:
 
 
 def _build_team_compositions(pool, season: int) -> dict:
-    """Returns {team_abbrev: avg_mix_dict} for all 30 teams using the
-    most recent season's pool data. Filters to MIN_GAMES threshold."""
+    """Returns {team_abbrev: weighted_mix_dict} for all 30 teams.
+
+    Uses games-weighted averaging so starters (more games) drive the team's
+    archetype profile proportionally more than bench players. Limits to the
+    top-9 rotation by games to prevent the 12th man from distorting the picture.
+    """
     MIN_GAMES = 20
+    TOP_ROTATION = 9
+
     by_team: dict[str, list[dict]] = {}
     for p in pool:
         if p.get("season") != season:
@@ -124,13 +130,27 @@ def _build_team_compositions(pool, season: int) -> dict:
             continue
         if not p.get("named_mix"):
             continue
-        by_team.setdefault(team, []).append(p["named_mix"])
+        by_team.setdefault(team, []).append({
+            "mix": p["named_mix"],
+            "games": float(p.get("games") or 1),
+        })
 
     compositions = {}
-    for team, mixes in by_team.items():
+    for team, players in by_team.items():
+        # Keep only top-9 by games played
+        players.sort(key=lambda x: -x["games"])
+        rotation = players[:TOP_ROTATION]
+
+        total_games = sum(pl["games"] for pl in rotation)
+        if total_games == 0:
+            continue
+
+        # Games-weighted average: starters count proportionally more
         avg = {}
         for arch in _ARCH_ORDER:
-            avg[arch] = sum(m.get(arch, 0) for m in mixes) / len(mixes)
+            avg[arch] = sum(
+                pl["mix"].get(arch, 0) * pl["games"] for pl in rotation
+            ) / total_games
         compositions[team] = avg
     return compositions
 
@@ -182,16 +202,20 @@ def _fit_score(player_mix: dict, team_mix: dict, league_avg: dict) -> tuple[floa
         gap_contributions.append((contribution, arch))
         raw += contribution
 
-    # Complementarity: look at what the team already has strong and adjust
+    # Complementarity: look at what the team already has strong and adjust.
+    # Use the player's full archetype mix (not just the primary) so that a
+    # 60% HE / 25% Secondary Playmaker player gets a blended complementarity
+    # signal, rather than being treated as a pure HE.
     comp_bonus = 0.0
     for arch, t_pct in team_mix.items():
         if t_pct < 10:
-            continue  # team doesn't really have this archetype, skip
-        rules = _COMPLEMENTARITY.get(player_primary, {})
-        if arch in rules:
-            comp_bonus += rules[arch] * (t_pct / 100)
+            continue
+        for p_arch, p_weight in player_mix.items():
+            rules = _COMPLEMENTARITY.get(p_arch, {})
+            if arch in rules:
+                comp_bonus += rules[arch] * (t_pct / 100) * (p_weight / 100)
 
-    raw = max(0.0, raw + comp_bonus * 20)
+    raw = max(0.0, raw + comp_bonus * 50)
 
     # Build reason: top archetype gap filled
     gap_contributions.sort(key=lambda x: -x[0])
