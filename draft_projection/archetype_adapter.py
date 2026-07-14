@@ -132,14 +132,20 @@ _load_shot_zones_assisted()
 def get_shot_creation_data(conn, q, *, player_name: str) -> Optional[dict]:
     """Returns per-zone assisted/unassisted display data for a prospect, or None if unavailable."""
     from server import normalize_name_for_match
-    key_str = normalize_name_for_match(player_name)
-    season_rows = q(conn, """
-        SELECT academic_year FROM archive_cbb_player_stats
-        WHERE name_key = ? ORDER BY academic_year DESC LIMIT 1
-    """, (key_str,))
-    if not season_rows:
+    base_key = normalize_name_for_match(player_name)
+    key_str = None
+    academic_year = None
+    for candidate in _name_key_candidates(base_key):
+        rows = q(conn, """
+            SELECT academic_year FROM archive_cbb_player_stats
+            WHERE name_key = ? ORDER BY academic_year DESC LIMIT 1
+        """, (candidate,))
+        if rows:
+            key_str = candidate
+            academic_year = rows[0]["academic_year"]
+            break
+    if key_str is None:
         return None
-    academic_year = season_rows[0]["academic_year"]
     entry = _SHOT_ZONES_AST.get((key_str, academic_year))
     if not entry:
         return None
@@ -229,19 +235,52 @@ def _row_to_archetype_input(r: dict) -> dict:
     }
 
 
+_NICKNAME_MAP = {
+    "nate": "nathan", "nick": "nicholas", "mike": "michael", "dave": "david",
+    "alex": "alexander", "zach": "zachary", "zak": "zachary", "jake": "jacob",
+    "will": "william", "matt": "matthew", "bob": "robert", "rob": "robert",
+    "bill": "william", "andy": "andrew", "tony": "anthony",
+}
+
+def _name_key_candidates(key: str) -> list[str]:
+    """Returns lookup candidates: original key, suffix-stripped, and nickname expansions."""
+    candidates = [key]
+    # Strip name suffixes (Jr., Sr., II, III, IV)
+    stripped = re.sub(r"\s+\b(jr|sr|ii|iii|iv)\b$", "", key).strip()
+    if stripped != key:
+        candidates.append(stripped)
+    # Expand first-name nickname
+    parts = key.split()
+    if parts:
+        expanded = _NICKNAME_MAP.get(parts[0])
+        if expanded:
+            candidates.append(" ".join([expanded] + parts[1:]))
+            if stripped != key:
+                stripped_parts = stripped.split()
+                candidates.append(" ".join([expanded] + stripped_parts[1:]))
+    return candidates
+
+
 def compute_archetype_mix(conn, q, *, player_name: str) -> Optional[dict]:
     """Returns the same named_mix shape archetype_engine.build_player_report
     already returns for NBA players (9 archetype names -> percentage),
     computed from this prospect's most recent college season's peer pool.
     Returns None if no college stats are available."""
     from server import normalize_name_for_match
-    key = normalize_name_for_match(player_name)
+    base_key = normalize_name_for_match(player_name)
 
-    season_rows = q(conn, """
-        SELECT academic_year FROM archive_cbb_player_stats
-        WHERE name_key = ? ORDER BY academic_year DESC LIMIT 1
-    """, (key,))
-    if not season_rows:
+    key = None
+    for candidate in _name_key_candidates(base_key):
+        rows = q(conn, """
+            SELECT academic_year FROM archive_cbb_player_stats
+            WHERE name_key = ? ORDER BY academic_year DESC LIMIT 1
+        """, (candidate,))
+        if rows:
+            key = candidate
+            season_rows = rows
+            break
+
+    if key is None:
         return None
     academic_year = season_rows[0]["academic_year"]
 

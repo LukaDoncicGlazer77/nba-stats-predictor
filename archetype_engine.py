@@ -429,7 +429,11 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
         "Playmaking Big": sf * (p["ast_pct_pr"] ** 2) * p["usg_pct_pr"] * p["drb_pct_pr"] * 12,
         "Rim Protector": sf * defense["rim_protector"] * 0.8,
         "3&D Wing": versatile_raw * scoring["three_pt_pressure"] * (low_creation / 100) * 3 * three_d_cs,
-        "Defensive Wing": versatile_raw * low_creation * 2 * (1 if usage == "low" else 0.5),
+        # Height gate: centers (80"+) are versatile bigs/rim protectors, not wings.
+        # Sigmoid centered at 80" suppresses Defensive Wing for true bigs while
+        # preserving it for guards/wings (6'7" and under stays at ~75%+ strength).
+        "Defensive Wing": (1.0 - 1.0 / (1.0 + math.exp(-2.0 * ((p.get("ht_in") or 78) - 80))))
+            * versatile_raw * low_creation * 2 * (1 if usage == "low" else 0.5),
         "Hybrid Offensive Big": sf * (hybrid * 4),
     }
     total = sum(raw.values()) or 1.0
