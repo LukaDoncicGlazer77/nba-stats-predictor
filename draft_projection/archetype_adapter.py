@@ -235,30 +235,9 @@ def _row_to_archetype_input(r: dict) -> dict:
     }
 
 
-_NICKNAME_MAP = {
-    "nate": "nathan", "nick": "nicholas", "mike": "michael", "dave": "david",
-    "alex": "alexander", "zach": "zachary", "zak": "zachary", "jake": "jacob",
-    "will": "william", "matt": "matthew", "bob": "robert", "rob": "robert",
-    "bill": "william", "andy": "andrew", "tony": "anthony",
-}
-
 def _name_key_candidates(key: str) -> list[str]:
-    """Returns lookup candidates: original key, suffix-stripped, and nickname expansions."""
-    candidates = [key]
-    # Strip name suffixes (Jr., Sr., II, III, IV)
-    stripped = re.sub(r"\s+\b(jr|sr|ii|iii|iv)\b$", "", key).strip()
-    if stripped != key:
-        candidates.append(stripped)
-    # Expand first-name nickname
-    parts = key.split()
-    if parts:
-        expanded = _NICKNAME_MAP.get(parts[0])
-        if expanded:
-            candidates.append(" ".join([expanded] + parts[1:]))
-            if stripped != key:
-                stripped_parts = stripped.split()
-                candidates.append(" ".join([expanded] + stripped_parts[1:]))
-    return candidates
+    from server import name_key_candidates
+    return name_key_candidates(key)
 
 
 def compute_archetype_mix(conn, q, *, player_name: str) -> Optional[dict]:

@@ -296,6 +296,34 @@ def normalize_name_for_match(name) -> str:
     return re.sub(r"[^a-z ]", "", name.lower()).strip()
 
 
+_NICKNAME_EXPANSIONS = {
+    "nate": "nathan", "nick": "nicholas", "mike": "michael", "dave": "david",
+    "alex": "alexander", "zach": "zachary", "zak": "zachary", "jake": "jacob",
+    "will": "william", "matt": "matthew", "bob": "robert", "rob": "robert",
+    "bill": "william", "andy": "andrew", "tony": "anthony",
+}
+
+
+def name_key_candidates(name: str) -> list:
+    """Returns lookup variants for a display name: original, suffix-stripped
+    (Jr./Sr./II/III/IV), and first-name nickname expansions.
+    Used by any code that queries archive_cbb_player_stats by name_key."""
+    key = normalize_name_for_match(name)
+    candidates = [key]
+    stripped = re.sub(r"\s+\b(jr|sr|ii|iii|iv)\b$", "", key).strip()
+    if stripped != key:
+        candidates.append(stripped)
+    parts = key.split()
+    if parts:
+        expanded = _NICKNAME_EXPANSIONS.get(parts[0])
+        if expanded:
+            candidates.append(" ".join([expanded] + parts[1:]))
+            if stripped != key:
+                s_parts = stripped.split()
+                candidates.append(" ".join([expanded] + s_parts[1:]))
+    return candidates
+
+
 def safe_int_py(val):
     try:
         return int(str(val).strip())

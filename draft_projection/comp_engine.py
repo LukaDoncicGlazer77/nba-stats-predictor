@@ -207,6 +207,9 @@ def composite_similarity(query_z: dict, query_missing: dict, member: PoolMember)
     return max(0.0, min(100.0, 100 * score)), breakdown
 
 
+_STAT_CATEGORIES = {"production", "advanced", "efficiency"}
+
+
 def find_top_comps(conn, q, pool: HistoricalPool, *, player_name: str, college: Optional[str] = None,
                     age_at_draft: Optional[float] = None, overall_pick: Optional[float] = None,
                     top_n: int = 50) -> list[dict]:
@@ -216,6 +219,15 @@ def find_top_comps(conn, q, pool: HistoricalPool, *, player_name: str, college: 
         conn, q, player_name=player_name, college=college,
         age_at_draft=age_at_draft, overall_pick=overall_pick,
     )
+    # Require at least one real statistical signal (production/advanced/efficiency).
+    # Without it the score is driven only by physical + draft slot — too coarse
+    # to be meaningful and produces artificially inflated similarities (~95-99%)
+    # for international players who have no CBB data.
+    stat_features = [f for f in FEATURE_NAMES if FEATURE_CATEGORY[f] in _STAT_CATEGORIES]
+    has_stats = any(not fv.missing.get(f, True) for f in stat_features)
+    if not has_stats:
+        return []
+
     query_z = _standardize_query(fv.values, fv.missing, pool.pool_stats)
 
     results = []

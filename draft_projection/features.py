@@ -425,20 +425,22 @@ class SportsReferenceCBBProvider:
     name = "cbb_stats"
 
     def fetch(self, conn, q, player_name, college=None, season=None, player_id=None) -> dict:
-        from server import normalize_name_for_match
-        key = normalize_name_for_match(player_name)
-        try:
-            rows = q(conn, f"""
-                SELECT {", ".join(_CBB_RAW_COLS)}, class_year, position, height_in, weight_lb, team, academic_year
-                FROM archive_cbb_player_stats
-                WHERE name_key = ?
-                ORDER BY academic_year DESC
-            """, (key,))
-        except Exception as exc:
-            log.warning("SportsReferenceCBBProvider query failed for %s: %s", player_name, exc)
-            return {}
-        candidates = [(r["academic_year"], _cbb_row_to_features(dict(r))) for r in rows]
-        return _select_plausible_row(candidates, season)
+        from server import name_key_candidates
+        for key in name_key_candidates(player_name):
+            try:
+                rows = q(conn, f"""
+                    SELECT {", ".join(_CBB_RAW_COLS)}, class_year, position, height_in, weight_lb, team, academic_year
+                    FROM archive_cbb_player_stats
+                    WHERE name_key = ?
+                    ORDER BY academic_year DESC
+                """, (key,))
+            except Exception as exc:
+                log.warning("SportsReferenceCBBProvider query failed for %s: %s", player_name, exc)
+                return {}
+            if rows:
+                candidates = [(r["academic_year"], _cbb_row_to_features(dict(r))) for r in rows]
+                return _select_plausible_row(candidates, season)
+        return {}
 
     def bulk_fetch_all(self, conn, q, *, name_keys=None) -> dict:
         """Used by pool-building (thousands of players) to avoid one
