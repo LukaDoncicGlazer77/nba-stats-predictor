@@ -1080,20 +1080,27 @@ function renderTeamFitPanel(data, panel) {
     return;
   }
 
-  const teamLogos = {
-    ATL: "🦅", BOS: "🍀", BRK: "🕸️", CHI: "🐂", CHO: "🐝",
-    CLE: "⚔️", DAL: "🤠", DEN: "⛰️", DET: "🔧", GSW: "🌁",
-    HOU: "🚀", IND: "🏎️", LAC: "⚡", LAL: "💜", MEM: "🐻",
-    MIA: "🌴", MIL: "🦌", MIN: "🐺", NOP: "🎷", NYK: "🗽",
-    OKC: "🌪️", ORL: "🎢", PHI: "🔔", PHO: "☀️", POR: "🌹",
-    SAC: "👑", SAS: "🪖", TOR: "🦕", UTA: "🏔️", WAS: "🦅",
+  const teamNbaIds = {
+    ATL: 1610612737, BOS: 1610612738, BRK: 1610612751, CHI: 1610612741, CHO: 1610612766,
+    CLE: 1610612739, DAL: 1610612742, DEN: 1610612743, DET: 1610612765, GSW: 1610612744,
+    HOU: 1610612745, IND: 1610612754, LAC: 1610612746, LAL: 1610612747, MEM: 1610612763,
+    MIA: 1610612748, MIL: 1610612749, MIN: 1610612750, NOP: 1610612740, NYK: 1610612752,
+    OKC: 1610612760, ORL: 1610612753, PHI: 1610612755, PHO: 1610612756, POR: 1610612757,
+    SAC: 1610612758, SAS: 1610612759, TOR: 1610612761, UTA: 1610612762, WAS: 1610612764,
+  };
+  const teamLogoUrl = (abbrev) => {
+    const id = teamNbaIds[abbrev];
+    return id ? `https://cdn.nba.com/logos/nba/${id}/global/L/logo.svg` : null;
   };
 
   const scoreColor = (s) => s >= 80 ? "#4eb8e0" : s >= 65 ? "#7c5cff" : "#a0a0b0";
 
   const cards = fits.map((f, i) => {
     const rank = i + 1;
-    const logo = teamLogos[f.team] || "🏀";
+    const logoUrl = teamLogoUrl(f.team);
+    const logoHtml = logoUrl
+      ? `<img src="${logoUrl}" alt="${f.name}" class="tf-logo-img" onerror="this.style.display='none'">`
+      : `<span class="tf-logo-fallback">🏀</span>`;
     const color = scoreColor(f.fit_score);
     const needs = f.team_needs.length
       ? `<div class="tf-needs">Team needs: ${f.team_needs.map(n => `<span class="tf-need-chip">${n}</span>`).join("")}</div>`
@@ -1101,7 +1108,7 @@ function renderTeamFitPanel(data, panel) {
     return `
       <div class="tf-card ${rank === 1 ? "tf-card-top" : ""}">
         <div class="tf-rank">${rank}</div>
-        <div class="tf-logo">${logo}</div>
+        <div class="tf-logo">${logoHtml}</div>
         <div class="tf-info">
           <div class="tf-team-name">${f.city} <strong>${f.name}</strong></div>
           <div class="tf-reason">${escapeHtml(f.reason)}</div>

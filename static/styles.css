@@ -4718,7 +4718,9 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 
 .tf-rank { font-size: 1.1rem; font-weight: 700; color: var(--muted); min-width: 22px; text-align: center; }
 .tf-card-top .tf-rank { color: #4eb8e0; }
-.tf-logo { font-size: 1.5rem; min-width: 32px; text-align: center; }
+.tf-logo { min-width: 40px; text-align: center; display: flex; align-items: center; justify-content: center; }
+.tf-logo-img { width: 36px; height: 36px; object-fit: contain; }
+.tf-logo-fallback { font-size: 1.5rem; }
 .tf-info { flex: 1; min-width: 0; }
 .tf-team-name { font-size: 0.95rem; color: var(--text); margin-bottom: 3px; }
 .tf-reason { font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; }
