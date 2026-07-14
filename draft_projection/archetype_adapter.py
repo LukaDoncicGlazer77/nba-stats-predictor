@@ -198,6 +198,22 @@ def _add_college_percentiles(rows: list[dict]) -> None:
 
 
 def _row_to_archetype_input(r: dict) -> dict:
+    # Self-creation proxy for CBB players: NBA players have real shot-tracking
+    # self_creation from archive_player_shooting; CBB players don't. Use Barttorvik
+    # assisted-shot data as a proxy: low rim_ast_pct (self-created inside) + high
+    # three_unast_pct (pull-up 3s) = high self-creation. This prevents raw usg*ast
+    # from over-inflating HE scores for high-usage finishers (lob catchers, etc.).
+    rim_ast_pr = r.get("rim_ast_pct_pr")
+    three_unast_pr = r.get("three_unast_pct_pr")
+    if rim_ast_pr is not None and three_unast_pr is not None:
+        sc_proxy = 0.5 * (1.0 - rim_ast_pr) + 0.5 * three_unast_pr
+    elif rim_ast_pr is not None:
+        sc_proxy = 1.0 - rim_ast_pr
+    elif three_unast_pr is not None:
+        sc_proxy = three_unast_pr
+    else:
+        sc_proxy = None
+
     return {
         "usg_pct_pr": r["usg_pct_pr"], "ast_pct_pr": r["ast_pct_pr"],
         "blk_pct_pr": r["blk_pct_pr"], "drb_pct_pr": r["dreb_pct_pr"],
@@ -207,8 +223,9 @@ def _row_to_archetype_input(r: dict) -> dict:
         "three_att_rate_pr": r.get("three_att_rate_pr"),
         "rim_ast_pct_pr": r.get("rim_ast_pct_pr"),
         "three_unast_pct_pr": r.get("three_unast_pct_pr"),
-        "dbpm": r.get("dbpm"),  # college DBPM from sports-reference.com/cbb
-        "ht_in": r.get("height_in"),  # feeds _size_factor() in named_archetype_mix
+        "self_creation_pr": sc_proxy,
+        "dbpm": r.get("dbpm"),
+        "ht_in": r.get("height_in"),
     }
 
 

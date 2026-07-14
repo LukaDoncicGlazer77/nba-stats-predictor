@@ -312,12 +312,12 @@ def _size_factor(ht_in) -> float:
 
 
 def _rim_dreb_dampener(ht_in) -> float:
-    """Scales down rim/dreb signals for guards so a guard who crashes the glass
-    doesn't inflate Rim Protector scores. Sigmoid centered on 76" (6-4):
-    ~0.27 at 6-2, ~0.5 at 6-4, ~0.73 at 6-6, ~0.88 at 6-8. Unknown height → 0.75."""
+    """Scales down rim/dreb signals for non-bigs so forwards like Carmelo don't
+    read as Rim Protectors. Sigmoid centered on 79" (6-7): ~0.05 at 6-5,
+    ~0.5 at 6-7, ~0.95 at 6-9+. Unknown height → 0.75."""
     if ht_in is None:
         return 0.75
-    return 1.0 / (1.0 + math.exp(-1.5 * (ht_in - 76)))
+    return 1.0 / (1.0 + math.exp(-1.5 * (ht_in - 79)))
 
 
 def _softmax(scores: dict) -> dict:
