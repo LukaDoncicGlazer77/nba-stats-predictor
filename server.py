@@ -632,7 +632,6 @@ class Handler(SimpleHTTPRequestHandler):
                     (token,),
                 )
                 conn.commit()
-            send_welcome_email(row[0])
             return self.send_json({"ok": True, "email": row[0]})
 
         if parsed.path == "/api/resend-verification":
