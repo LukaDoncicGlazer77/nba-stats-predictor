@@ -105,6 +105,81 @@ def send_verification_email(to_email: str, token: str) -> bool:
         return False
 
 
+def send_welcome_email(to_email: str) -> bool:
+    html = f"""
+    <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:0 auto;background:#05070d;border-radius:14px;overflow:hidden;border:1px solid rgba(124,92,255,0.18)">
+      <!-- header -->
+      <div style="background:linear-gradient(135deg,#7c3aed 0%,#2563eb 100%);padding:32px 36px 28px">
+        <div style="font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.5px">StatFuel</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;letter-spacing:0.5px">NBA PLAYER INTELLIGENCE</div>
+      </div>
+      <!-- body -->
+      <div style="padding:36px 36px 28px">
+        <h1 style="font-size:24px;font-weight:700;color:#eaf0ff;margin:0 0 12px">Welcome to StatFuel.</h1>
+        <p style="color:#8899b4;font-size:15px;line-height:1.6;margin:0 0 28px">
+          You now have full access to NBA player intelligence — archetypes, draft projections, historical comps, and trajectory analysis for every player in the league.
+        </p>
+        <!-- feature grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:28px">
+          <div style="background:rgba(124,92,255,0.08);border:1px solid rgba(124,92,255,0.2);border-radius:10px;padding:16px">
+            <div style="font-size:18px;margin-bottom:6px">⚡</div>
+            <div style="font-size:13px;font-weight:600;color:#c4b5fd;margin-bottom:4px">Archetype Engine</div>
+            <div style="font-size:12px;color:#6475a0;line-height:1.5">9 playing styles, blended by data — not labels.</div>
+          </div>
+          <div style="background:rgba(91,140,255,0.08);border:1px solid rgba(91,140,255,0.2);border-radius:10px;padding:16px">
+            <div style="font-size:18px;margin-bottom:6px">🎯</div>
+            <div style="font-size:13px;font-weight:600;color:#93c5fd;margin-bottom:4px">Draft Projections</div>
+            <div style="font-size:12px;color:#6475a0;line-height:1.5">Outcome probabilities for every prospect.</div>
+          </div>
+          <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:10px;padding:16px">
+            <div style="font-size:18px;margin-bottom:6px">🔍</div>
+            <div style="font-size:13px;font-weight:600;color:#67e8f9;margin-bottom:4px">Historical Comps</div>
+            <div style="font-size:12px;color:#6475a0;line-height:1.5">2,300+ player pool matched by similarity.</div>
+          </div>
+          <div style="background:rgba(124,92,255,0.08);border:1px solid rgba(124,92,255,0.2);border-radius:10px;padding:16px">
+            <div style="font-size:18px;margin-bottom:6px">📈</div>
+            <div style="font-size:13px;font-weight:600;color:#c4b5fd;margin-bottom:4px">Trajectory Analysis</div>
+            <div style="font-size:12px;color:#6475a0;line-height:1.5">See how a player's game evolves season by season.</div>
+          </div>
+        </div>
+        <a href="https://statfuel.online" style="display:block;text-align:center;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;text-decoration:none;padding:14px 28px;border-radius:9px;font-weight:600;font-size:15px;letter-spacing:0.2px">Open StatFuel →</a>
+      </div>
+      <!-- footer -->
+      <div style="padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06)">
+        <p style="color:#3a4a6a;font-size:12px;margin:0;line-height:1.6">
+          You're receiving this because you created an account at <a href="https://statfuel.online" style="color:#5b8cff;text-decoration:none">statfuel.online</a>.<br>
+          Questions? Reply to this email.
+        </p>
+      </div>
+    </div>
+    """
+    payload = json.dumps({
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": "noreply@statfuel.online", "name": "StatFuel"},
+        "subject": "Welcome to StatFuel — you're in.",
+        "content": [{"type": "text/html", "value": html}],
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {SENDGRID_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status < 300
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        print(f"send_welcome_email failed: {exc.code} {body}")
+        return False
+    except Exception as exc:
+        print(f"send_welcome_email failed: {exc}")
+        return False
+
+
 def send_reset_email(to_email: str, token: str) -> bool:
     reset_url = f"https://statfuel.online/?reset_token={token}"
     html = f"""
@@ -557,6 +632,7 @@ class Handler(SimpleHTTPRequestHandler):
                     (token,),
                 )
                 conn.commit()
+            send_welcome_email(row[0])
             return self.send_json({"ok": True, "email": row[0]})
 
         if parsed.path == "/api/resend-verification":
