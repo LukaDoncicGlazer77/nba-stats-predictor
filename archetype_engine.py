@@ -152,7 +152,7 @@ def load_pool(conn, q):
             continue
         defended_by_key[(r["player_name"], yr)] = _to_float(r["pct_plusminus"])
     games_rows = q(conn, """
-        SELECT player_id, season, g, pts_per_game, trb_per_game
+        SELECT player_id, season, g, pts_per_game, trb_per_game, pos
         FROM archive_player_per_game
     """)
     physical_rows = q(conn, "SELECT player_id, ht_in_in, wt FROM archive_player_career_info")
@@ -172,6 +172,7 @@ def load_pool(conn, q):
                 "games": g,
                 "pts_pg": _to_float(r["pts_per_game"]),
                 "trb_pg": _to_float(r["trb_per_game"]),
+                "pos": r.get("pos"),
             }
 
     shooting_by_key = {}
@@ -212,7 +213,7 @@ def load_pool(conn, q):
         pool.append({
             "player": r["player"], "player_id": r["player_id"],
             "season": int(r["season"]), "age": _to_float(r["age"]), "games": games,
-            "team": r.get("team"),
+            "team": r.get("team"), "pos": per_game.get("pos"),
             "usg_pct": usg, "ast_pct": ast, "blk_pct": blk, "drb_pct": drb, "stl_pct": stl,
             "fg3a_rate": _to_float(r["x3p_ar"]) or 0.0, "ft_rate": _to_float(r["f_tr"]) or 0.0,
             "dbpm": _to_float(r["dbpm"]),

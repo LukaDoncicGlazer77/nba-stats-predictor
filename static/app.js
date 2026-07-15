@@ -1105,12 +1105,15 @@ function renderTeamFitPanel(data, panel) {
     const needs = f.team_needs.length
       ? `<div class="tf-needs">Team needs: ${f.team_needs.map(n => `<span class="tf-need-chip">${n}</span>`).join("")}</div>`
       : "";
+    const contenderBadge = f.contender
+      ? `<span class="tf-contender-badge">Contender</span>`
+      : `<span class="tf-rebuilding-badge">Rebuilding</span>`;
     return `
       <div class="tf-card ${rank === 1 ? "tf-card-top" : ""}">
         <div class="tf-rank">${rank}</div>
         <div class="tf-logo">${logoHtml}</div>
         <div class="tf-info">
-          <div class="tf-team-name">${f.city} <strong>${f.name}</strong></div>
+          <div class="tf-team-name">${f.city} <strong>${f.name}</strong> ${contenderBadge}</div>
           <div class="tf-reason">${escapeHtml(f.reason)}</div>
           ${needs}
         </div>

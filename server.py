@@ -1223,7 +1223,17 @@ class Handler(SimpleHTTPRequestHandler):
                     return self.send_json({"error": "No archetype data for this player/season"}, status=404)
                 pool = archetype_engine.annotate(archetype_engine.load_pool(conn, q))
             player_mix = report.get("archetype_weights", {})
-            fits = team_fit_engine.score_team_fit(player_mix, pool, season=int(season), player_id=player_id)
+            # Pull extra signals from the pool entry for the target player
+            target_entry = next(
+                (p for p in pool if p["player_id"] == player_id and p["season"] == int(season)),
+                None,
+            )
+            player_usg_pr = (target_entry.get("usg_pct_pr") or 0.5) if target_entry else 0.5
+            player_pos    = (target_entry.get("pos")) if target_entry else None
+            fits = team_fit_engine.score_team_fit(
+                player_mix, pool, season=int(season), player_id=player_id,
+                player_usg_pr=player_usg_pr, player_pos=player_pos,
+            )
             return self.send_json({"player": report["player"], "season": season, "fits": fits})
 
         if parsed.path == "/api/salary-predict":

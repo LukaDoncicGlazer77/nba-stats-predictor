@@ -4731,5 +4731,14 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; color: #9a8de0;
 }
 .tf-score { font-size: 1.3rem; font-weight: 700; min-width: 44px; text-align: right; }
-
+.tf-contender-badge {
+  font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  background: rgba(78,184,224,0.12); border: 1px solid rgba(78,184,224,0.3);
+  color: #4eb8e0; border-radius: 4px; padding: 1px 5px; vertical-align: middle;
+}
+.tf-rebuilding-badge {
+  font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  background: rgba(160,160,176,0.08); border: 1px solid rgba(160,160,176,0.2);
+  color: var(--muted); border-radius: 4px; padding: 1px 5px; vertical-align: middle;
+}
 .tf-footnote { font-size: 0.73rem; color: var(--muted); margin-top: 14px; opacity: 0.7; }
