@@ -1,15 +1,13 @@
 """
-Team fit analysis: given a player (NBA or prospect), score how well they'd
-complement each NBA team's current roster archetype composition.
+Team fit analysis: given a player, score how well they complement each NBA team.
 
-Logic:
-  1. Load the most recent season's archetype data for all NBA players with a team.
-  2. For each team, compute the average archetype mix (% of each of the 9 archetypes).
-  3. For the target player, find which archetypes they bring most strongly.
-  4. Score each team by how much the player fills a gap in their roster.
-  5. Apply a complementarity bonus/penalty (e.g. a team already stacked with HEs
-     gets penalized for adding another HE).
-  6. Return the top 5 teams with a plain-English reason.
+Signals (in order of application):
+  1. Gap filling    — player covers archetypes the team is below league average on
+  2. Complementarity — hand-coded archetype synergy/conflict rules (team → player)
+  3. Effectiveness  — what team archetypes make THIS player better (bidirectional)
+  4. Star pairing   — how well player pairs with the team's highest-VORP anchor
+  5. Creation clash — penalty when both player and team are high ball-demand
+  6. Minutes factor — continuous crowding penalty as position group fills up
 """
 
 import math
@@ -20,51 +18,30 @@ _ARCH_ORDER = [
     "3&D Wing", "Defensive Wing", "Hybrid Offensive Big",
 ]
 
-# Multi-team rows (trade seasons) — skip these for team composition
 _MULTI_TEAM = {"2TM", "3TM", "4TM", "TOT"}
 
-# BBRef abbrev → display name + city
 _TEAM_NAMES = {
-    "ATL": ("Atlanta", "Hawks"),
-    "BOS": ("Boston", "Celtics"),
-    "BRK": ("Brooklyn", "Nets"),
-    "CHI": ("Chicago", "Bulls"),
-    "CHO": ("Charlotte", "Hornets"),
-    "CLE": ("Cleveland", "Cavaliers"),
-    "DAL": ("Dallas", "Mavericks"),
-    "DEN": ("Denver", "Nuggets"),
-    "DET": ("Detroit", "Pistons"),
-    "GSW": ("Golden State", "Warriors"),
-    "HOU": ("Houston", "Rockets"),
-    "IND": ("Indiana", "Pacers"),
-    "LAC": ("LA", "Clippers"),
-    "LAL": ("LA", "Lakers"),
-    "MEM": ("Memphis", "Grizzlies"),
-    "MIA": ("Miami", "Heat"),
-    "MIL": ("Milwaukee", "Bucks"),
-    "MIN": ("Minnesota", "Timberwolves"),
-    "NOP": ("New Orleans", "Pelicans"),
-    "NYK": ("New York", "Knicks"),
-    "OKC": ("Oklahoma City", "Thunder"),
-    "ORL": ("Orlando", "Magic"),
-    "PHI": ("Philadelphia", "76ers"),
-    "PHO": ("Phoenix", "Suns"),
-    "POR": ("Portland", "Trail Blazers"),
-    "SAC": ("Sacramento", "Kings"),
-    "SAS": ("San Antonio", "Spurs"),
-    "TOR": ("Toronto", "Raptors"),
-    "UTA": ("Utah", "Jazz"),
-    "WAS": ("Washington", "Wizards"),
+    "ATL": ("Atlanta", "Hawks"),       "BOS": ("Boston", "Celtics"),
+    "BRK": ("Brooklyn", "Nets"),       "CHI": ("Chicago", "Bulls"),
+    "CHO": ("Charlotte", "Hornets"),   "CLE": ("Cleveland", "Cavaliers"),
+    "DAL": ("Dallas", "Mavericks"),    "DEN": ("Denver", "Nuggets"),
+    "DET": ("Detroit", "Pistons"),     "GSW": ("Golden State", "Warriors"),
+    "HOU": ("Houston", "Rockets"),     "IND": ("Indiana", "Pacers"),
+    "LAC": ("LA", "Clippers"),         "LAL": ("LA", "Lakers"),
+    "MEM": ("Memphis", "Grizzlies"),   "MIA": ("Miami", "Heat"),
+    "MIL": ("Milwaukee", "Bucks"),     "MIN": ("Minnesota", "Timberwolves"),
+    "NOP": ("New Orleans", "Pelicans"),"NYK": ("New York", "Knicks"),
+    "OKC": ("Oklahoma City", "Thunder"),"ORL": ("Orlando", "Magic"),
+    "PHI": ("Philadelphia", "76ers"),  "PHO": ("Phoenix", "Suns"),
+    "POR": ("Portland", "Trail Blazers"),"SAC": ("Sacramento", "Kings"),
+    "SAS": ("San Antonio", "Spurs"),   "TOR": ("Toronto", "Raptors"),
+    "UTA": ("Utah", "Jazz"),           "WAS": ("Washington", "Wizards"),
 }
 
-# Archetypes that conflict (having too many hurts the team)
-# Maps archetype → penalty factor applied when the team already has excess of it
-_SATURATION_THRESHOLD = 25.0  # team average % above which adding more hurts
-_SATURATION_PENALTY = 0.55    # multiply gap score by this if team is saturated
+_SATURATION_THRESHOLD = 25.0
+_SATURATION_PENALTY   = 0.55
 
-# How much each archetype "needs" certain other archetypes on the roster
-# Positive = complementary (having X on team helps Y fit)
-# Negative = conflicting (having too much X on team hurts Y's fit)
+# Team has X → player archetype Y benefits/clashes
 _COMPLEMENTARITY = {
     "Heliocentric Engine": {
         "Off-Ball Scorer": +0.15, "3&D Wing": +0.15, "Rim Protector": +0.10,
@@ -104,18 +81,29 @@ _COMPLEMENTARITY = {
     },
 }
 
+# Team has X → player archetype Y becomes MORE effective at their role
+# (bidirectional: complements the player, not just the team)
+_PLAYER_EFFECTIVENESS = {
+    "Heliocentric Engine":  {"Off-Ball Scorer": 0.10, "3&D Wing": 0.10, "Rim Protector": 0.08},
+    "Secondary Playmaker":  {"Heliocentric Engine": 0.08, "Off-Ball Scorer": 0.08, "Scoring Big": 0.06},
+    "Off-Ball Scorer":      {"Heliocentric Engine": 0.15, "Secondary Playmaker": 0.10, "Playmaking Big": 0.08},
+    "3&D Wing":             {"Heliocentric Engine": 0.12, "Secondary Playmaker": 0.10, "Playmaking Big": 0.08},
+    "Rim Protector":        {"Heliocentric Engine": 0.10, "Secondary Playmaker": 0.08, "3&D Wing": 0.06},
+    "Playmaking Big":       {"Off-Ball Scorer": 0.10, "3&D Wing": 0.10, "Defensive Wing": 0.08},
+    "Scoring Big":          {"Heliocentric Engine": 0.10, "Secondary Playmaker": 0.08, "3&D Wing": 0.06},
+    "Defensive Wing":       {"Heliocentric Engine": 0.10, "Off-Ball Scorer": 0.06},
+    "Hybrid Offensive Big": {"3&D Wing": 0.10, "Secondary Playmaker": 0.08},
+}
+
+_CREATION_CLASH_THRESHOLD = 0.68
+_CREATION_CLASH_PENALTY   = 0.80
+
 
 def _dominant_archetype(mix: dict) -> str:
     return max(mix, key=mix.get)
 
 
-# Position groups for crowding detection. BBRef pos strings like "PG", "SG-SF", "C" etc.
-_GUARD_POS   = {"PG", "SG"}
-_WING_POS    = {"SF", "SG-SF", "SF-SG", "SF-PF", "PF-SF"}
-_BIG_POS     = {"PF", "C", "PF-C", "C-PF"}
-
 def _pos_group(pos: str | None) -> str:
-    """Coerce a BBRef position string to 'guard', 'wing', or 'big'."""
     if not pos:
         return "wing"
     primary = pos.split("-")[0].strip().upper()
@@ -130,13 +118,12 @@ def _build_team_compositions(pool, season: int, exclude_player_id: str | None = 
     """Returns {team_abbrev: team_info_dict} for all 30 teams.
 
     team_info_dict keys:
-      mix         — games-weighted average archetype %s (top-9 rotation)
-      avg_usg_pr  — games-weighted average usg_pct_pr (creation-demand signal)
-      pos_counts  — {'guard': N, 'wing': N, 'big': N} among rotation
-      total_vorp  — sum of vorp for all qualifying players (contender signal)
-
-    exclude_player_id: omit this player from their own team's composition so
-    the team isn't artificially satisfied by the player already being on it.
+      mix           — games-weighted average archetype %s (top-9 rotation)
+      avg_usg_pr    — games-weighted average usg_pct_pr
+      pos_counts    — {'guard': N, 'wing': N, 'big': N} in rotation
+      total_vorp    — sum of vorp across all qualifying players
+      star_mix      — named_mix of the highest-VORP player in rotation
+      star_dominant — dominant archetype of the star
     """
     MIN_GAMES = 20
     TOP_ROTATION = 9
@@ -158,10 +145,11 @@ def _build_team_compositions(pool, season: int, exclude_player_id: str | None = 
             continue
         vorp_by_team[team] = vorp_by_team.get(team, 0.0) + (p.get("vorp") or 0.0)
         by_team.setdefault(team, []).append({
-            "mix": p["named_mix"],
-            "games": float(p.get("games") or 1),
-            "usg_pr": p.get("usg_pct_pr") or 0.5,
+            "mix":      p["named_mix"],
+            "games":    float(p.get("games") or 1),
+            "usg_pr":   p.get("usg_pct_pr") or 0.5,
             "pos_group": _pos_group(p.get("pos")),
+            "vorp":     p.get("vorp") or 0.0,
         })
 
     compositions = {}
@@ -173,27 +161,32 @@ def _build_team_compositions(pool, season: int, exclude_player_id: str | None = 
         if total_games == 0:
             continue
 
-        avg = {}
-        for arch in _ARCH_ORDER:
-            avg[arch] = sum(pl["mix"].get(arch, 0) * pl["games"] for pl in rotation) / total_games
-
+        avg = {
+            arch: sum(pl["mix"].get(arch, 0) * pl["games"] for pl in rotation) / total_games
+            for arch in _ARCH_ORDER
+        }
         avg_usg_pr = sum(pl["usg_pr"] * pl["games"] for pl in rotation) / total_games
 
         pos_counts: dict[str, int] = {"guard": 0, "wing": 0, "big": 0}
         for pl in rotation:
             pos_counts[pl["pos_group"]] += 1
 
+        # Star = highest VORP in rotation (team identity anchor for pairing score)
+        star = max(rotation, key=lambda x: x["vorp"])
+        star_mix = star["mix"]
+
         compositions[team] = {
-            "mix": avg,
-            "avg_usg_pr": avg_usg_pr,
-            "pos_counts": pos_counts,
-            "total_vorp": vorp_by_team.get(team, 0.0),
+            "mix":          avg,
+            "avg_usg_pr":   avg_usg_pr,
+            "pos_counts":   pos_counts,
+            "total_vorp":   vorp_by_team.get(team, 0.0),
+            "star_mix":     star_mix,
+            "star_dominant": _dominant_archetype(star_mix) if star_mix else None,
         }
     return compositions
 
 
 def _league_avg(compositions: dict) -> dict:
-    """Average archetype distribution across all teams."""
     avg = {a: 0.0 for a in _ARCH_ORDER}
     n = len(compositions)
     if n == 0:
@@ -204,16 +197,6 @@ def _league_avg(compositions: dict) -> dict:
     return {a: v / n for a, v in avg.items()}
 
 
-# Position slots considered crowded (out of a 9-man rotation)
-_POS_CROWDED_THRESHOLD = 4   # ≥4 players at the same position group = crowded
-_POS_CROWDED_PENALTY   = 0.75  # multiply raw score by this when position is crowded
-
-# Creation-clash: when both player and team are high ball-demand, penalize.
-# usg_pct_pr > 0.70 = high-usage player / team.
-_CREATION_CLASH_THRESHOLD = 0.68
-_CREATION_CLASH_PENALTY   = 0.80
-
-
 def _fit_score(
     player_mix: dict,
     team_info: dict,
@@ -221,39 +204,29 @@ def _fit_score(
     player_usg_pr: float = 0.5,
     player_pos_group: str = "wing",
 ) -> tuple[float, str]:
-    """
-    Score how well a player fits a team and produce a reason string.
-
-    New signals vs. the original:
-      - Creation clash: penalises adding a high-usage player to a team already
-        carrying a high average usage load (two ball-dominant players clash).
-      - Position crowding: penalises adding a player when the team already has
-        ≥4 rotation spots at the same position group (guard/wing/big).
-    """
     team_mix      = team_info["mix"]
     team_usg_pr   = team_info.get("avg_usg_pr", 0.5)
     pos_counts    = team_info.get("pos_counts", {})
+    star_mix      = team_info.get("star_mix", {})
+    star_dominant = team_info.get("star_dominant")
 
     player_primary = _dominant_archetype(player_mix)
 
+    # 1. Gap filling
     raw = 0.0
     gap_contributions: list[tuple[float, str]] = []
-
     for arch in _ARCH_ORDER:
-        p_pct = player_mix.get(arch, 0)
-        t_pct = team_mix.get(arch, 0)
+        p_pct  = player_mix.get(arch, 0)
+        t_pct  = team_mix.get(arch, 0)
         la_pct = league_avg.get(arch, 0)
-
-        gap = la_pct - t_pct  # positive = team is weak here
+        gap = la_pct - t_pct
         contribution = p_pct * max(gap, 0) / 100
-
         if t_pct > _SATURATION_THRESHOLD and gap < 0:
             contribution *= _SATURATION_PENALTY
-
         gap_contributions.append((contribution, arch))
         raw += contribution
 
-    # Complementarity bonus/penalty
+    # 2. Complementarity: team composition → player fit (one-directional)
     comp_bonus = 0.0
     for arch, t_pct in team_mix.items():
         if t_pct < 10:
@@ -262,10 +235,28 @@ def _fit_score(
             rules = _COMPLEMENTARITY.get(p_arch, {})
             if arch in rules:
                 comp_bonus += rules[arch] * (t_pct / 100) * (p_weight / 100)
+    raw += comp_bonus * 50
 
-    raw = max(0.0, raw + comp_bonus * 50)
+    # 3. Bidirectional effectiveness: team composition → player performs better
+    eff_bonus = 0.0
+    for p_arch, p_weight in player_mix.items():
+        effectiveness = _PLAYER_EFFECTIVENESS.get(p_arch, {})
+        for team_arch, team_pct in team_mix.items():
+            if team_arch in effectiveness:
+                eff_bonus += effectiveness[team_arch] * (team_pct / 100) * (p_weight / 100)
+    raw += eff_bonus * 40
 
-    # Creation clash: both player and team are high ball-demand
+    # 4. Star pairing: player vs the team's primary anchor specifically
+    if star_dominant and star_mix:
+        star_bonus = 0.0
+        star_pct = star_mix.get(star_dominant, 0)
+        for p_arch, p_weight in player_mix.items():
+            rules = _COMPLEMENTARITY.get(p_arch, {})
+            if star_dominant in rules:
+                star_bonus += rules[star_dominant] * (star_pct / 100) * (p_weight / 100)
+        raw += star_bonus * 35
+
+    # 5. Creation clash penalty
     creation_clash = (
         player_usg_pr > _CREATION_CLASH_THRESHOLD
         and team_usg_pr > _CREATION_CLASH_THRESHOLD
@@ -273,24 +264,27 @@ def _fit_score(
     if creation_clash:
         raw *= _CREATION_CLASH_PENALTY
 
-    # Position crowding: team already has too many players at this position group
-    pos_crowded = pos_counts.get(player_pos_group, 0) >= _POS_CROWDED_THRESHOLD
-    if pos_crowded:
-        raw *= _POS_CROWDED_PENALTY
+    # 6. Continuous minutes/crowding factor (replaces binary threshold)
+    # 0-2 players at position: no effect; each additional player above 2 costs 12%
+    pos_count = pos_counts.get(player_pos_group, 0)
+    minutes_factor = max(0.55, 1.0 - max(0, pos_count - 2) * 0.12)
+    raw *= minutes_factor
 
-    # Build reason string
+    # Reason string
     gap_contributions.sort(key=lambda x: -x[0])
     top_arch = gap_contributions[0][1] if gap_contributions else player_primary
-
     team_weak_on = [
         arch for arch in _ARCH_ORDER
         if (league_avg.get(arch, 0) - team_mix.get(arch, 0)) > 3
     ]
 
+    pos_crowded = pos_count >= 4
     if creation_clash:
         reason = f"Ball-dominant roster — may clash with {player_primary} role"
     elif pos_crowded:
         reason = f"Crowded at {player_pos_group} — fewer minutes available"
+    elif star_dominant and player_primary in (_COMPLEMENTARITY.get(star_dominant, {})):
+        reason = f"{player_primary} pairs well with the team's {star_dominant} star"
     elif player_primary in team_weak_on:
         reason = f"Fills a gap — team is thin on {player_primary}s"
     elif top_arch != player_primary and top_arch in team_weak_on:
@@ -321,12 +315,8 @@ def score_team_fit(
     player_pos: str | None = None,
 ) -> list[dict]:
     """
-    Main entry point. Returns a list of top_n team fit dicts:
+    Returns top_n team fit dicts:
       {team, city, name, fit_score, reason, team_needs, contender, player_primary}
-
-    player_id:     BBRef slug — excluded from their own team's composition.
-    player_usg_pr: player's usage percentile (0-1) for creation-clash detection.
-    player_pos:    BBRef position string for position-crowding detection.
     """
     compositions = _build_team_compositions(pool, season, exclude_player_id=player_id)
     if not compositions:
@@ -335,7 +325,6 @@ def score_team_fit(
     la = _league_avg(compositions)
     player_pos_group = _pos_group(player_pos)
 
-    # Determine contender threshold: top third of teams by total VORP.
     all_vorps = sorted((info["total_vorp"] for info in compositions.values()), reverse=True)
     contender_cutoff = all_vorps[len(all_vorps) // 3] if all_vorps else 0.0
 
@@ -354,30 +343,30 @@ def score_team_fit(
         )
         top_gaps = [a for gap, a in gaps if gap > 2][:3]
         raw_results.append({
-            "team": abbrev,
-            "city": city,
-            "name": name,
-            "_raw": raw_score,
-            "reason": reason,
-            "team_needs": top_gaps,
-            "contender": team_info["total_vorp"] >= contender_cutoff,
+            "team":           abbrev,
+            "city":           city,
+            "name":           name,
+            "_raw":           raw_score,
+            "reason":         reason,
+            "team_needs":     top_gaps,
+            "contender":      team_info["total_vorp"] >= contender_cutoff,
             "player_primary": _dominant_archetype(player_mix),
         })
 
     raw_results.sort(key=lambda r: -r["_raw"])
 
-    # Anchor: the median raw score across all 30 teams maps to 50.
-    # This gives absolute meaning (top fits score 70-90+, poor fits 20-40)
-    # without being sensitive to near-zero league-average self-scores.
-    all_raws = sorted(r["_raw"] for r in raw_results)
-    mid = len(all_raws) // 2
-    median_raw = (all_raws[mid - 1] + all_raws[mid]) / 2 if len(all_raws) >= 2 else all_raws[0]
-    scale_anchor = max(median_raw, 0.001)
+    # Span-based normalization across all 30 teams.
+    # Best team → 90, worst team → 35, linear in between.
+    # Raw scores can be negative (when penalties outweigh bonuses) — that's fine,
+    # span normalization handles it without any division-by-near-zero risk.
+    max_raw = raw_results[0]["_raw"]
+    min_raw = raw_results[-1]["_raw"]
+    span = max(max_raw - min_raw, 1e-6)
 
     results = []
     for r in raw_results[:top_n]:
-        absolute = 50 * r["_raw"] / scale_anchor
-        r["fit_score"] = round(max(20, min(97, absolute)), 1)
+        normalized = 35 + 55 * (r["_raw"] - min_raw) / span
+        r["fit_score"] = round(min(90, normalized), 1)
         del r["_raw"]
         results.append(r)
 
