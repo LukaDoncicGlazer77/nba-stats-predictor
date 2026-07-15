@@ -2421,19 +2421,20 @@ async function renderCareerOutcomeView(container, prospect) {
           <span>Closest Historical Draft Comps</span>
         </div>
         <table class="cmp-table4 co-comp-table">
-          <thead><tr><th>Player</th><th>Pick</th><th>Yr</th><th>PTS</th><th>REB</th><th>AST</th><th>Seasons</th></tr></thead>
+          <thead><tr><th>Player</th><th>Pick</th><th>Yr</th><th>PTS</th><th>REB</th><th>AST</th><th>Seasons</th><th>Outcome</th></tr></thead>
           <tbody>${comps.map((c, i) => `<tr>
-            <td class="co-comp-name-cell"><span class="co-comp-rank">${i + 1}</span>${co_avatar(c)}<span>${c.player}</span>${c.position_match ? `<span class="co-match-badge" title="Same position bucket"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>Pos match</span>` : ""}</td>
+            <td class="co-comp-name-cell"><span class="co-comp-rank">${i + 1}</span>${co_avatar(c)}<span>${c.player}</span></td>
             <td>#${c.overall_pick}</td>
             <td>${c.draft_season}</td>
             ${co_bar_cell(c.career_pts, "career_pts", "var(--accent-1)")}
             ${co_bar_cell(c.career_reb, "career_reb", "var(--blue)")}
             ${co_bar_cell(c.career_ast, "career_ast", "var(--accent-3)")}
             <td>${c.seasons_played ?? "—"}</td>
+            <td><span class="co-tier-badge co-tier-${(c.tier_label || "").toLowerCase().replace(/[^a-z]/g, "-")}">${c.tier_label ?? "—"}</span></td>
           </tr>`).join("")}</tbody>
         </table>
         <p class="co-footnote">
-          Comps are matched by draft slot and position only (no measurables or scouting data for 2026 prospects) — treat as a rough historical baseline, not a scouting projection. Recently drafted comps reflect only 1–2 seasons of data.
+          Comps are matched by draft slot and college stats similarity — treat as a historical baseline, not a scouting projection. Recently drafted comps reflect only 1–2 seasons of data.
         </p>
         <div id="coCollegeSection"></div>
       </div>

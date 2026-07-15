@@ -4138,6 +4138,25 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 .co-match-badge svg { width: 9px; height: 9px; flex-shrink: 0; }
 
+.co-tier-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  background: rgba(124,140,255,0.1);
+  color: var(--muted);
+  border: 1px solid rgba(124,140,255,0.2);
+}
+.co-tier-badge.co-tier-superstar   { background: rgba(255,180,0,0.15); color: #ffd060; border-color: rgba(255,180,0,0.3); }
+.co-tier-badge.co-tier-all-nba     { background: rgba(255,140,0,0.12); color: #ffaa40; border-color: rgba(255,140,0,0.25); }
+.co-tier-badge.co-tier-all-star    { background: rgba(78,184,224,0.13); color: #4eb8e0; border-color: rgba(78,184,224,0.28); }
+.co-tier-badge.co-tier-high-level-starter { background: rgba(0,212,138,0.11); color: #00d48a; border-color: rgba(0,212,138,0.25); }
+.co-tier-badge.co-tier-starter     { background: rgba(0,212,138,0.08); color: #00c47e; border-color: rgba(0,212,138,0.2); }
+.co-tier-badge.co-tier-bust        { background: rgba(255,80,80,0.1); color: #ff6060; border-color: rgba(255,80,80,0.2); }
+
 .co-footnote {
   color: var(--muted);
   font-size: 0.72rem;
