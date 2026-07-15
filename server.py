@@ -1223,7 +1223,7 @@ class Handler(SimpleHTTPRequestHandler):
                     return self.send_json({"error": "No archetype data for this player/season"}, status=404)
                 pool = archetype_engine.annotate(archetype_engine.load_pool(conn, q))
             player_mix = report.get("archetype_weights", {})
-            fits = team_fit_engine.score_team_fit(player_mix, pool, season=int(season))
+            fits = team_fit_engine.score_team_fit(player_mix, pool, season=int(season), player_id=player_id)
             return self.send_json({"player": report["player"], "season": season, "fits": fits})
 
         if parsed.path == "/api/salary-predict":

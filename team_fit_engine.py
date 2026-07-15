@@ -109,12 +109,15 @@ def _dominant_archetype(mix: dict) -> str:
     return max(mix, key=mix.get)
 
 
-def _build_team_compositions(pool, season: int) -> dict:
+def _build_team_compositions(pool, season: int, exclude_player_id: str | None = None) -> dict:
     """Returns {team_abbrev: weighted_mix_dict} for all 30 teams.
 
     Uses games-weighted averaging so starters (more games) drive the team's
     archetype profile proportionally more than bench players. Limits to the
     top-9 rotation by games to prevent the 12th man from distorting the picture.
+
+    exclude_player_id: BBRef player_id to omit from team compositions (used to
+    prevent the target player from inflating their own team's fit score).
     """
     MIN_GAMES = 20
     TOP_ROTATION = 9
@@ -122,6 +125,8 @@ def _build_team_compositions(pool, season: int) -> dict:
     by_team: dict[str, list[dict]] = {}
     for p in pool:
         if p.get("season") != season:
+            continue
+        if exclude_player_id and p.get("player_id") == exclude_player_id:
             continue
         team = p.get("team")
         if not team or team in _MULTI_TEAM:
@@ -246,16 +251,32 @@ def _fit_score(player_mix: dict, team_mix: dict, league_avg: dict) -> tuple[floa
     return raw, reason
 
 
-def score_team_fit(player_mix: dict, pool, season: int, top_n: int = 5) -> list[dict]:
+def score_team_fit(
+    player_mix: dict,
+    pool,
+    season: int,
+    top_n: int = 5,
+    player_id: str | None = None,
+) -> list[dict]:
     """
     Main entry point. Returns a list of top_n team fit dicts:
       {team, city, name, fit_score, reason, team_archetype_gaps}
+
+    player_id: BBRef slug of the target player — excluded from team compositions
+    so their own team isn't artificially penalised for already having them.
     """
-    compositions = _build_team_compositions(pool, season)
+    compositions = _build_team_compositions(pool, season, exclude_player_id=player_id)
     if not compositions:
         return []
 
     la = _league_avg(compositions)
+
+    # Compute the league-average raw score so we have an absolute reference point.
+    # A player who is a perfect league-average fit for a perfectly average team
+    # gets a score of ~50. Great fits score higher; poor fits score lower.
+    la_self_score, _ = _fit_score(la, la, la)
+    scale_anchor = max(la_self_score, 0.001)
+
     raw_results = []
     for abbrev, team_mix in compositions.items():
         raw_score, reason = _fit_score(player_mix, team_mix, la)
@@ -277,15 +298,13 @@ def score_team_fit(player_mix: dict, pool, season: int, top_n: int = 5) -> list[
 
     raw_results.sort(key=lambda r: -r["_raw"])
 
-    # Normalize so top team = 95, rest scaled linearly, floor at 40
-    max_raw = raw_results[0]["_raw"] if raw_results else 1.0
-    min_raw = raw_results[-1]["_raw"] if raw_results else 0.0
-    span = max(max_raw - min_raw, 0.001)
-
+    # Absolute normalisation: anchor league-average fit = 50, scale proportionally.
+    # Cap at 97, floor at 20, so scores meaningfully reflect actual fit quality
+    # rather than always spanning 40-95 regardless of how good the fits are.
     results = []
     for r in raw_results[:top_n]:
-        normalized = 40 + 55 * (r["_raw"] - min_raw) / span
-        r["fit_score"] = round(min(95, normalized), 1)
+        absolute = 50 * r["_raw"] / scale_anchor
+        r["fit_score"] = round(max(20, min(97, absolute)), 1)
         del r["_raw"]
         results.append(r)
 
