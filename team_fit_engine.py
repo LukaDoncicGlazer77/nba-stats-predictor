@@ -335,11 +335,6 @@ def score_team_fit(
     la = _league_avg(compositions)
     player_pos_group = _pos_group(player_pos)
 
-    # League-average team as the absolute fit reference (score = 50).
-    la_team_info = {"mix": la, "avg_usg_pr": 0.5, "pos_counts": {"guard": 3, "wing": 3, "big": 3}, "total_vorp": 0.0}
-    la_self_score, _ = _fit_score(la, la_team_info, la, player_usg_pr=0.5, player_pos_group="wing")
-    scale_anchor = max(la_self_score, 0.001)
-
     # Determine contender threshold: top third of teams by total VORP.
     all_vorps = sorted((info["total_vorp"] for info in compositions.values()), reverse=True)
     contender_cutoff = all_vorps[len(all_vorps) // 3] if all_vorps else 0.0
@@ -371,7 +366,14 @@ def score_team_fit(
 
     raw_results.sort(key=lambda r: -r["_raw"])
 
-    # Absolute normalisation: league-average fit = 50, cap 97, floor 20.
+    # Anchor: the median raw score across all 30 teams maps to 50.
+    # This gives absolute meaning (top fits score 70-90+, poor fits 20-40)
+    # without being sensitive to near-zero league-average self-scores.
+    all_raws = sorted(r["_raw"] for r in raw_results)
+    mid = len(all_raws) // 2
+    median_raw = (all_raws[mid - 1] + all_raws[mid]) / 2 if len(all_raws) >= 2 else all_raws[0]
+    scale_anchor = max(median_raw, 0.001)
+
     results = []
     for r in raw_results[:top_n]:
         absolute = 50 * r["_raw"] / scale_anchor
