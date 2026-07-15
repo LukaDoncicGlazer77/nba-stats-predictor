@@ -425,9 +425,8 @@ def named_archetype_mix(p, creation, defense, scoring, usage):
         "Heliocentric Engine": creation["heliocentric_engine"],
         "Secondary Playmaker": creation["secondary_playmaker"],
         "Off-Ball Scorer": creation["off_ball_scorer"] * scoring["three_pt_pressure"] / 100 * 2,
-        "Scoring Big": sf * (creation["off_ball_scorer"] * scoring["interior_pressure"] / 100 * 2
-            + creation["non_creator_finisher"] * scoring["interior_pressure"] / 100 * 1.5),
-        "Playmaking Big": sf * (p["ast_pct_pr"] ** 2) * p["usg_pct_pr"] * p["drb_pct_pr"] * 12,
+        "Scoring Big": sf * creation["off_ball_scorer"] * scoring["interior_pressure"] / 100 * 2,
+        "Playmaking Big": sf * (p["ast_pct_pr"] ** 2) * p["usg_pct_pr"] * p["drb_pct_pr"] * p["blk_pct_pr"] * 80,
         "Rim Protector": sf * defense["rim_protector"] * 0.8,
         "3&D Wing": versatile_raw * scoring["three_pt_pressure"] * (low_creation / 100) * 3 * three_d_cs,
         # Height gate: centers (80"+) are versatile bigs/rim protectors, not wings.
