@@ -174,12 +174,14 @@ def _build_team_compositions(pool, season: int, exclude_player_id: str | None = 
         # Star = highest VORP in rotation (team identity anchor for pairing score)
         star = max(rotation, key=lambda x: x["vorp"])
         star_mix = star["mix"]
+        max_vorp = star["vorp"]
 
         compositions[team] = {
             "mix":          avg,
             "avg_usg_pr":   avg_usg_pr,
             "pos_counts":   pos_counts,
             "total_vorp":   vorp_by_team.get(team, 0.0),
+            "max_vorp":     max_vorp,
             "star_mix":     star_mix,
             "star_dominant": _dominant_archetype(star_mix) if star_mix else None,
         }
@@ -325,8 +327,9 @@ def score_team_fit(
     la = _league_avg(compositions)
     player_pos_group = _pos_group(player_pos)
 
-    all_vorps = sorted((info["total_vorp"] for info in compositions.values()), reverse=True)
-    contender_cutoff = all_vorps[len(all_vorps) // 3] if all_vorps else 0.0
+    # Contender = team has at least one star-level player (VORP >= 3.0).
+    # Using max individual VORP rather than total avoids distortion from
+    # trade seasons where a star's partial-season VORP is artificially low.
 
     raw_results = []
     for abbrev, team_info in compositions.items():
@@ -349,7 +352,7 @@ def score_team_fit(
             "_raw":           raw_score,
             "reason":         reason,
             "team_needs":     top_gaps,
-            "contender":      team_info["total_vorp"] >= contender_cutoff,
+            "contender":      team_info.get("max_vorp", 0.0) >= 3.0,
             "player_primary": _dominant_archetype(player_mix),
         })
 
