@@ -260,3 +260,108 @@ Verified: Cooper Flagg profile (elite numbers across the board) fires no weaknes
 
 Latest commits: `7df0534` (weakness expansion) → `3b9eea7` (auth bug) → `ba81e76` (shot-zone integration). All live on `statfuel.online`. No known instability at end of session.
 
+---
+
+## Session — 2026-07-13/14/15: Team Fit engine, archetype formula fixes, historical comps gap
+
+All changes committed and live unless noted.
+
+### 1. Team Fit engine — full rebuild (`team_fit_engine.py`)
+
+The Team Fit feature was rebuilt from scratch across multiple iterations. Current state:
+
+**Self-exclusion fix**: The target player was previously counted in their own team's composition when scoring fit. Fixed by passing `player_id` through `score_team_fit()` → `_build_team_compositions()` and excluding the target player from all 30 team compositions.
+
+**Normalization — span-based (best→90, worst→35)**:
+Previous attempts using a league-average anchor failed: when the anchor score ≈ 0, all real scores inflated to 97%. Final fix: sort all 30 raw scores and apply:
+```python
+span = max(max_raw - min_raw, 1e-6)
+normalized = 35 + 55 * (r["_raw"] - min_raw) / span
+r["fit_score"] = round(min(90, normalized), 1)
+```
+This is always stable — only requires `max ≠ min` across 30 teams.
+
+**Scoring components** (`_fit_score`):
+- Gap filling: player archetype fills underrepresented roles (weighted by how rare they are on the team)
+- Complementarity: player archetype complements the team's star player archetype
+- Bidirectional effectiveness: `_PLAYER_EFFECTIVENESS` dict scores 9×9 archetype pairs
+- Star pairing bonus: if player and team star are known great pairs (HE+3D, HE+RimProtector, etc.)
+- Creation clash: `if player_usg_pr > 0.68 and team_usg_pr > 0.68: raw *= 0.80`
+- Continuous minutes factor: `max(0.55, 1.0 - max(0, pos_count - 2) * 0.12)` — crowded positions lower fit
+
+**Contender detection** — two fixes:
+1. Original: used `total_vorp` sum, which was distorted by mid-season acquisitions having partial VORP
+2. First fix: switched to `max individual VORP ≥ 3.0` per team
+3. Second fix (2026-07-15): traded players' VORP is split across team entries (Luka had DAL VORP + LAL VORP, neither alone ≥ 3.0). Fixed by pre-computing `max_vorp_by_player` across all team entries for that season and using that effective VORP in team compositions. `commit a692b59`
+
+**pos passthrough**: `server.py` extracts `player_usg_pr` and `player_pos` from the pool entry and passes them to `score_team_fit()` for the continuous minutes factor to work correctly.
+
+**UI**: Contender/Rebuilding badges added to the team fit panel in `app.js`/`styles.css`.
+
+### 2. Archetype engine: `pos` field added
+
+`pos` (position string) added to pool entries. Required for bidirectional fit scoring in `team_fit_engine.py`.
+- Added to `archive_player_per_game` SELECT in `load_pool()`
+- Added to `games_by_key` dict
+- Added to pool `append()` dict
+
+### 3. Archetype formula fixes (`archetype_engine.py`)
+
+**Scoring Big — non_creator_finisher bug (commit `69ba498`)**:
+
+`non_creator_finisher = (1-usg)*(1-ast)` is near 1.0 for any rim-runner with low usage and low AST (Gobert, Adams). Combined with near-100% `interior_pressure`, the old formula:
+```python
+"Scoring Big": sf * (creation["off_ball_scorer"] * scoring["interior_pressure"] / 100 * 2
+    + creation["non_creator_finisher"] * scoring["interior_pressure"] / 100 * 1.5),
+```
+inflated Gobert and Adams to ~46% Scoring Big. Fix: removed the `non_creator_finisher` term entirely:
+```python
+"Scoring Big": sf * creation["off_ball_scorer"] * scoring["interior_pressure"] / 100 * 2,
+```
+Result: Gobert → Rim Protector 38.9% ✓, Adams → Rim Protector 36.3% ✓
+
+**Playmaking Big — scale mismatch (commit `69ba498`)**:
+
+`HE` comes from `creation["heliocentric_engine"]` which is a softmax %-value (0-100 range). Old PlayBig formula:
+```python
+"Playmaking Big": sf * (ast_pct_pr ** 2) * usg_pct_pr * drb_pct_pr * 12,
+```
+Max product ≈ 11.5 — far below HE ≈ 46 for Jokic (ast=1.0), so HE always won. Fix: added `blk_pct_pr` factor (distinguishes big-man playmakers from guard-creators) and raised multiplier:
+```python
+"Playmaking Big": sf * (ast_pct_pr ** 2) * usg_pct_pr * drb_pct_pr * blk_pct_pr * 80,
+```
+- Jokic (ast=1.0, blk=0.705): PlayBig ≈ 54 > HE ≈ 47 → Playmaking Big ✓
+- Luka (ast=0.99, blk=0.511): PlayBig ≈ 36 < HE ≈ 47 → Heliocentric Engine ✓
+- Gobert (ast~0.05): PlayBig = (0.05)² × ... ≈ 0 → stays Rim Protector ✓
+
+**Remaining 2026 anomalies** (not formula bugs — genuine 2026 season data):
+- Jokic: ast_pr = 1.000, blk_pr = 0.705 — now correctly Playmaking Big after the fix
+- Embiid: ast_pr = 0.820 in 38 games (unusually high) → shows Rim Protector instead of Scoring Big; this reflects his actual 2026 playmaking role, not an error
+- Giannis: usg_pr = 0.998, ast_pr = 0.986 in 36 games → shows HE; Hybrid Offensive Big formula multiplier (4) is too small to compete but revisiting it risks regressions elsewhere
+
+### 4. Archetype accuracy scan
+
+Ran `analyze_archetypes.py` against all 2026-season players. 53 flagged players across rules:
+- **G1**: guards dominant in big archetypes (Rim Protector / Scoring Big / Playmaking Big)
+- **B1/B2**: bigs showing Heliocentric Engine with low AST or low USG
+- **B3**: bigs showing Rim Protector with low BLK
+- **A1**: 23 players with no dominant archetype (primary < 20%) — often bench players with fragmented profiles
+- **A3**: 9 players showing Defensive Wing without defensive signal (stl_pr < 0.40 and dbpm_pr < 0.40)
+- **REF**: known reference player mismatches
+
+Output: `flagged_archetypes.csv` (generated locally, not committed — re-run `analyze_archetypes.py` with `DATABASE_URL` set).
+
+### 5. Historical comps gap — data backfill needed
+
+**Symptom**: Same-stage and projected-engine comps for current players only show players from roughly 2015-2026. Kevin Garnett, early-2000s stars, etc. do not appear.
+
+**Root cause**: `archive_advanced` and `archive_player_per_game` only contain seasons that were explicitly loaded into the DB. `update_current_season.py` updates only the current season. Historical backfill was done via `import_archive.py` from CSV files (now absent locally). The DB likely only has ~10-12 years of data.
+
+**Fix**: Run `update_current_season.py --season YEAR` for each historical year you want in the pool, going back to the desired cutoff (e.g. 1985 or 1996). This scrapes Basketball-Reference for that season. Recommended: run for 1980-2014 in sequence with 4s delays already baked into the scraper. Once loaded, `load_pool()` has no season filter so all historical players automatically appear as comps.
+
+**Note**: USG%, AST%, BLK%, DRB%, STL% are available in Basketball-Reference going back to 1973-74, so players from any post-1974 season will pass the pool filter.
+
+### Current status (2026-07-15)
+
+Latest commits: `a692b59` (contender detection for traded players) → `69ba498` (Scoring Big + PlayBig fixes). All live. `analyze_archetypes.py`, `check_fix.py`, `debug_player.py` are local verification scripts not committed to main — safe to delete if not needed.
+
