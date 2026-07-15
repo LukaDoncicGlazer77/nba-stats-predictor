@@ -128,12 +128,18 @@ def _build_team_compositions(pool, season: int, exclude_player_id: str | None = 
     MIN_GAMES = 20
     TOP_ROTATION = 9
 
+    # For traded players, VORP is split across team entries. Use the max across
+    # all team entries so a mid-season acquisition isn't penalized on their new team.
+    season_pool = [p for p in pool if p.get("season") == season]
+    max_vorp_by_player: dict[str, float] = {}
+    for p in season_pool:
+        pid = p["player_id"]
+        max_vorp_by_player[pid] = max(max_vorp_by_player.get(pid, 0.0), p.get("vorp") or 0.0)
+
     by_team: dict[str, list[dict]] = {}
     vorp_by_team: dict[str, float] = {}
 
-    for p in pool:
-        if p.get("season") != season:
-            continue
+    for p in season_pool:
         if exclude_player_id and p.get("player_id") == exclude_player_id:
             continue
         team = p.get("team")
@@ -143,13 +149,14 @@ def _build_team_compositions(pool, season: int, exclude_player_id: str | None = 
             continue
         if not p.get("named_mix"):
             continue
-        vorp_by_team[team] = vorp_by_team.get(team, 0.0) + (p.get("vorp") or 0.0)
+        effective_vorp = max_vorp_by_player.get(p["player_id"], p.get("vorp") or 0.0)
+        vorp_by_team[team] = vorp_by_team.get(team, 0.0) + effective_vorp
         by_team.setdefault(team, []).append({
             "mix":      p["named_mix"],
             "games":    float(p.get("games") or 1),
             "usg_pr":   p.get("usg_pct_pr") or 0.5,
             "pos_group": _pos_group(p.get("pos")),
-            "vorp":     p.get("vorp") or 0.0,
+            "vorp":     effective_vorp,
         })
 
     compositions = {}
