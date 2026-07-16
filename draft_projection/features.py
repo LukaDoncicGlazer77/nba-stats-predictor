@@ -567,12 +567,190 @@ class DraftBoardProvider:
 # SportsReferenceCBBProvider is listed first -- it's the richer, currently
 # working source (real PER/WS/BPM, weight); NCAAStatsProvider stays
 # registered as a fallback in case it ever has a player/season the other
+_NBA_ADV_COLS_NOVICE = [
+    "player_id", "season",
+    "usg_percent", "ast_percent", "blk_percent", "drb_percent",
+    "stl_percent", "ts_percent", "tov_percent",
+    "per", "ws_48", "bpm", "obpm", "dbpm",
+]
+_NBA_PG_COLS_NOVICE = [
+    "player_id", "season",
+    "pts_per_game", "trb_per_game", "ast_per_game",
+    "stl_per_game", "blk_per_game", "tov_per_game",
+    "fg_percent", "x3p_percent", "ft_percent",
+    "mp_per_game", "g",
+]
+
+
+def _sf(v) -> Optional[float]:
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _nba_season_to_features(adv: dict, pg: dict) -> dict:
+    """Convert one NBA season's advanced + per-game rows to the CBB feature schema."""
+    out = {}
+    # Rate stats: both NBA (archive_advanced) and CBB store these as percentages (e.g. 25.3)
+    for nba_col, feat in [
+        ("usg_percent", "usg_pct"), ("ast_percent", "ast_pct"),
+        ("blk_percent", "blk_pct"), ("drb_percent", "dreb_pct"),
+        ("stl_percent", "stl_pct"), ("tov_percent", "tov_pct"),
+    ]:
+        v = _sf(adv.get(nba_col))
+        if v is not None:
+            out[feat] = v
+    # TS% stored as decimal (0.567) in both NBA and CBB
+    ts = _sf(adv.get("ts_percent"))
+    if ts is not None:
+        out["ts_pct"] = ts
+    # Shooting percentages — decimal in both
+    for nba_col, feat in [("fg_percent", "fg_pct"), ("x3p_percent", "fg3_pct"), ("ft_percent", "ft_pct")]:
+        v = _sf(pg.get(nba_col))
+        if v is not None:
+            out[feat] = v
+    # Per-40 counting stats (per-game * 40 / mpg)
+    mpg = _sf(pg.get("mp_per_game"))
+    if mpg and mpg > 0:
+        for nba_col, feat in [
+            ("pts_per_game", "pts_per40"), ("trb_per_game", "reb_per40"),
+            ("ast_per_game", "ast_per40"), ("stl_per_game", "stl_per40"),
+            ("blk_per_game", "blk_per40"), ("tov_per_game", "tov_per40"),
+        ]:
+            v = _sf(pg.get(nba_col))
+            if v is not None:
+                out[feat] = v * 40.0 / mpg
+    # Advanced metrics — PER, WS/40 (from WS/48), BPM family
+    per_v = _sf(adv.get("per"))
+    if per_v is not None:
+        out["college_per"] = per_v
+    ws48 = _sf(adv.get("ws_48"))
+    if ws48 is not None:
+        out["college_ws_per40"] = ws48 * (40.0 / 48.0)
+    for nba_col, feat in [("obpm", "college_obpm"), ("dbpm", "college_dbpm"), ("bpm", "college_bpm")]:
+        v = _sf(adv.get(nba_col))
+        if v is not None:
+            out[feat] = v
+    return out
+
+
+def _average_nba_season_features(season_triples: list[tuple]) -> dict:
+    """Minutes-weighted average of feature dicts across multiple NBA seasons.
+    season_triples: [(season_int, adv_dict, pg_dict), ...]"""
+    weighted: dict = {}
+    total_weight = 0.0
+    for _, adv, pg in season_triples:
+        feats = _nba_season_to_features(adv, pg)
+        if not feats:
+            continue
+        g = _sf(pg.get("g")) or 0.0
+        mpg = _sf(pg.get("mp_per_game")) or 0.0
+        weight = g * mpg  # total minutes as weight
+        if weight <= 0:
+            weight = 1.0
+        total_weight += weight
+        for k, v in feats.items():
+            weighted[k] = weighted.get(k, 0.0) + v * weight
+    if total_weight <= 0:
+        return {}
+    return {k: v / total_weight for k, v in weighted.items()}
+
+
+class NBANoviceProvider:
+    """NBA rookie-season proxy for prep-to-pro draftees who skipped college
+    (KG, Kobe, LeBron, McGrady, Dwight Howard, etc.) — without this
+    provider, their feature vectors are 65% default, making them invisible
+    as comps against college prospects.
+
+    Uses first 1-3 NBA seasons (draft_season+1 through +3) mapped to the
+    CBB feature schema. Rate stats (USG%, AST%, TS%, BPM, PER) are used
+    directly — they're league-relative and comparable across college/NBA.
+    Per-40 counting stats reflect a slightly different scoring environment
+    but are still useful signal.
+
+    CBB providers are listed earlier in PROVIDERS, so their values always
+    win — this only fills in features still None after CBB lookups fail.
+    Bulk path fetches all NBA seasons unfiltered (NBA tables are ~50k rows,
+    far smaller than the 275k-row CBB table, so no memory concern)."""
+    name = "nba_novice"
+
+    def fetch(self, conn, q, player_name, college=None, season=None, player_id=None) -> dict:
+        if not player_id or season is None:
+            return {}
+        draft_season = int(season)
+        min_s, max_s = draft_season + 1, draft_season + 3
+        try:
+            adv_rows = q(conn, f"""
+                SELECT {', '.join(_NBA_ADV_COLS_NOVICE)} FROM archive_advanced
+                WHERE player_id = ? AND season::int BETWEEN ? AND ?
+            """, (player_id, min_s, max_s))
+            pg_rows = q(conn, f"""
+                SELECT {', '.join(_NBA_PG_COLS_NOVICE)} FROM archive_player_per_game
+                WHERE player_id = ? AND season::int BETWEEN ? AND ?
+            """, (player_id, min_s, max_s))
+        except Exception as exc:
+            log.warning("NBANoviceProvider.fetch failed for %s: %s", player_name, exc)
+            return {}
+        adv_by_s = {int(r["season"]): dict(r) for r in adv_rows if r.get("season")}
+        # Prefer the row with most games (TOT row for traded players)
+        pg_by_s: dict = {}
+        for r in pg_rows:
+            try:
+                s = int(r["season"])
+            except (TypeError, ValueError):
+                continue
+            existing = pg_by_s.get(s)
+            if existing is None or (_sf(r.get("g")) or 0) > (_sf(existing.get("g")) or 0):
+                pg_by_s[s] = dict(r)
+        seasons = sorted(set(adv_by_s) | set(pg_by_s))
+        triples = [(s, adv_by_s.get(s, {}), pg_by_s.get(s, {})) for s in seasons]
+        return _average_nba_season_features(triples)
+
+    def bulk_fetch_all(self, conn, q, *, name_keys=None) -> dict:
+        """Returns {player_id: [(season_int, adv_dict, pg_dict), ...]} for every
+        player in archive_advanced / archive_player_per_game. Caller filters to
+        the draft-season window [draft_season+1, draft_season+3]."""
+        try:
+            adv_rows = q(conn, f"SELECT {', '.join(_NBA_ADV_COLS_NOVICE)} FROM archive_advanced")
+            pg_rows = q(conn, f"SELECT {', '.join(_NBA_PG_COLS_NOVICE)} FROM archive_player_per_game")
+        except Exception as exc:
+            log.warning("NBANoviceProvider bulk fetch failed: %s", exc)
+            return {}
+        adv_by: dict = {}
+        for r in adv_rows:
+            try:
+                s = int(r["season"])
+            except (TypeError, ValueError):
+                continue
+            adv_by.setdefault(r["player_id"], {})[s] = dict(r)
+        pg_by: dict = {}
+        for r in pg_rows:
+            try:
+                s = int(r["season"])
+            except (TypeError, ValueError):
+                continue
+            pid = r["player_id"]
+            existing = pg_by.setdefault(pid, {}).get(s)
+            if existing is None or (_sf(r.get("g")) or 0) > (_sf(existing.get("g")) or 0):
+                pg_by[pid] = pg_by.get(pid, {})
+                pg_by[pid][s] = dict(r)
+        all_ids = set(adv_by) | set(pg_by)
+        out: dict = {}
+        for pid in all_ids:
+            seasons = sorted(set(adv_by.get(pid, {})) | set(pg_by.get(pid, {})))
+            out[pid] = [(s, adv_by.get(pid, {}).get(s, {}), pg_by.get(pid, {}).get(s, {}))
+                        for s in seasons]
+        return out
+
+
 # doesn't. College production/efficiency/role/advanced features only come
 # from college-stats providers; physical profile additionally falls back to
 # career info (historical players) or the draft board (pre-draft prospects),
 # so physical signal isn't entirely dependent on either scraper having run.
 PROVIDERS: list[CollegeStatsProvider] = [
     SportsReferenceCBBProvider(), NCAAStatsProvider(), CareerInfoProvider(), DraftBoardProvider(),
+    NBANoviceProvider(),
 ]
 
 
@@ -658,13 +836,12 @@ def bulk_build_feature_vectors(conn, q, requests: list[dict], *, allowed_name_ke
     overall_pick, player_id}.
 
     Note: unlike build_feature_vector (fully generic over PROVIDERS), this
-    bulk path currently knows about exactly three lookup-key shapes
-    (name_key for cbb_stats/ncaa_stats, player_id for career_info). A future
-    provider that wants the bulk path needs one more `if bulk_tables.get(...)`
-    branch here -- a small, explicit addition, not a refactor. A provider
-    that skips this (like DraftBoardProvider) still works correctly via the
-    per-player build_feature_vector path; it just won't be fast at
-    pool-building scale.
+    bulk path currently knows about four lookup-key shapes: name_key for
+    cbb_stats/ncaa_stats, player_id for career_info, and player_id+draft_season
+    for nba_novice. A future provider that wants the bulk path needs one more
+    branch here. A provider that skips this (like DraftBoardProvider) still
+    works correctly via the per-player build_feature_vector path; it just
+    won't be fast at pool-building scale.
     """
     from server import normalize_name_for_match
 
@@ -708,5 +885,18 @@ def bulk_build_feature_vectors(conn, q, requests: list[dict], *, allowed_name_ke
             for k, v in fetched.items():
                 if k not in raw or raw[k] is None:
                     raw[k] = v
+        # NBA novice proxy: fills in production/advanced features for prep-to-pro
+        # draftees (no CBB data). CBB values already in raw always win because they
+        # were set earlier; this only populates keys that are still None.
+        nba_novice_table = bulk_tables.get("nba_novice")
+        if nba_novice_table and req.get("player_id") and draft_season:
+            player_seasons = nba_novice_table.get(req["player_id"]) or []
+            min_s, max_s = int(draft_season) + 1, int(draft_season) + 3
+            relevant = [(s, adv, pg) for s, adv, pg in player_seasons if min_s <= s <= max_s]
+            if relevant:
+                fetched = _average_nba_season_features(relevant)
+                for k, v in fetched.items():
+                    if k not in raw or raw[k] is None:
+                        raw[k] = v
         vectors.append(_raw_to_vector(raw, req.get("age_at_draft"), req.get("overall_pick")))
     return vectors
