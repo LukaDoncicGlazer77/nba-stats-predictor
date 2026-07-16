@@ -571,12 +571,9 @@ _NBA_ADV_COLS_NOVICE = [
     "player_id", "season",
     "usg_percent", "ast_percent", "blk_percent", "drb_percent",
     "stl_percent", "ts_percent", "tov_percent",
-    "per", "ws_48", "bpm", "obpm", "dbpm",
 ]
 _NBA_PG_COLS_NOVICE = [
     "player_id", "season",
-    "pts_per_game", "trb_per_game", "ast_per_game",
-    "stl_per_game", "blk_per_game", "tov_per_game",
     "fg_percent", "x3p_percent", "ft_percent",
     "mp_per_game", "g",
 ]
@@ -590,45 +587,43 @@ def _sf(v) -> Optional[float]:
 
 
 def _nba_season_to_features(adv: dict, pg: dict) -> dict:
-    """Convert one NBA season's advanced + per-game rows to the CBB feature schema."""
+    """Map one NBA season's advanced + per-game rows to the CBB feature schema.
+
+    Deliberately includes ONLY stats that are on comparable scales across
+    college and NBA contexts:
+      - Shooting percentages (FG%, 3P%, FT%) — same formula, same decimal scale
+      - Defensive rate stats (BLK%, STL%) — same formula, same percentage scale
+      - Efficiency / role rates (TS%, AST%, USG%, DRB%, TOV%) — same formula
+
+    Deliberately EXCLUDES:
+      - Per-40 counting stats (pts/40, reb/40, etc.): NBA rookies produce fewer
+        points/40 than dominant college players (~14 vs ~20+). Including these
+        gives HS draftees below-average z-scores on scoring, actively penalising
+        them vs. the college-dominated pool instead of being neutral.
+      - PER, BPM, WS: different baselines and harder to achieve in the NBA than
+        college; cross-context comparisons would mislead the z-scoring."""
     out = {}
-    # Rate stats: both NBA (archive_advanced) and CBB store these as percentages (e.g. 25.3)
-    for nba_col, feat in [
-        ("usg_percent", "usg_pct"), ("ast_percent", "ast_pct"),
-        ("blk_percent", "blk_pct"), ("drb_percent", "dreb_pct"),
-        ("stl_percent", "stl_pct"), ("tov_percent", "tov_pct"),
-    ]:
+    # Defensive rate stats (production category) — percentage, same scale
+    for nba_col, feat in [("blk_percent", "blk_pct"), ("stl_percent", "stl_pct")]:
         v = _sf(adv.get(nba_col))
         if v is not None:
             out[feat] = v
-    # TS% stored as decimal (0.567) in both NBA and CBB
-    ts = _sf(adv.get("ts_percent"))
-    if ts is not None:
-        out["ts_pct"] = ts
-    # Shooting percentages — decimal in both
+    # Shooting percentages (production category) — decimal, same scale
     for nba_col, feat in [("fg_percent", "fg_pct"), ("x3p_percent", "fg3_pct"), ("ft_percent", "ft_pct")]:
         v = _sf(pg.get(nba_col))
         if v is not None:
             out[feat] = v
-    # Per-40 counting stats (per-game * 40 / mpg)
-    mpg = _sf(pg.get("mp_per_game"))
-    if mpg and mpg > 0:
-        for nba_col, feat in [
-            ("pts_per_game", "pts_per40"), ("trb_per_game", "reb_per40"),
-            ("ast_per_game", "ast_per40"), ("stl_per_game", "stl_per40"),
-            ("blk_per_game", "blk_per40"), ("tov_per_game", "tov_per40"),
-        ]:
-            v = _sf(pg.get(nba_col))
-            if v is not None:
-                out[feat] = v * 40.0 / mpg
-    # Advanced metrics — PER, WS/40 (from WS/48), BPM family
-    per_v = _sf(adv.get("per"))
-    if per_v is not None:
-        out["college_per"] = per_v
-    ws48 = _sf(adv.get("ws_48"))
-    if ws48 is not None:
-        out["college_ws_per40"] = ws48 * (40.0 / 48.0)
-    for nba_col, feat in [("obpm", "college_obpm"), ("dbpm", "college_dbpm"), ("bpm", "college_bpm")]:
+    # TS% (efficiency category) — decimal, same scale
+    ts = _sf(adv.get("ts_percent"))
+    if ts is not None:
+        out["ts_pct"] = ts
+    # Playmaking / turnover rates (efficiency category) — percentage, same scale
+    for nba_col, feat in [("ast_percent", "ast_pct"), ("tov_percent", "tov_pct")]:
+        v = _sf(adv.get(nba_col))
+        if v is not None:
+            out[feat] = v
+    # Role rates (role category) — percentage, same scale
+    for nba_col, feat in [("usg_percent", "usg_pct"), ("drb_percent", "dreb_pct")]:
         v = _sf(adv.get(nba_col))
         if v is not None:
             out[feat] = v
