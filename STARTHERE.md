@@ -365,3 +365,145 @@ Output: `flagged_archetypes.csv` (generated locally, not committed — re-run `a
 
 Latest commits: `a692b59` (contender detection for traded players) → `69ba498` (Scoring Big + PlayBig fixes). All live. `analyze_archetypes.py`, `check_fix.py`, `debug_player.py` are local verification scripts not committed to main — safe to delete if not needed.
 
+---
+
+## Session — 2026-07-15/16: Historical data backfill, draft/career comps fixes, NBA Playing Style Comps
+
+All changes committed and live unless noted.
+
+### 1. Historical NBA data backfill (1980-2014)
+
+**Symptom**: NBA player comps (same-stage and projected-engine) only surfaced players from ~2015-2026. Kevin Garnett, Tim Duncan, early-2000s stars were invisible.
+
+**Root cause**: `archive_advanced` and `archive_player_per_game` only contained ~2015-2026 seasons. `load_pool()` has no season filter — it just returns whatever is in the DB.
+
+**Fix**: Ran `update_current_season.py --season YEAR` for each year 1980-2014 in a loop. Command used:
+```bash
+source .venv/bin/activate
+for year in $(seq 1980 2014); do
+    echo "Loading $year..."
+    python3 update_current_season.py --season $year
+    sleep 4
+done
+```
+The scraper already has delays baked in; the extra 4s sleep avoids Basketball-Reference rate limits.
+
+**Caveat**: `archive_player_dashboard` is a SQL VIEW (not a table) — the loop logs `cannot delete from view` for that table each year, which is expected and non-critical. `archive_advanced` and `archive_player_per_game` insert successfully.
+
+**After backfill**: Pool now covers 1980-2026. Push any commit to trigger a Railway redeploy so the server process restarts and picks up the new data (draft projection pool is cached for process lifetime — no TTL).
+
+### 2. Career outcome comps: Outcome tier badge column (`app.js` / `styles.css`, commit `8bcb9b9`)
+
+Added an "Outcome" column to the career outcome comps table displaying each historical comp's actual NBA outcome tier.
+
+**Frontend changes**:
+- `app.js`: Added `<th>Outcome</th>` column in `<thead>` and `<td><span class="co-tier-badge co-tier-${...}">${c.tier_label}</span></td>` in each row. Tier class is derived by lowercasing and removing non-alpha characters from `tier_label`.
+- `styles.css`: Added `.co-tier-badge` base style plus tier-specific color variants:
+  - `.co-tier-superstar` — gold (#ffd060)
+  - `.co-tier-all-nba` — orange (#ffaa40)
+  - `.co-tier-all-star` — blue (#4eb8e0)
+  - `.co-tier-high-level-starter` — green (#00d48a)
+  - `.co-tier-starter` — lighter green (#00c47e)
+  - `.co-tier-bust` — red (#ff6060)
+
+### 3. Comp engine fix for high-school draftees (`draft_projection/comp_engine.py`, commit `36cf853`)
+
+**Problem**: High-school draftees (no college career — Kevin Garnett, Kobe, LeBron, etc.) got `z=0` (pool mean) for every college statistical feature. This created artificial distance vs. above-average college prospects, scoring them lower than a mediocre college player even when the physical/role profile matched well.
+
+**Fix**: In `_category_similarity()`, for categories in `_STAT_CATEGORIES = {"production", "advanced", "efficiency"}`, require **both** sides to have real data. If either side is missing all data for a college stat category, skip the category entirely and renormalize remaining weights (the existing graceful-degradation logic already handles renormalization). Non-stat categories (`draft_context`, `physical`, `role`) keep the original "at least one side has data" logic.
+
+```python
+if category in _STAT_CATEGORIES:
+    usable = [n for n in names if not ma.get(n, True) and not mb.get(n, True)]
+else:
+    usable = [n for n in names if not (ma.get(n, True) and mb.get(n, True))]
+```
+
+**Limitation**: Even with this fix, KG (high-school draftee) scores low against Wilson (college player) because 65% of the category weight is for college stats — and with both sides excluded from all 3 stat categories, the comp score is driven only by physical + draft_context + role (35% of weight). KG won't top the college-based comp list for a college prospect.
+
+### 4. NBA Playing Style Comps — new section on draft projection tab (`server.py` + `app.js`, commit `4c2b029`)
+
+**Solution for the KG problem**: Added a separate "NBA Playing Style Comps" section that bypasses the college-stats comp engine entirely. Instead, it compares the prospect's college archetype profile (`named_mix` dict from `compute_archetype_mix()`) against every NBA player's career `named_mix` via cosine similarity. This surfaces players who *played the same role* in the NBA as the prospect plays in college, regardless of college career.
+
+**`server.py` additions**:
+
+```python
+import time as _time_module
+_nba_pool_cache = None
+_nba_pool_cache_time = 0.0
+_NBA_POOL_TTL = 600  # 10-minute TTL
+
+def _get_nba_pool():
+    global _nba_pool_cache, _nba_pool_cache_time
+    now = _time_module.time()
+    if _nba_pool_cache is not None and (now - _nba_pool_cache_time) < _NBA_POOL_TTL:
+        return _nba_pool_cache
+    with get_conn() as conn:
+        pool = archetype_engine.annotate(archetype_engine.load_pool(conn, q))
+    _nba_pool_cache = pool
+    _nba_pool_cache_time = _time_module.time()
+    return pool
+
+def _nba_style_comps(prospect_mix: dict, top_n: int = 5) -> list[dict]:
+    """Cosine similarity between prospect's named_mix and every NBA season's named_mix.
+    De-dupes to one entry per player (best game-count × age-prime-weight season)."""
+    if not prospect_mix:
+        return []
+    pool = _get_nba_pool()
+    # One entry per player: prefer peak-prime seasons (age 22-32) and high games
+    best_by_player: dict = {}
+    for p in pool:
+        pid = p["player_id"]
+        age = p.get("age") or 0
+        games = p.get("games") or 0
+        score = games * (1.2 if 22 <= age <= 32 else 1.0)
+        if pid not in best_by_player or score > best_by_player[pid]["_score"]:
+            best_by_player[pid] = {**p, "_score": score}
+    def _arch_sim(a, b):
+        keys = list(a.keys())
+        if not keys: return 0.0
+        dot = sum(a.get(k, 0) * b.get(k, 0) for k in keys)
+        na = sum(v**2 for v in a.values())**0.5
+        nb = sum(v**2 for v in b.values())**0.5
+        return dot / (na * nb) if na * nb > 0 else 0.0
+    results = []
+    for p in best_by_player.values():
+        mix = p.get("named_mix") or {}
+        sim = _arch_sim(prospect_mix, mix)
+        results.append({"player": p["player"], "player_id": p["player_id"],
+                        "season": p["season"], "dominant_engine": p.get("dominant_engine", ""),
+                        "similarity": round(sim * 100, 1)})
+    results.sort(key=lambda r: -r["similarity"])
+    return results[:top_n]
+```
+
+Wired into `/api/draft-projection` handler:
+```python
+prospect_mix = (result.get("archetype") or {}).get("mix") or {}
+result["nba_style_comps"] = _nba_style_comps(prospect_mix)
+```
+
+**`app.js` additions** (draft projection tab):
+```javascript
+${data.nba_style_comps && data.nba_style_comps.length ? `
+<div class="cmp-pcard-title" style="margin-top:20px">NBA Playing Style Comps</div>
+<p style="color:var(--muted);font-size:0.75rem;margin-bottom:10px">
+  NBA players whose career archetype most closely matches this prospect's college playing style — includes all eras.
+</p>
+<table class="cmp-table4">
+  <thead><tr><th>Player</th><th>Season</th><th>Primary Archetype</th><th>Style Match</th></tr></thead>
+  <tbody>${data.nba_style_comps.map(c => `<tr>
+    <td>${escapeHtml(c.player)}</td>
+    <td>${c.season}</td>
+    <td>${escapeHtml(c.dominant_engine)}</td>
+    <td>${c.similarity}%</td>
+  </tr>`).join("")}</tbody>
+</table>` : ""}
+```
+
+**Why KG now appears**: After the historical backfill (1980-2014), KG's seasons are in the NBA pool. His `named_mix` (heavy Playmaking Big / Scoring Big / 3&D Wing) will surface for prospects with similar college archetype profiles. The college-stats comp engine still won't surface him (he had no college career), but the NBA Playing Style Comps section will.
+
+### Current status (2026-07-16)
+
+Commits this session: `8bcb9b9` (career outcome tier badges) → `36cf853` (comp engine high-school fix) → `4c2b029` (NBA Playing Style Comps in draft projection tab). Historical backfill (1980-2014) completed locally — data is in Supabase. Pool rebuilds on next Railway redeploy.
+
