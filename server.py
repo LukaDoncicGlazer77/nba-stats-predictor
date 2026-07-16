@@ -269,6 +269,67 @@ _draft_projection_pool = None
 _draft_projection_pool_lock = threading.Lock()
 _draft_projection_cache = {}   # name -> (result_dict, timestamp)
 _DRAFT_PROJECTION_CACHE_TTL = 600  # 10 minutes
+
+# ── Cached NBA archetype pool for style comps ─────────────────────────────────
+import time as _time_module
+_nba_pool_cache = None
+_nba_pool_cache_time = 0.0
+_NBA_POOL_TTL = 600
+
+def _get_nba_pool():
+    global _nba_pool_cache, _nba_pool_cache_time
+    now = _time_module.time()
+    if _nba_pool_cache is not None and (now - _nba_pool_cache_time) < _NBA_POOL_TTL:
+        return _nba_pool_cache
+    with get_conn() as conn:
+        pool = archetype_engine.annotate(archetype_engine.load_pool(conn, q))
+    _nba_pool_cache = pool
+    _nba_pool_cache_time = _time_module.time()
+    return pool
+
+
+def _nba_style_comps(prospect_mix: dict, top_n: int = 5) -> list[dict]:
+    """Find NBA players whose career archetype best matches the prospect's college archetype mix."""
+    if not prospect_mix:
+        return []
+    try:
+        pool = _get_nba_pool()
+    except Exception:
+        return []
+
+    # Use the best qualifying season per player (most games, age 22-32 preferred)
+    best_by_player: dict = {}
+    for p in pool:
+        pid = p["player_id"]
+        age = p.get("age") or 0
+        games = p.get("games") or 0
+        score = games * (1.2 if 22 <= age <= 32 else 1.0)
+        if pid not in best_by_player or score > best_by_player[pid]["_score"]:
+            best_by_player[pid] = {**p, "_score": score}
+
+    def _arch_sim(a: dict, b: dict) -> float:
+        keys = list(a.keys())
+        if not keys:
+            return 0.0
+        dot = sum(a.get(k, 0) * b.get(k, 0) for k in keys)
+        na = sum(v ** 2 for v in a.values()) ** 0.5
+        nb = sum(v ** 2 for v in b.values()) ** 0.5
+        return dot / (na * nb) if na * nb > 0 else 0.0
+
+    results = []
+    for p in best_by_player.values():
+        mix = p.get("named_mix") or {}
+        sim = _arch_sim(prospect_mix, mix)
+        results.append({
+            "player": p["player"],
+            "player_id": p["player_id"],
+            "season": p["season"],
+            "dominant_engine": p.get("dominant_engine", ""),
+            "similarity": round(sim * 100, 1),
+        })
+
+    results.sort(key=lambda r: -r["similarity"])
+    return results[:top_n]
 def _get_draft_projection_pool():
     global _draft_projection_pool
     if _draft_projection_pool is not None:
@@ -1232,6 +1293,8 @@ class Handler(SimpleHTTPRequestHandler):
                     conn, q, pool, player_name=name, college=college,
                     age_at_draft=age_at_draft, overall_pick=overall_pick,
                 )
+            prospect_mix = (result.get("archetype") or {}).get("mix") or {}
+            result["nba_style_comps"] = _nba_style_comps(prospect_mix)
             _draft_projection_cache[cache_key] = (result, _time.time())
             return self.send_json(result)
 

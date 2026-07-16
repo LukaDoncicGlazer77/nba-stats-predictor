@@ -2761,6 +2761,19 @@ async function renderDraftProjectionView(container, prospect) {
       <div class="cmp-pcard-title" style="margin-top:20px">Top Historical Comparables</div>
       ${data.comparables.length ? buildComparablesTable(data.comparables) : `<p style="color:var(--muted);font-size:0.85rem">No comparable historical draft picks found.</p>`}
 
+      ${data.nba_style_comps && data.nba_style_comps.length ? `
+      <div class="cmp-pcard-title" style="margin-top:20px">NBA Playing Style Comps</div>
+      <p style="color:var(--muted);font-size:0.75rem;margin-bottom:10px">NBA players whose career archetype most closely matches this prospect's college playing style — includes all eras.</p>
+      <table class="cmp-table4">
+        <thead><tr><th>Player</th><th>Season</th><th>Primary Archetype</th><th>Style Match</th></tr></thead>
+        <tbody>${data.nba_style_comps.map(c => `<tr>
+          <td>${escapeHtml(c.player)}</td>
+          <td>${c.season}</td>
+          <td>${escapeHtml(c.dominant_engine)}</td>
+          <td>${c.similarity}%</td>
+        </tr>`).join("")}</tbody>
+      </table>` : ""}
+
       <div class="cmp-pcard-title" style="margin-top:20px">Scouting Notes</div>
       ${buildExplainabilityLists(data.explainability)}
     </div>`;
