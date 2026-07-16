@@ -978,12 +978,12 @@ function renderArchetypePanel(report, player) {
     )
     .join("");
 
-  const sameStageRows = report.same_stage_comps
+  const sameStageRows = (report.same_stage_comps || [])
     .map(
       (c) => `<li>${escapeHtml(c.player)} (${c.season}) &mdash; ${c.similarity}%<br><span class="comp-explanation">${escapeHtml(c.explanation || "")}</span></li>`
     )
     .join("");
-  const projectedRows = report.projected_engine_comps
+  const projectedRows = (report.projected_engine_comps || [])
     .map(
       (c) => `<li>${escapeHtml(c.player)} (${c.season}) &mdash; ${c.engine_similarity}% engine match<br><span class="comp-explanation">${escapeHtml(c.explanation || "")}</span></li>`
     )
