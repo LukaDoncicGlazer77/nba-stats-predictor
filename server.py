@@ -180,6 +180,34 @@ def send_welcome_email(to_email: str) -> bool:
         return False
 
 
+def send_feedback_notification(category: str, message: str, from_email: str) -> None:
+    label = {"bug": "Bug Report", "feature": "Feature Request", "general": "General Feedback"}.get(category, category)
+    html = f"""
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:28px;background:#0d0d1a;color:#e2e8f0;border-radius:12px;border:1px solid rgba(124,92,255,0.2)">
+      <h2 style="color:#a78bfa;margin:0 0 4px">[StatFuel Feedback] {label}</h2>
+      <p style="color:#475569;font-size:13px;margin:0 0 20px">From: {from_email}</p>
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px;font-size:15px;line-height:1.6;color:#cbd5e1;white-space:pre-wrap">{message}</div>
+    </div>
+    """
+    payload = json.dumps({
+        "personalizations": [{"to": [{"email": "ameenfern77@gmail.com"}]}],
+        "from": {"email": "noreply@statfuel.online", "name": "StatFuel"},
+        "reply_to": {"email": from_email} if from_email and "@" in from_email else {"email": "noreply@statfuel.online"},
+        "subject": f"[StatFuel] {label}",
+        "content": [{"type": "text/html", "value": html}],
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=payload,
+        headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=15)
+    except Exception as exc:
+        print(f"send_feedback_notification failed: {exc}")
+
+
 def send_reset_email(to_email: str, token: str) -> bool:
     reset_url = f"https://statfuel.online/?reset_token={token}"
     html = f"""
@@ -792,6 +820,28 @@ class Handler(SimpleHTTPRequestHandler):
                 )
                 conn.commit()
             return self.send_json({"ok": True, "email": email})
+
+        if parsed.path == "/api/feedback":
+            category = (body.get("category") or "general").strip().lower()
+            message = (body.get("message") or "").strip()
+            from_email = (body.get("email") or "").strip().lower()
+            if not message:
+                return self.send_json({"error": "Message required"}, status=400)
+            if len(message) > 4000:
+                return self.send_json({"error": "Message too long"}, status=400)
+            with get_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO archive_feedback (category, message, email, created_at)
+                    VALUES (%s, %s, %s, now())
+                """, (category, message, from_email or None))
+                conn.commit()
+            threading.Thread(
+                target=send_feedback_notification,
+                args=(category, message, from_email or "anonymous"),
+                daemon=True,
+            ).start()
+            return self.send_json({"ok": True})
 
         if parsed.path == "/api/heartbeat":
             email = (body.get("email") or "").strip().lower()
@@ -1654,6 +1704,24 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
             time.sleep(retry_delay_seconds)
 
 
+def ensure_feedback_table():
+    try:
+        with get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS archive_feedback (
+                    id SERIAL PRIMARY KEY,
+                    category TEXT NOT NULL DEFAULT 'general',
+                    message TEXT NOT NULL,
+                    email TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """)
+            conn.commit()
+    except Exception as exc:
+        print(f"ensure_feedback_table failed: {exc}")
+
+
 def _prewarm_pool():
     try:
         _get_draft_projection_pool()
@@ -1663,6 +1731,7 @@ def _prewarm_pool():
 
 def main():
     ensure_users_table()
+    ensure_feedback_table()
     threading.Thread(target=_prewarm_pool, daemon=True).start()
     threading.Thread(target=_flush_heartbeats, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))

@@ -3214,6 +3214,80 @@ if (_initialSection === "player-profile" && _deepLinkId) {
   navigate(_initialSection);
 }
 
+// ── Feedback page ─────────────────────────────────────────────────────────────
+(function initFeedback() {
+  let selectedCategory = "bug";
+
+  document.querySelectorAll(".fb-cat-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".fb-cat-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedCategory = btn.dataset.cat;
+    });
+  });
+
+  const msgEl = document.getElementById("fbMessage");
+  const countEl = document.getElementById("fbCharCount");
+  if (msgEl && countEl) {
+    msgEl.addEventListener("input", () => {
+      const len = msgEl.value.length;
+      countEl.textContent = `${len} / 4000`;
+      countEl.style.color = len > 3800 ? "#f87171" : "";
+    });
+  }
+
+  const submitBtn = document.getElementById("fbSubmitBtn");
+  const statusEl = document.getElementById("fbStatus");
+  if (!submitBtn) return;
+
+  submitBtn.addEventListener("click", async () => {
+    const message = (msgEl && msgEl.value.trim()) || "";
+    if (!message) {
+      showFbStatus("error", "Please enter a message.");
+      return;
+    }
+    const email = (document.getElementById("fbEmail") || {}).value || "";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending…";
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: selectedCategory, message, email }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showFbStatus("success", "Thank you! Your feedback has been received.");
+        if (msgEl) msgEl.value = "";
+        if (document.getElementById("fbEmail")) document.getElementById("fbEmail").value = "";
+        if (countEl) countEl.textContent = "0 / 4000";
+      } else {
+        showFbStatus("error", data.error || "Something went wrong. Please try again.");
+      }
+    } catch {
+      showFbStatus("error", "Network error. Please try again.");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Send Feedback";
+    }
+  });
+
+  function showFbStatus(type, msg) {
+    if (!statusEl) return;
+    statusEl.style.display = "block";
+    statusEl.className = "feedback-status " + (type === "success" ? "feedback-status-ok" : "feedback-status-err");
+    statusEl.textContent = msg;
+    if (type === "success") setTimeout(() => { statusEl.style.display = "none"; }, 5000);
+  }
+
+  // Pre-fill email if logged in
+  const userEmail = localStorage.getItem("sf_session");
+  if (userEmail && userEmail !== "guest") {
+    const emailEl = document.getElementById("fbEmail");
+    if (emailEl) emailEl.value = userEmail;
+  }
+})();
+
 // Heartbeat: ping every 60s to track active time for logged-in users
 (function startHeartbeat() {
   const email = localStorage.getItem('sf_session');
