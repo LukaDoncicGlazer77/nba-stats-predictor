@@ -2769,7 +2769,7 @@ async function renderDraftProjectionView(container, prospect) {
         <tbody>${data.nba_style_comps.map(c => `<tr>
           <td>${escapeHtml(c.player)}</td>
           <td>${c.season}</td>
-          <td>${escapeHtml(c.dominant_engine)}</td>
+          <td>${escapeHtml((c.dominant_engine || "").replace(/_/g, " "))}</td>
           <td>${c.similarity}%</td>
         </tr>`).join("")}</tbody>
       </table>` : ""}

@@ -320,11 +320,12 @@ def _nba_style_comps(prospect_mix: dict, top_n: int = 5) -> list[dict]:
     for p in best_by_player.values():
         mix = p.get("named_mix") or {}
         sim = _arch_sim(prospect_mix, mix)
+        primary_archetype = max(mix, key=mix.get) if mix else ""
         results.append({
             "player": p["player"],
             "player_id": p["player_id"],
             "season": p["season"],
-            "dominant_engine": p.get("dominant_engine", ""),
+            "dominant_engine": primary_archetype,
             "similarity": round(sim * 100, 1),
         })
 
