@@ -178,10 +178,18 @@ def _category_similarity(za: dict, ma: dict, zb: dict, mb: dict, category: str) 
     have that degenerate case and is the standard approach for this kind of
     comp/similarity score."""
     names = FEATURES_BY_CATEGORY[category]
-    # A feature only counts if at least one side has real (non-missing) data
-    # for it -- if both sides are missing everything in a category, the
-    # category is unavailable, not "similar".
-    usable = [n for n in names if not (ma.get(n, True) and mb.get(n, True))]
+    if category in _STAT_CATEGORIES:
+        # For college stat categories: require BOTH sides to have real data.
+        # A high-school draftee (no college career) gets z=0 (pool mean) for
+        # every college feature, which would create artificial distance vs. an
+        # above-average college prospect. Excluding the category entirely lets
+        # the comparison fall back to draft context + physical only — a fair
+        # basis when one player simply had no college career.
+        usable = [n for n in names if not ma.get(n, True) and not mb.get(n, True)]
+    else:
+        # For non-statistical categories (draft context, physical): keep the
+        # original "at least one side has data" logic.
+        usable = [n for n in names if not (ma.get(n, True) and mb.get(n, True))]
     if not usable:
         return None
     sq_dists = [(za[n] - zb[n]) ** 2 for n in usable]
