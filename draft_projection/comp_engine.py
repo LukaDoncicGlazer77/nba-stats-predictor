@@ -34,12 +34,12 @@ from draft_projection.labels import build_career_labels
 log = logging.getLogger("draft_projection.comp_engine")
 
 CATEGORY_WEIGHTS = {
-    "production": 0.28,
+    "production": 0.32,
     "advanced": 0.22,
     "efficiency": 0.15,
     "role": 0.18,
     "physical": 0.12,
-    "draft_context": 0.05,
+    "draft_context": 0.01,
 }
 CATEGORIES = list(CATEGORY_WEIGHTS.keys())
 FEATURES_BY_CATEGORY = {
