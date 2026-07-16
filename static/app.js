@@ -2338,7 +2338,7 @@ function renderComparison() {
 
 // ── Career Outcome (prospect projection) ───────────────────────────────────────
 async function renderCareerOutcomeView(container, prospect) {
-  container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⏳</div><div>Projecting career outcome for ${escapeHtml(prospect.name)}...</div></div>`;
+  container.innerHTML = `<div class="loading-state"><div class="sf-spinner"></div><span>Projecting career outcome for ${escapeHtml(prospect.name)}&hellip;</span></div>`;
   let data;
   try {
     data = await fetch(`/api/prospect-outcome?name=${encodeURIComponent(prospect.name)}`).then(r => r.json());
@@ -2716,7 +2716,7 @@ function buildComparablesTable(comparables) {
 }
 
 async function renderDraftProjectionView(container, prospect) {
-  container.innerHTML = `<div class="compare-placeholder"><div class="compare-placeholder-icon">⏳</div><div>Generating career-tier projection for ${escapeHtml(prospect.name)}...</div></div>`;
+  container.innerHTML = `<div class="loading-state"><div class="sf-spinner"></div><span>Generating career-tier projection for ${escapeHtml(prospect.name)}&hellip;</span></div>`;
   let data;
   try {
     data = await fetch(`/api/draft-projection?name=${encodeURIComponent(prospect.name)}`).then(r => r.json());
