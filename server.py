@@ -297,16 +297,9 @@ def _nba_style_comps(prospect_mix: dict, top_n: int = 5) -> list[dict]:
     except Exception:
         return []
 
-    # Only consider recent seasons so comps reflect the current NBA, not a
-    # player's decade-ago peak (e.g. Embiid's MVP year vs his current form).
-    RECENT_CUTOFF = 2022
-    recent_pool = [p for p in pool if (p.get("season") or 0) >= RECENT_CUTOFF]
-    if not recent_pool:
-        recent_pool = pool  # fallback if archive hasn't been populated yet
-
     # Use the best qualifying season per player (most games, age 22-32 preferred)
     best_by_player: dict = {}
-    for p in recent_pool:
+    for p in pool:
         pid = p["player_id"]
         age = p.get("age") or 0
         games = p.get("games") or 0
