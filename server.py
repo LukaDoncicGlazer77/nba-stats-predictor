@@ -307,14 +307,14 @@ def _nba_style_comps(prospect_mix: dict, top_n: int = 5) -> list[dict]:
         if pid not in best_by_player or score > best_by_player[pid]["_score"]:
             best_by_player[pid] = {**p, "_score": score}
 
+    import math as _math
     def _arch_sim(a: dict, b: dict) -> float:
-        keys = list(a.keys())
+        keys = sorted(set(a.keys()) | set(b.keys()))
         if not keys:
             return 0.0
-        dot = sum(a.get(k, 0) * b.get(k, 0) for k in keys)
-        na = sum(v ** 2 for v in a.values()) ** 0.5
-        nb = sum(v ** 2 for v in b.values()) ** 0.5
-        return dot / (na * nb) if na * nb > 0 else 0.0
+        sq_dists = [(a.get(k, 0) - b.get(k, 0)) ** 2 for k in keys]
+        mean_sq = sum(sq_dists) / len(sq_dists)
+        return _math.exp(-mean_sq / 15.0)
 
     results = []
     for p in best_by_player.values():
