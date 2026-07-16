@@ -149,6 +149,7 @@ function navigate(section) {
     else renderCareerOutcomeBar();
     renderCareerOutcomePage();
   }
+  if (section === "referee-bias") loadRefereeBias();
   if (section === "draft-projection") {
     if (!prospectsLoaded) loadProspects().then(() => renderDraftProjectionBar());
     else renderDraftProjectionBar();
@@ -3213,6 +3214,175 @@ if (_initialSection === "player-profile" && _deepLinkId) {
 } else {
   navigate(_initialSection);
 }
+
+// ── Referee Bias dashboard ────────────────────────────────────────────────────
+let _refData = null;
+let _refSortCol = "games";
+let _refSortAsc = false;
+let _refFilter = "";
+
+async function loadRefereeBias() {
+  const subtitle = $("#refSubtitle");
+  if (_refData) { renderRefList(); return; }
+  if (subtitle) subtitle.textContent = "Loading referee data…";
+  try {
+    const res = await fetch("/api/referee-stats");
+    _refData = await res.json();
+    if (!Array.isArray(_refData)) _refData = [];
+    if (subtitle) {
+      subtitle.textContent = _refData.length
+        ? `${_refData.length} referees · 2015–2025 regular season`
+        : "No data yet — run pull_referee_data.py to populate";
+    }
+    renderRefList();
+  } catch {
+    if (subtitle) subtitle.textContent = "Failed to load referee data";
+  }
+}
+
+function renderRefList() {
+  const tbody = $("#refTableBody");
+  if (!tbody || !_refData) return;
+  let rows = _refData.filter(r => !_refFilter || r.ref_name.toLowerCase().includes(_refFilter));
+  rows = rows.slice().sort((a, b) => {
+    const av = a[_refSortCol] ?? "", bv = b[_refSortCol] ?? "";
+    if (typeof av === "string") return _refSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    return _refSortAsc ? av - bv : bv - av;
+  });
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">
+      ${_refFilter ? "No referees matching filter" : "No data — run pull_referee_data.py first"}
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const fd = parseFloat(r.foul_disparity);
+    const fdClass = fd > 0.8 ? "ref-bias-high" : fd < -0.3 ? "ref-bias-low" : "ref-bias-neutral";
+    const ftd = parseFloat(r.fta_disparity);
+    const ftdClass = ftd > 1.5 ? "ref-bias-high" : ftd < -0.5 ? "ref-bias-low" : "ref-bias-neutral";
+    return `<tr class="ref-row" data-name="${escapeHtml(r.ref_name)}">
+      <td><button class="ref-name-btn">${escapeHtml(r.ref_name)}</button></td>
+      <td>${r.games}</td>
+      <td>${r.avg_total_fouls}</td>
+      <td>${r.home_pf_avg}</td>
+      <td>${r.away_pf_avg}</td>
+      <td><span class="ref-bias-badge ${fdClass}">${fd > 0 ? "+" : ""}${fd.toFixed(2)}</span></td>
+      <td><span class="ref-bias-badge ${ftdClass}">${ftd > 0 ? "+" : ""}${ftd.toFixed(2)}</span></td>
+      <td>${(parseFloat(r.home_win_pct) * 100).toFixed(1)}%</td>
+    </tr>`;
+  }).join("");
+
+  tbody.querySelectorAll(".ref-name-btn").forEach(btn => {
+    btn.addEventListener("click", () => showRefDetail(btn.closest("tr").dataset.name));
+  });
+}
+
+async function showRefDetail(name) {
+  $("#refListView").style.display = "none";
+  const detail = $("#refDetailView");
+  detail.style.display = "";
+  $("#refDetailName").textContent = name;
+  $("#refDetailMeta").textContent = "Loading…";
+  $("#refStatCards").innerHTML = "";
+  $("#refTeamBars").innerHTML = "";
+  $("#refSeasonChart").innerHTML = "";
+
+  try {
+    const res = await fetch(`/api/referee-detail?name=${encodeURIComponent(name)}`);
+    const data = await res.json();
+    const agg = _refData.find(r => r.ref_name === name) || {};
+    $("#refDetailMeta").textContent = `${agg.games || 0} games officiated · 2015–2025`;
+    renderRefStatCards(agg);
+    renderRefTeamBars(data.team_tendencies || []);
+    renderRefSeasonChart(data.seasons || []);
+  } catch {
+    $("#refDetailMeta").textContent = "Failed to load detail";
+  }
+}
+
+function renderRefStatCards(agg) {
+  const fd = parseFloat(agg.foul_disparity) || 0;
+  const ftd = parseFloat(agg.fta_disparity) || 0;
+  const hwp = (parseFloat(agg.home_win_pct) || 0) * 100;
+  const cards = [
+    { label: "Fouls / Game", value: agg.avg_total_fouls || "—", sub: "total (both teams)" },
+    { label: "Foul Bias", value: (fd > 0 ? "+" : "") + fd.toFixed(2), sub: "away minus home PF", cls: fd > 0.8 ? "ref-stat-high" : fd < -0.3 ? "ref-stat-low" : "" },
+    { label: "FTA Bias", value: (ftd > 0 ? "+" : "") + ftd.toFixed(2), sub: "away minus home FTA", cls: ftd > 1.5 ? "ref-stat-high" : ftd < -0.5 ? "ref-stat-low" : "" },
+    { label: "Home Win %", value: hwp.toFixed(1) + "%", sub: "in games they officiated", cls: hwp > 56 ? "ref-stat-high" : hwp < 46 ? "ref-stat-low" : "" },
+  ];
+  $("#refStatCards").innerHTML = cards.map(c => `
+    <div class="ref-stat-card ${c.cls || ""}">
+      <div class="ref-stat-value">${c.value}</div>
+      <div class="ref-stat-label">${c.label}</div>
+      <div class="ref-stat-sub">${c.sub}</div>
+    </div>`).join("");
+}
+
+function renderRefTeamBars(teams) {
+  const el = $("#refTeamBars");
+  if (!teams.length) { el.innerHTML = `<p style="color:var(--muted);font-size:0.85rem">No team data</p>`; return; }
+  const maxAbs = Math.max(...teams.map(t => Math.abs(parseFloat(t.pf_vs_avg))), 0.1);
+  const sorted = teams.slice().sort((a, b) => parseFloat(b.pf_vs_avg) - parseFloat(a.pf_vs_avg));
+  el.innerHTML = sorted.map(t => {
+    const val = parseFloat(t.pf_vs_avg);
+    const pct = Math.abs(val) / maxAbs * 50;
+    const isPos = val >= 0;
+    return `<div class="ref-team-row">
+      <span class="ref-team-name">${escapeHtml(t.team)}</span>
+      <div class="ref-team-bar-wrap">
+        <div class="ref-team-bar-center"></div>
+        <div class="ref-team-bar ${isPos ? "ref-bar-pos" : "ref-bar-neg"}"
+             style="${isPos ? "left:50%;width:" : "right:50%;width:"}${pct}%"></div>
+      </div>
+      <span class="ref-team-val ${isPos ? "ref-val-pos" : "ref-val-neg"}">${isPos ? "+" : ""}${val.toFixed(2)}</span>
+    </div>`;
+  }).join("");
+}
+
+function renderRefSeasonChart(seasons) {
+  const el = $("#refSeasonChart");
+  if (!seasons.length) { el.innerHTML = `<p style="color:var(--muted);font-size:0.85rem">No season data</p>`; return; }
+  const maxFouls = Math.max(...seasons.map(s => parseFloat(s.avg_total_fouls)));
+  el.innerHTML = `<div class="ref-season-bars">
+    ${seasons.map(s => {
+      const h = (parseFloat(s.avg_total_fouls) / maxFouls * 100).toFixed(1);
+      const fd = parseFloat(s.foul_disparity);
+      return `<div class="ref-season-col">
+        <div class="ref-season-tip">${s.avg_total_fouls} fouls<br>bias ${fd > 0 ? "+" : ""}${fd.toFixed(2)}</div>
+        <div class="ref-season-bar" style="height:${h}%"></div>
+        <div class="ref-season-lbl">${String(s.season).slice(2)}-${String(parseInt(s.season)+1).slice(2)}</div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+// Sort headers
+document.querySelectorAll(".ref-sort-col").forEach(th => {
+  th.style.cursor = "pointer";
+  th.addEventListener("click", () => {
+    const col = th.dataset.col;
+    if (_refSortCol === col) _refSortAsc = !_refSortAsc;
+    else { _refSortCol = col; _refSortAsc = col === "ref_name"; }
+    document.querySelectorAll(".ref-sort-col").forEach(h => h.classList.remove("sort-asc","sort-desc"));
+    th.classList.add(_refSortAsc ? "sort-asc" : "sort-desc");
+    renderRefList();
+  });
+});
+
+const refSearchEl = $("#refSearch");
+if (refSearchEl) {
+  refSearchEl.addEventListener("input", () => {
+    _refFilter = refSearchEl.value.trim().toLowerCase();
+    renderRefList();
+  });
+}
+
+$("#refBackBtn") && $("#refBackBtn").addEventListener("click", () => {
+  $("#refDetailView").style.display = "none";
+  $("#refListView").style.display = "";
+});
 
 // ── Feedback page ─────────────────────────────────────────────────────────────
 (function initFeedback() {

@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260716-feedback" />
+    <link rel="stylesheet" href="styles.css?v=20260716-referee" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -420,6 +420,12 @@
           <li><button class="nav-item" data-section="watchlist">
             <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h8a1 1 0 011 1v11l-5-3-5 3V3a1 1 0 011-1z"/></svg>
             Watchlist
+          </button></li>
+
+          <li class="nav-heading">LEAGUE TOOLS</li>
+          <li><button class="nav-item" data-section="referee-bias">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>
+            Referee Bias
           </button></li>
 
           <li class="nav-heading">TEAM TOOLS</li>
@@ -1095,6 +1101,69 @@
           </div>
         </section>
 
+        <!-- Referee Bias Section -->
+        <section class="page hidden" id="page-referee-bias">
+          <div class="page-header">
+            <div>
+              <h2>Referee Bias</h2>
+              <p class="page-subtitle" id="refSubtitle">Loading referee data&hellip;</p>
+            </div>
+            <div class="page-controls">
+              <input id="refSearch" type="search" placeholder="Search referee&hellip;" class="player-filter-input" style="max-width:240px" />
+            </div>
+          </div>
+
+          <!-- List view -->
+          <div id="refListView">
+            <div class="table-panel">
+              <div class="table-wrap">
+                <table id="refTable">
+                  <thead>
+                    <tr>
+                      <th class="ref-sort-col" data-col="ref_name">Referee</th>
+                      <th class="ref-sort-col" data-col="games">Games</th>
+                      <th class="ref-sort-col" data-col="avg_total_fouls">Fouls/Game</th>
+                      <th class="ref-sort-col" data-col="home_pf_avg">Home PF</th>
+                      <th class="ref-sort-col" data-col="away_pf_avg">Away PF</th>
+                      <th class="ref-sort-col" data-col="foul_disparity" title="Away PF minus Home PF — positive means more fouls on away team">Foul Bias ↑</th>
+                      <th class="ref-sort-col" data-col="fta_disparity" title="Away FTA minus Home FTA">FTA Bias ↑</th>
+                      <th class="ref-sort-col" data-col="home_win_pct">Home Win%</th>
+                    </tr>
+                  </thead>
+                  <tbody id="refTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detail view -->
+          <div id="refDetailView" style="display:none">
+            <div class="ref-detail-header">
+              <button id="refBackBtn" class="ref-back-btn">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><path d="M10 3L5 8l5 5"/></svg>
+                All Referees
+              </button>
+              <div>
+                <h3 id="refDetailName" style="margin:0;font-size:1.3rem"></h3>
+                <p id="refDetailMeta" style="margin:4px 0 0;color:var(--muted);font-size:0.85rem"></p>
+              </div>
+            </div>
+
+            <div class="ref-stat-cards" id="refStatCards"></div>
+
+            <div class="ref-detail-grid">
+              <div class="panel-card">
+                <div class="panel-card-header">Team Tendencies <span class="ref-legend">(away fouls vs. ref's avg)</span></div>
+                <div id="refTeamBars" class="ref-team-bars"></div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-header">Season Trend</div>
+                <div id="refSeasonChart" class="ref-season-chart"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Feedback Section -->
         <section class="page hidden" id="page-feedback">
           <div class="page-header">
@@ -1128,7 +1197,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260716-feedback"></script>
+    <script src="app.js?v=20260716-referee"></script>
 
     <!--Start of Tawk.to Script-->
     <script type="text/javascript">

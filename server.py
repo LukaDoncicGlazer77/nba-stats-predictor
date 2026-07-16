@@ -1648,6 +1648,15 @@ class Handler(SimpleHTTPRequestHandler):
                 self.end_headers()
             return
 
+        if parsed.path == "/api/referee-stats":
+            return self.send_json(_get_referee_stats())
+
+        if parsed.path == "/api/referee-detail":
+            name = (parsed_qs.get("name") or [""])[0].strip()
+            if not name:
+                return self.send_json({"error": "name required"}, status=400)
+            return self.send_json(_get_referee_detail(name))
+
         if parsed.path.startswith("/api/"):
             return self.send_json({"error": "Not found"}, status=404)
 
@@ -1704,6 +1713,140 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
             time.sleep(retry_delay_seconds)
 
 
+_REF_STATS_CACHE = {"data": None, "ts": 0}
+_REF_STATS_TTL = 3600  # 1 hour
+
+_REF_DETAIL_CACHE = {}
+_REF_DETAIL_TTL = 600
+
+_REF_AGGS_SQL = """
+WITH ref_games AS (
+    SELECT ref1 AS ref_name, season, home_team, away_team,
+           home_pf, away_pf, home_fta, away_fta, home_pts, away_pts
+    FROM archive_referee_games WHERE ref1 IS NOT NULL AND ref1 != ''
+    UNION ALL
+    SELECT ref2, season, home_team, away_team,
+           home_pf, away_pf, home_fta, away_fta, home_pts, away_pts
+    FROM archive_referee_games WHERE ref2 IS NOT NULL AND ref2 != ''
+    UNION ALL
+    SELECT ref3, season, home_team, away_team,
+           home_pf, away_pf, home_fta, away_fta, home_pts, away_pts
+    FROM archive_referee_games WHERE ref3 IS NOT NULL AND ref3 != ''
+)
+SELECT
+    ref_name,
+    COUNT(*) AS games,
+    ROUND(AVG(home_pf + away_pf)::numeric, 2) AS avg_total_fouls,
+    ROUND(AVG(home_pf)::numeric, 2) AS home_pf_avg,
+    ROUND(AVG(away_pf)::numeric, 2) AS away_pf_avg,
+    ROUND(AVG(CAST(away_pf AS float) - home_pf)::numeric, 2) AS foul_disparity,
+    ROUND(AVG(home_fta)::numeric, 2) AS home_fta_avg,
+    ROUND(AVG(away_fta)::numeric, 2) AS away_fta_avg,
+    ROUND(AVG(CAST(away_fta AS float) - home_fta)::numeric, 2) AS fta_disparity,
+    ROUND(AVG(CASE WHEN home_pts > away_pts THEN 1.0 ELSE 0.0 END)::numeric, 3) AS home_win_pct
+FROM ref_games
+WHERE ref_name IS NOT NULL AND ref_name != ''
+GROUP BY ref_name
+HAVING COUNT(*) >= 20
+ORDER BY games DESC
+"""
+
+def _get_referee_stats():
+    now = time.time()
+    if _REF_STATS_CACHE["data"] is not None and now - _REF_STATS_CACHE["ts"] < _REF_STATS_TTL:
+        return _REF_STATS_CACHE["data"]
+    try:
+        with get_conn() as conn:
+            rows = q(conn, _REF_AGGS_SQL)
+        result = [dict(r) for r in rows]
+        _REF_STATS_CACHE["data"] = result
+        _REF_STATS_CACHE["ts"] = now
+        return result
+    except Exception as exc:
+        print(f"referee_stats error: {exc}")
+        return []
+
+
+def _get_referee_detail(name: str):
+    now = time.time()
+    cache_key = name.lower()
+    if cache_key in _REF_DETAIL_CACHE and now - _REF_DETAIL_CACHE[cache_key]["ts"] < _REF_DETAIL_TTL:
+        return _REF_DETAIL_CACHE[cache_key]["data"]
+    try:
+        with get_conn() as conn:
+            # Season-by-season trend
+            season_rows = q(conn, """
+                WITH ref_games AS (
+                    SELECT season, home_pf, away_pf, home_fta, away_fta, home_pts, away_pts
+                    FROM archive_referee_games
+                    WHERE ref1=%s OR ref2=%s OR ref3=%s
+                )
+                SELECT season,
+                    COUNT(*) AS games,
+                    ROUND(AVG(home_pf + away_pf)::numeric, 2) AS avg_total_fouls,
+                    ROUND(AVG(CAST(away_pf AS float) - home_pf)::numeric, 2) AS foul_disparity,
+                    ROUND(AVG(CAST(away_fta AS float) - home_fta)::numeric, 2) AS fta_disparity,
+                    ROUND(AVG(CASE WHEN home_pts > away_pts THEN 1.0 ELSE 0.0 END)::numeric, 3) AS home_win_pct
+                FROM ref_games
+                GROUP BY season ORDER BY season
+            """, (name, name, name))
+
+            # Team tendencies — how does this ref treat each team as the AWAY team
+            # vs. the ref's own average away_pf
+            team_rows = q(conn, """
+                WITH ref_games AS (
+                    SELECT away_team AS team, away_pf AS pf, away_fta AS fta
+                    FROM archive_referee_games
+                    WHERE ref1=%s OR ref2=%s OR ref3=%s
+                ),
+                overall AS (
+                    SELECT AVG(pf) AS avg_pf FROM ref_games
+                )
+                SELECT rg.team,
+                    COUNT(*) AS games,
+                    ROUND(AVG(rg.pf)::numeric, 2) AS avg_pf,
+                    ROUND((AVG(rg.pf) - o.avg_pf)::numeric, 2) AS pf_vs_avg,
+                    ROUND(AVG(rg.fta)::numeric, 2) AS avg_fta
+                FROM ref_games rg, overall o
+                GROUP BY rg.team, o.avg_pf
+                HAVING COUNT(*) >= 5
+                ORDER BY pf_vs_avg DESC
+            """, (name, name, name, name, name, name))
+
+        data = {
+            "name": name,
+            "seasons": [dict(r) for r in season_rows],
+            "team_tendencies": [dict(r) for r in team_rows],
+        }
+        _REF_DETAIL_CACHE[cache_key] = {"data": data, "ts": now}
+        return data
+    except Exception as exc:
+        print(f"referee_detail error: {exc}")
+        return {"name": name, "seasons": [], "team_tendencies": []}
+
+
+def ensure_referee_table():
+    try:
+        with get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS archive_referee_games (
+                    game_id TEXT PRIMARY KEY,
+                    season SMALLINT,
+                    game_date TEXT,
+                    home_team TEXT,
+                    away_team TEXT,
+                    ref1 TEXT, ref2 TEXT, ref3 TEXT,
+                    home_pf SMALLINT, away_pf SMALLINT,
+                    home_fta SMALLINT, away_fta SMALLINT,
+                    home_pts SMALLINT, away_pts SMALLINT
+                )
+            """)
+            conn.commit()
+    except Exception as exc:
+        print(f"ensure_referee_table failed: {exc}")
+
+
 def ensure_feedback_table():
     try:
         with get_conn() as conn:
@@ -1732,6 +1875,7 @@ def _prewarm_pool():
 def main():
     ensure_users_table()
     ensure_feedback_table()
+    ensure_referee_table()
     threading.Thread(target=_prewarm_pool, daemon=True).start()
     threading.Thread(target=_flush_heartbeats, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))

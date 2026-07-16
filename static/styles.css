@@ -4875,3 +4875,114 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .feedback-category-row { gap: 8px; }
   .fb-cat-btn { font-size: 0.78rem; height: 38px; }
 }
+
+/* ── Referee Bias dashboard ─────────────────────────────────────────────────── */
+.ref-row { cursor: default; }
+.ref-name-btn {
+  background: none; border: none; color: var(--ink); font-family: inherit;
+  font-size: 0.9rem; font-weight: 600; cursor: pointer; padding: 0; text-align: left;
+  transition: color 0.15s;
+}
+.ref-name-btn:hover { color: var(--sidebar-active, #7c8cff); }
+
+.ref-bias-badge {
+  display: inline-block; padding: 2px 7px; border-radius: 5px;
+  font-size: 0.82rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.ref-bias-high  { background: rgba(239,68,68,0.12);  color: #f87171; }
+.ref-bias-low   { background: rgba(34,197,94,0.12);  color: #4ade80; }
+.ref-bias-neutral{ background: rgba(255,255,255,0.05); color: var(--muted); }
+
+/* Sort indicators */
+.ref-sort-col.sort-asc::after  { content: " ↑"; color: var(--sidebar-active, #7c8cff); }
+.ref-sort-col.sort-desc::after { content: " ↓"; color: var(--sidebar-active, #7c8cff); }
+
+/* Detail header */
+.ref-detail-header {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
+}
+.ref-back-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--card-border, rgba(255,255,255,0.08));
+  border-radius: 8px; color: var(--muted); font-family: inherit;
+  font-size: 0.82rem; font-weight: 600; padding: 7px 12px; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ref-back-btn:hover { background: rgba(255,255,255,0.09); color: var(--ink); }
+
+/* Stat cards */
+.ref-stat-cards {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px;
+}
+.ref-stat-card {
+  background: var(--panel); border: 1px solid var(--card-border, rgba(255,255,255,0.08));
+  border-radius: 12px; padding: 18px 20px; text-align: center;
+  backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+.ref-stat-value {
+  font-size: 1.6rem; font-weight: 800; color: var(--ink);
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.ref-stat-label { font-size: 0.78rem; font-weight: 700; color: var(--muted); margin: 6px 0 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+.ref-stat-sub   { font-size: 0.72rem; color: var(--muted); opacity: 0.7; }
+.ref-stat-card.ref-stat-high .ref-stat-value { color: #f87171; }
+.ref-stat-card.ref-stat-low  .ref-stat-value { color: #4ade80; }
+
+/* Detail grid */
+.ref-detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.panel-card {
+  background: var(--panel); border: 1px solid var(--card-border, rgba(255,255,255,0.08));
+  border-radius: 14px; padding: 20px 22px;
+  backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+.panel-card-header {
+  font-size: 0.82rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px;
+}
+.ref-legend { font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 0.75rem; }
+
+/* Team bars */
+.ref-team-bars { display: flex; flex-direction: column; gap: 7px; max-height: 420px; overflow-y: auto; }
+.ref-team-row  { display: grid; grid-template-columns: 48px 1fr 52px; align-items: center; gap: 8px; }
+.ref-team-name { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-align: right; }
+.ref-team-bar-wrap { position: relative; height: 10px; background: rgba(255,255,255,0.04); border-radius: 4px; }
+.ref-team-bar-center { position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: rgba(255,255,255,0.2); }
+.ref-team-bar { position: absolute; top: 0; height: 100%; border-radius: 4px; transition: width 0.4s; }
+.ref-bar-pos  { background: linear-gradient(90deg, #f87171, #ef4444); }
+.ref-bar-neg  { background: linear-gradient(270deg, #4ade80, #22c55e); }
+.ref-team-val { font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ref-val-pos  { color: #f87171; }
+.ref-val-neg  { color: #4ade80; }
+
+/* Season chart */
+.ref-season-chart { height: 180px; }
+.ref-season-bars {
+  display: flex; align-items: flex-end; gap: 8px; height: 100%; padding-top: 24px; position: relative;
+}
+.ref-season-col {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 4px; height: 100%; justify-content: flex-end; position: relative;
+}
+.ref-season-col:hover .ref-season-tip { opacity: 1; }
+.ref-season-tip {
+  position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+  background: rgba(15,20,35,0.95); border: 1px solid var(--card-border); border-radius: 6px;
+  padding: 5px 8px; font-size: 0.7rem; color: var(--ink); white-space: nowrap;
+  pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 10; text-align: center;
+}
+.ref-season-bar {
+  width: 100%; border-radius: 4px 4px 0 0; min-height: 4px;
+  background: linear-gradient(180deg, var(--sidebar-active, #7c8cff), rgba(124,140,255,0.4));
+}
+.ref-season-lbl { font-size: 0.65rem; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .ref-stat-cards    { grid-template-columns: repeat(2, 1fr); }
+  .ref-detail-grid   { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .ref-stat-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ref-stat-value { font-size: 1.2rem; }
+}
