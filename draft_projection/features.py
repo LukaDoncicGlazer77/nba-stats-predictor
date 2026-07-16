@@ -601,7 +601,11 @@ def _nba_season_to_features(adv: dict, pg: dict) -> dict:
         gives HS draftees below-average z-scores on scoring, actively penalising
         them vs. the college-dominated pool instead of being neutral.
       - PER, BPM, WS: different baselines and harder to achieve in the NBA than
-        college; cross-context comparisons would mislead the z-scoring."""
+        college; cross-context comparisons would mislead the z-scoring.
+      - TS%: same formula but different league distributions. Elite college players
+        routinely post 60%+ TS% while good NBA rookies typically post 52-55%.
+        Including TS% gives HS draftees systematically below-average z-scores on
+        efficiency relative to the college-dominated pool."""
     out = {}
     # Defensive rate stats (production category) — percentage, same scale
     for nba_col, feat in [("blk_percent", "blk_pct"), ("stl_percent", "stl_pct")]:
@@ -613,10 +617,6 @@ def _nba_season_to_features(adv: dict, pg: dict) -> dict:
         v = _sf(pg.get(nba_col))
         if v is not None:
             out[feat] = v
-    # TS% (efficiency category) — decimal, same scale
-    ts = _sf(adv.get("ts_percent"))
-    if ts is not None:
-        out["ts_pct"] = ts
     # Playmaking / turnover rates (efficiency category) — percentage, same scale
     for nba_col, feat in [("ast_percent", "ast_pct"), ("tov_percent", "tov_pct")]:
         v = _sf(adv.get(nba_col))

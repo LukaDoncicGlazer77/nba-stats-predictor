@@ -215,7 +215,7 @@ def composite_similarity(query_z: dict, query_missing: dict, member: PoolMember)
     return max(0.0, min(100.0, 100 * score)), breakdown
 
 
-_STAT_CATEGORIES = {"production", "advanced", "efficiency"}
+_STAT_CATEGORIES = {"production", "advanced", "efficiency", "role"}
 
 
 def find_top_comps(conn, q, pool: HistoricalPool, *, player_name: str, college: Optional[str] = None,

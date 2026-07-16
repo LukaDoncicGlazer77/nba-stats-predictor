@@ -33,7 +33,7 @@ log = logging.getLogger("draft_projection.service")
 
 TOP_N_COMPS_FOR_POOL_SCORING = 50  # comp-based probability estimator wants a wide pool
 TOP_N_COMPS_TO_RETURN = 10         # final displayed comps
-TOP_N_FOR_ARCH_BLEND = 20          # compute arch_match on this many before re-sorting
+TOP_N_FOR_ARCH_BLEND = 30          # compute arch_match on this many before re-sorting
 
 ARCH_BLEND_WEIGHT = 0.40           # weight of arch_match in final sim; rest goes to raw comp sim
 
