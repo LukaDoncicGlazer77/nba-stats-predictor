@@ -188,8 +188,16 @@ def _category_similarity(za: dict, ma: dict, zb: dict, mb: dict, category: str) 
         usable = [n for n in names if not ma.get(n, True) and not mb.get(n, True)]
     else:
         # For non-statistical categories (draft context, physical): keep the
-        # original "at least one side has data" logic.
-        usable = [n for n in names if not (ma.get(n, True) and mb.get(n, True))]
+        # original "at least one side has data" logic — except for features
+        # that are inherently college-context and meaningless for prep-to-pro
+        # players (class_year, conf_strength). Those require both sides to have
+        # data so a HS draftee isn't penalized for having no college career.
+        both_required = _COLLEGE_CONTEXT_FEATURES
+        usable = [
+            n for n in names
+            if (n in both_required and not ma.get(n, True) and not mb.get(n, True))
+            or (n not in both_required and not (ma.get(n, True) and mb.get(n, True)))
+        ]
     if not usable:
         return None
     sq_dists = [(za[n] - zb[n]) ** 2 for n in usable]
@@ -215,7 +223,11 @@ def composite_similarity(query_z: dict, query_missing: dict, member: PoolMember)
     return max(0.0, min(100.0, 100 * score)), breakdown
 
 
-_STAT_CATEGORIES = {"production", "advanced", "efficiency", "role"}
+_STAT_CATEGORIES = {"production", "advanced", "efficiency"}
+# Role features that are only meaningful for college players — a prep-to-pro
+# draftee has no class year or conference, so comparing them to pool mean
+# creates artificial distance. Require both sides to have these features.
+_COLLEGE_CONTEXT_FEATURES = {"class_year_numeric", "conf_strength"}
 
 
 def find_top_comps(conn, q, pool: HistoricalPool, *, player_name: str, college: Optional[str] = None,
