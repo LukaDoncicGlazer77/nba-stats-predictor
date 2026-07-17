@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260717-referee2" />
+    <link rel="stylesheet" href="styles.css?v=20260717-refplayer" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -1108,8 +1108,12 @@
               <h2>Referee Bias</h2>
               <p class="page-subtitle" id="refSubtitle">Loading referee data&hellip;</p>
             </div>
-            <div class="page-controls">
-              <input id="refSearch" type="search" placeholder="Search referee&hellip;" class="player-filter-input" style="max-width:240px" />
+            <div class="page-controls" style="gap:10px">
+              <div class="ref-mode-toggle">
+                <button class="ref-mode-btn active" id="refModeRefs" data-mode="refs">By Referee</button>
+                <button class="ref-mode-btn" id="refModePlayer" data-mode="player">By Player</button>
+              </div>
+              <input id="refSearch" type="search" placeholder="Search referee&hellip;" class="player-filter-input" style="max-width:220px" />
             </div>
           </div>
 
@@ -1137,6 +1141,18 @@
                 </table>
               </div>
             </div>
+          </div>
+
+          <!-- Player mode view -->
+          <div id="refPlayerView" style="display:none">
+            <div class="ref-player-search-row">
+              <div class="ref-player-input-wrap">
+                <svg class="ref-player-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" width="15" height="15"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+                <input id="refPlayerInput" type="search" class="ref-player-input" placeholder="Search player (e.g. Luka Doncic, LeBron James)…" autocomplete="off" />
+              </div>
+              <button id="refPlayerSearchBtn" class="ref-player-btn">Search</button>
+            </div>
+            <div id="refPlayerResult"></div>
           </div>
 
           <!-- Detail view -->
@@ -1215,7 +1231,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260717-referee2"></script>
+    <script src="app.js?v=20260717-refplayer"></script>
 
     <!--Start of Tawk.to Script-->
     <script type="text/javascript">

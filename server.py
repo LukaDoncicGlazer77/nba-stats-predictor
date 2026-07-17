@@ -1648,6 +1648,12 @@ class Handler(SimpleHTTPRequestHandler):
                 self.end_headers()
             return
 
+        if parsed.path == "/api/referee-player":
+            player_query = (parsed_qs.get("player") or [""])[0].strip()
+            if not player_query:
+                return self.send_json({"error": "player parameter required"}, status=400)
+            return self.send_json(_get_referee_player_stats(player_query))
+
         if parsed.path == "/api/referee-stats":
             return self.send_json(_get_referee_stats())
 
@@ -1712,6 +1718,173 @@ def ensure_users_table(max_attempts=5, retry_delay_seconds=2):
                 return
             time.sleep(retry_delay_seconds)
 
+
+import unicodedata as _unicodedata
+
+# ── NBA Stats API helpers ──────────────────────────────────────────────────────
+_NBA_API_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://www.nba.com/",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://www.nba.com",
+    "x-nba-stats-origin": "stats",
+    "x-nba-stats-token": "true",
+}
+
+def _nba_api_get(url):
+    req = urllib.request.Request(url, headers=_NBA_API_HEADERS)
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read())
+
+def _normalize_player_name(name):
+    nfkd = _unicodedata.normalize("NFKD", name.lower())
+    return "".join(c for c in nfkd if not _unicodedata.combining(c))
+
+_ALL_NBA_PLAYERS_CACHE = {"data": None, "ts": 0}
+
+def _get_all_nba_players():
+    now = time.time()
+    if _ALL_NBA_PLAYERS_CACHE["data"] and now - _ALL_NBA_PLAYERS_CACHE["ts"] < 86400:
+        return _ALL_NBA_PLAYERS_CACHE["data"]
+    data = _nba_api_get("https://stats.nba.com/stats/commonallplayers?IsOnlyCurrentSeason=0&LeagueID=00&Season=2024-25")
+    rows = data["resultSets"][0]["rowSet"]
+    players = []
+    for r in rows:
+        try:
+            players.append({
+                "id": r[0], "name": r[2],
+                "from_year": int(r[4]) if r[4] else 0,
+                "to_year": int(r[5]) if r[5] else 0,
+            })
+        except Exception:
+            pass
+    _ALL_NBA_PLAYERS_CACHE["data"] = players
+    _ALL_NBA_PLAYERS_CACHE["ts"] = now
+    return players
+
+def _find_nba_player(query):
+    players = _get_all_nba_players()
+    q = _normalize_player_name(query.strip())
+    # exact match
+    for p in players:
+        if _normalize_player_name(p["name"]) == q:
+            return p
+    # all query words appear in name
+    words = q.split()
+    for p in players:
+        norm = _normalize_player_name(p["name"])
+        if all(w in norm for w in words):
+            return p
+    return None
+
+_REF_PLAYER_CACHE = {}
+_REF_PLAYER_TTL = 3600 * 6
+
+def _get_referee_player_stats(player_query: str):
+    now = time.time()
+    cache_key = player_query.lower().strip()
+    if cache_key in _REF_PLAYER_CACHE and now - _REF_PLAYER_CACHE[cache_key]["ts"] < _REF_PLAYER_TTL:
+        return _REF_PLAYER_CACHE[cache_key]["data"]
+
+    player = _find_nba_player(player_query)
+    if not player:
+        return {"error": f"Player not found: {player_query}"}
+
+    # Fetch game logs for seasons this player was active AND in our ref DB (2015–2025)
+    seasons = []
+    for year in range(2014, 2025):  # 2014-15 through 2024-25
+        if player["from_year"] <= year + 1 <= player["to_year"]:
+            seasons.append(f"{year}-{str(year + 1)[2:]}")
+
+    all_games = {}  # game_id -> {pf, fta, pts, min}
+    for season in seasons:
+        try:
+            url = (f"https://stats.nba.com/stats/playergamelog"
+                   f"?PlayerID={player['id']}&Season={season}&SeasonType=Regular+Season")
+            data = _nba_api_get(url)
+            cols = data["resultSets"][0]["headers"]
+            idx = {c: i for i, c in enumerate(cols)}
+            for row in data["resultSets"][0]["rowSet"]:
+                gid = str(row[idx["Game_ID"]])
+                all_games[gid] = {
+                    "pf":  row[idx["PF"]],
+                    "fta": row[idx["FTA"]],
+                    "pts": row[idx["PTS"]],
+                    "min": row[idx["MIN"]],
+                }
+            time.sleep(0.6)
+        except Exception as exc:
+            print(f"ref_player game log {season}: {exc}")
+
+    if not all_games:
+        return {"error": "No game data found for this player", "player": player["name"]}
+
+    # Join with archive_referee_games
+    game_ids = list(all_games.keys())
+    try:
+        with get_conn() as conn:
+            ref_rows = q(conn, """
+                SELECT ref1, ref2, ref3, game_id
+                FROM archive_referee_games
+                WHERE game_id = ANY(%s)
+            """, (game_ids,))
+    except Exception as exc:
+        return {"error": f"DB error: {exc}", "player": player["name"]}
+
+    # Aggregate by referee
+    ref_stats = {}
+    matched = 0
+    for row in ref_rows:
+        gid = row["game_id"]
+        game = all_games.get(gid)
+        if not game:
+            continue
+        matched += 1
+        for col in ("ref1", "ref2", "ref3"):
+            ref = row[col]
+            if not ref:
+                continue
+            if ref not in ref_stats:
+                ref_stats[ref] = {"games": 0, "pf": 0, "fta": 0, "pts": 0}
+            s = ref_stats[ref]
+            s["games"] += 1
+            s["pf"]    += game["pf"]
+            s["fta"]   += game["fta"]
+            s["pts"]   += game["pts"]
+
+    MIN_GAMES = 5
+    result_list = []
+    for ref, s in ref_stats.items():
+        g = s["games"]
+        if g < MIN_GAMES:
+            continue
+        result_list.append({
+            "referee":  ref,
+            "games":    g,
+            "avg_pf":   round(s["pf"]  / g, 2),
+            "avg_fta":  round(s["fta"] / g, 2),
+            "avg_pts":  round(s["pts"] / g, 1),
+        })
+
+    result_list.sort(key=lambda x: -x["avg_pf"])
+
+    # League-wide avg PF and FTA for context
+    total_g = sum(s["games"] for s in ref_stats.values()) // 3  # each game has 3 refs
+    avg_pf_all  = round(sum(s["pf"] for s in ref_stats.values()) / max(sum(s["games"] for s in ref_stats.values()), 1), 2)
+    avg_fta_all = round(sum(s["fta"] for s in ref_stats.values()) / max(sum(s["games"] for s in ref_stats.values()), 1), 2)
+
+    result = {
+        "player":       player["name"],
+        "player_id":    player["id"],
+        "total_games":  len(all_games),
+        "matched_games": matched,
+        "avg_pf_all":   avg_pf_all,
+        "avg_fta_all":  avg_fta_all,
+        "referees":     result_list,
+    }
+    _REF_PLAYER_CACHE[cache_key] = {"data": result, "ts": now}
+    return result
 
 _REF_STATS_CACHE = {"data": None, "ts": 0}
 _REF_STATS_TTL = 3600  # 1 hour

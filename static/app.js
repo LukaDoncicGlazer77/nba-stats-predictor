@@ -3435,6 +3435,161 @@ function renderRefSeasonChart(seasons) {
   </div>`;
 }
 
+// ── Referee × Player mode ──────────────────────────────────────────────────────
+let _refMode = "refs";
+
+function _setRefMode(mode) {
+  _refMode = mode;
+  const isRefs = mode === "refs";
+  document.querySelectorAll(".ref-mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  $("#refListView").style.display   = isRefs ? "" : "none";
+  $("#refPlayerView").style.display = isRefs ? "none" : "";
+  $("#refDetailView").style.display = "none";
+  // swap search placeholder
+  const refSearch = $("#refSearch");
+  if (refSearch) refSearch.style.display = isRefs ? "" : "none";
+}
+
+document.querySelectorAll(".ref-mode-btn").forEach(btn => {
+  btn.addEventListener("click", () => _setRefMode(btn.dataset.mode));
+});
+
+async function refPlayerSearch() {
+  const input = $("#refPlayerInput");
+  const query = (input && input.value.trim()) || "";
+  if (!query) return;
+  const resultEl = $("#refPlayerResult");
+  resultEl.innerHTML = `<div class="ref-player-loading"><div class="sf-spinner" style="width:28px;height:28px;border-width:3px"></div><span>Fetching game logs for <strong>${escapeHtml(query)}</strong> across 10 seasons&hellip; (~10 seconds)</span></div>`;
+
+  try {
+    const res = await fetch(`/api/referee-player?player=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    if (data.error) {
+      resultEl.innerHTML = `<div class="ref-player-error">${escapeHtml(data.error)}</div>`;
+      return;
+    }
+    renderRefPlayerResult(data);
+  } catch {
+    resultEl.innerHTML = `<div class="ref-player-error">Network error — please try again.</div>`;
+  }
+}
+
+function renderRefPlayerResult(data) {
+  const resultEl = $("#refPlayerResult");
+  const refs = data.referees || [];
+  const leaguePf  = data.avg_pf_all;
+  const leagueFta = data.avg_fta_all;
+
+  // Sort options
+  const maxPf  = Math.max(...refs.map(r => r.avg_pf),  0.01);
+  const maxFta = Math.max(...refs.map(r => r.avg_fta), 0.01);
+
+  const topPf  = refs.slice().sort((a, b) => b.avg_pf  - a.avg_pf)[0];
+  const topFta = refs.slice().sort((a, b) => b.avg_fta - a.avg_fta)[0];
+  const botPf  = refs.slice().sort((a, b) => a.avg_pf  - b.avg_pf)[0];
+
+  resultEl.innerHTML = `
+    <div class="ref-player-header">
+      <div>
+        <h3 class="ref-player-name">${escapeHtml(data.player)}</h3>
+        <p class="ref-player-meta">${data.matched_games} games matched · ${refs.length} referees with 5+ games · League avg: ${leaguePf} PF, ${leagueFta} FTA per game</p>
+      </div>
+      <div class="ref-player-sort-row">
+        <span style="font-size:0.75rem;color:var(--muted);font-weight:600">Sort by:</span>
+        <button class="ref-psort-btn active" data-sort="pf">Personal Fouls</button>
+        <button class="ref-psort-btn" data-sort="fta">Free Throws Drawn</button>
+        <button class="ref-psort-btn" data-sort="games">Games</button>
+      </div>
+    </div>
+
+    <div class="ref-player-spotlights">
+      <div class="ref-pspot ref-pspot-bad">
+        <div class="ref-pspot-label">Most Whistles On ${escapeHtml(data.player.split(" ")[0])}</div>
+        <div class="ref-pspot-name">${escapeHtml(topPf?.referee || "—")}</div>
+        <div class="ref-pspot-val">${topPf?.avg_pf ?? "—"} PF/g <span style="opacity:0.6">in ${topPf?.games ?? 0} games</span></div>
+      </div>
+      <div class="ref-pspot ref-pspot-fta">
+        <div class="ref-pspot-label">Most FTA Given</div>
+        <div class="ref-pspot-name">${escapeHtml(topFta?.referee || "—")}</div>
+        <div class="ref-pspot-val">${topFta?.avg_fta ?? "—"} FTA/g <span style="opacity:0.6">in ${topFta?.games ?? 0} games</span></div>
+      </div>
+      <div class="ref-pspot ref-pspot-good">
+        <div class="ref-pspot-label">Fewest Whistles</div>
+        <div class="ref-pspot-name">${escapeHtml(botPf?.referee || "—")}</div>
+        <div class="ref-pspot-val">${botPf?.avg_pf ?? "—"} PF/g <span style="opacity:0.6">in ${botPf?.games ?? 0} games</span></div>
+      </div>
+    </div>
+
+    <div class="table-panel" id="refPlayerTable">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Referee</th>
+              <th>Games</th>
+              <th>Avg PF/Game</th>
+              <th>vs League Avg</th>
+              <th>Avg FTA/Game</th>
+              <th>Avg PTS/Game</th>
+              <th>Foul Meter</th>
+            </tr>
+          </thead>
+          <tbody id="refPlayerTableBody"></tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // Initial render sorted by PF
+  _renderRefPlayerRows(refs, "pf", leaguePf, maxPf);
+
+  // Sort buttons
+  resultEl.querySelectorAll(".ref-psort-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      resultEl.querySelectorAll(".ref-psort-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const sorted = refs.slice().sort((a, b) => {
+        if (btn.dataset.sort === "pf")    return b.avg_pf - a.avg_pf;
+        if (btn.dataset.sort === "fta")   return b.avg_fta - a.avg_fta;
+        return b.games - a.games;
+      });
+      _renderRefPlayerRows(sorted, btn.dataset.sort, leaguePf, maxPf);
+    });
+  });
+}
+
+function _renderRefPlayerRows(refs, sortKey, leaguePf, maxPf) {
+  const tbody = $("#refPlayerTableBody");
+  if (!tbody) return;
+  tbody.innerHTML = refs.map((r, i) => {
+    const diff = (r.avg_pf - leaguePf).toFixed(2);
+    const diffCls = parseFloat(diff) > 0.3 ? "ref-val-pos" : parseFloat(diff) < -0.3 ? "ref-val-neg" : "";
+    const pct = (r.avg_pf / maxPf * 100).toFixed(1);
+    const barColor = r.avg_pf > leaguePf + 0.5 ? "#f87171" : r.avg_pf < leaguePf - 0.3 ? "#4ade80" : "#8899b4";
+    return `<tr>
+      <td style="color:var(--muted);font-size:0.8rem;width:36px">#${i + 1}</td>
+      <td style="font-weight:700">${escapeHtml(r.referee)}</td>
+      <td style="color:var(--muted)">${r.games}</td>
+      <td style="font-weight:700;font-variant-numeric:tabular-nums">${r.avg_pf}</td>
+      <td><span class="${diffCls}" style="font-weight:700;font-variant-numeric:tabular-nums">${parseFloat(diff) > 0 ? "+" : ""}${diff}</span></td>
+      <td style="font-variant-numeric:tabular-nums">${r.avg_fta}</td>
+      <td style="color:var(--muted);font-variant-numeric:tabular-nums">${r.avg_pts}</td>
+      <td style="min-width:90px">
+        <div class="ref-pmeter-wrap">
+          <div class="ref-pmeter-fill" style="width:${pct}%;background:${barColor}"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+const refPlayerInput = $("#refPlayerInput");
+const refPlayerBtn   = $("#refPlayerSearchBtn");
+if (refPlayerBtn) refPlayerBtn.addEventListener("click", refPlayerSearch);
+if (refPlayerInput) {
+  refPlayerInput.addEventListener("keydown", e => { if (e.key === "Enter") refPlayerSearch(); });
+}
+
 // Sort headers
 document.querySelectorAll(".ref-sort-col").forEach(th => {
   th.style.cursor = "pointer";
