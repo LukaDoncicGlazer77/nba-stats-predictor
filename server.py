@@ -1787,60 +1787,51 @@ def _get_referee_player_stats(player_query: str):
     if cache_key in _REF_PLAYER_CACHE and now - _REF_PLAYER_CACHE[cache_key]["ts"] < _REF_PLAYER_TTL:
         return _REF_PLAYER_CACHE[cache_key]["data"]
 
-    player = _find_nba_player(player_query)
-    if not player:
-        return {"error": f"Player not found: {player_query}"}
-
-    # Fetch game logs for seasons this player was active AND in our ref DB (2015–2025)
-    seasons = []
-    for year in range(2014, 2025):  # 2014-15 through 2024-25
-        if player["from_year"] <= year + 1 <= player["to_year"]:
-            seasons.append(f"{year}-{str(year + 1)[2:]}")
-
-    all_games = {}  # game_id -> {pf, fta, pts, min}
-    for season in seasons:
-        try:
-            url = (f"https://stats.nba.com/stats/playergamelog"
-                   f"?PlayerID={player['id']}&Season={season}&SeasonType=Regular+Season")
-            data = _nba_api_get(url)
-            cols = data["resultSets"][0]["headers"]
-            idx = {c: i for i, c in enumerate(cols)}
-            for row in data["resultSets"][0]["rowSet"]:
-                gid = str(row[idx["Game_ID"]])
-                all_games[gid] = {
-                    "pf":  row[idx["PF"]],
-                    "fta": row[idx["FTA"]],
-                    "pts": row[idx["PTS"]],
-                    "min": row[idx["MIN"]],
-                }
-            time.sleep(0.6)
-        except Exception as exc:
-            print(f"ref_player game log {season}: {exc}")
-
-    if not all_games:
-        return {"error": "No game data found for this player", "player": player["name"]}
-
-    # Join with archive_referee_games
-    game_ids = list(all_games.keys())
     try:
         with get_conn() as conn:
-            ref_rows = q(conn, """
-                SELECT ref1, ref2, ref3, game_id
-                FROM archive_referee_games
-                WHERE game_id = ANY(%s)
-            """, (game_ids,))
-    except Exception as exc:
-        return {"error": f"DB error: {exc}", "player": player["name"]}
+            # Find player by name (case-insensitive partial match)
+            player_rows = q(conn, """
+                SELECT DISTINCT player_id, player_name
+                FROM archive_player_game_logs
+                WHERE lower(player_name) LIKE lower(%s)
+                LIMIT 1
+            """, (f"%{player_query.strip()}%",))
 
-    # Aggregate by referee
+            if not player_rows:
+                # Try word-by-word match
+                words = player_query.strip().split()
+                like_clause = " AND ".join(["lower(player_name) LIKE lower(%s)"] * len(words))
+                player_rows = q(conn, f"""
+                    SELECT DISTINCT player_id, player_name
+                    FROM archive_player_game_logs
+                    WHERE {like_clause}
+                    LIMIT 1
+                """, tuple(f"%{w}%" for w in words))
+
+            if not player_rows:
+                return {"error": f"Player not found: {player_query}. Try a star player like LeBron James, Luka Doncic, or Stephen Curry."}
+
+            player_name = player_rows[0]["player_name"]
+            player_id   = player_rows[0]["player_id"]
+
+            # Join player game logs with referee game data
+            rows = q(conn, """
+                SELECT r.ref1, r.ref2, r.ref3, p.game_id, p.pf, p.fta, p.pts
+                FROM archive_player_game_logs p
+                JOIN archive_referee_games r ON r.game_id = p.game_id
+                WHERE p.player_id = %s
+            """, (player_id,))
+    except Exception as exc:
+        return {"error": f"DB error: {exc}"}
+
+    if not rows:
+        return {"error": f"No matched games found for {player_name}. Data may not be loaded yet."}
+
+    all_game_ids = set()
     ref_stats = {}
-    matched = 0
-    for row in ref_rows:
+    for row in rows:
         gid = row["game_id"]
-        game = all_games.get(gid)
-        if not game:
-            continue
-        matched += 1
+        all_game_ids.add(gid)
         for col in ("ref1", "ref2", "ref3"):
             ref = row[col]
             if not ref:
@@ -1849,9 +1840,9 @@ def _get_referee_player_stats(player_query: str):
                 ref_stats[ref] = {"games": 0, "pf": 0, "fta": 0, "pts": 0}
             s = ref_stats[ref]
             s["games"] += 1
-            s["pf"]    += game["pf"]
-            s["fta"]   += game["fta"]
-            s["pts"]   += game["pts"]
+            s["pf"]    += (row["pf"]  or 0)
+            s["fta"]   += (row["fta"] or 0)
+            s["pts"]   += (row["pts"] or 0)
 
     MIN_GAMES = 5
     result_list = []
@@ -1869,19 +1860,18 @@ def _get_referee_player_stats(player_query: str):
 
     result_list.sort(key=lambda x: -x["avg_pf"])
 
-    # League-wide avg PF and FTA for context
-    total_g = sum(s["games"] for s in ref_stats.values()) // 3  # each game has 3 refs
-    avg_pf_all  = round(sum(s["pf"] for s in ref_stats.values()) / max(sum(s["games"] for s in ref_stats.values()), 1), 2)
-    avg_fta_all = round(sum(s["fta"] for s in ref_stats.values()) / max(sum(s["games"] for s in ref_stats.values()), 1), 2)
+    total_games_in_refs = sum(s["games"] for s in ref_stats.values())
+    avg_pf_all  = round(sum(s["pf"]  for s in ref_stats.values()) / max(total_games_in_refs, 1), 2)
+    avg_fta_all = round(sum(s["fta"] for s in ref_stats.values()) / max(total_games_in_refs, 1), 2)
 
     result = {
-        "player":       player["name"],
-        "player_id":    player["id"],
-        "total_games":  len(all_games),
-        "matched_games": matched,
-        "avg_pf_all":   avg_pf_all,
-        "avg_fta_all":  avg_fta_all,
-        "referees":     result_list,
+        "player":        player_name,
+        "player_id":     player_id,
+        "total_games":   len(all_game_ids),
+        "matched_games": len(rows),
+        "avg_pf_all":    avg_pf_all,
+        "avg_fta_all":   avg_fta_all,
+        "referees":      result_list,
     }
     _REF_PLAYER_CACHE[cache_key] = {"data": result, "ts": now}
     return result
@@ -2038,6 +2028,27 @@ def ensure_feedback_table():
         print(f"ensure_feedback_table failed: {exc}")
 
 
+def ensure_player_game_logs_table():
+    try:
+        with get_conn() as conn:
+            q(conn, """
+                CREATE TABLE IF NOT EXISTS archive_player_game_logs (
+                    player_id   TEXT NOT NULL,
+                    player_name TEXT NOT NULL,
+                    game_id     TEXT NOT NULL,
+                    season      TEXT,
+                    pf          INTEGER,
+                    fta         INTEGER,
+                    pts         INTEGER,
+                    PRIMARY KEY (player_id, game_id)
+                )
+            """)
+            q(conn, "CREATE INDEX IF NOT EXISTS idx_apgl_player_id ON archive_player_game_logs(player_id)")
+            q(conn, "CREATE INDEX IF NOT EXISTS idx_apgl_game_id   ON archive_player_game_logs(game_id)")
+    except Exception as exc:
+        print(f"ensure_player_game_logs_table failed: {exc}")
+
+
 def _prewarm_pool():
     try:
         _get_draft_projection_pool()
@@ -2049,6 +2060,7 @@ def main():
     ensure_users_table()
     ensure_feedback_table()
     ensure_referee_table()
+    ensure_player_game_logs_table()
     threading.Thread(target=_prewarm_pool, daemon=True).start()
     threading.Thread(target=_flush_heartbeats, daemon=True).start()
     port = int(os.environ.get("PORT", 8000))
