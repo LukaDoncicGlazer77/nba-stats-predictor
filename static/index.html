@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260716-referee" />
+    <link rel="stylesheet" href="styles.css?v=20260717-referee2" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -1115,19 +1115,22 @@
 
           <!-- List view -->
           <div id="refListView">
-            <div class="table-panel">
+            <!-- Spotlight cards -->
+            <div class="ref-spotlight" id="refSpotlight"></div>
+
+            <div class="table-panel" style="margin-top:18px">
               <div class="table-wrap">
                 <table id="refTable">
                   <thead>
                     <tr>
                       <th class="ref-sort-col" data-col="ref_name">Referee</th>
                       <th class="ref-sort-col" data-col="games">Games</th>
-                      <th class="ref-sort-col" data-col="avg_total_fouls">Fouls/Game</th>
-                      <th class="ref-sort-col" data-col="home_pf_avg">Home PF</th>
-                      <th class="ref-sort-col" data-col="away_pf_avg">Away PF</th>
-                      <th class="ref-sort-col" data-col="foul_disparity" title="Away PF minus Home PF — positive means more fouls on away team">Foul Bias ↑</th>
-                      <th class="ref-sort-col" data-col="fta_disparity" title="Away FTA minus Home FTA">FTA Bias ↑</th>
+                      <th class="ref-sort-col" data-col="avg_total_fouls">Fouls/G</th>
+                      <th class="ref-sort-col" data-col="foul_disparity" title="Away PF minus Home PF — positive = more fouls on away team">Foul Bias</th>
+                      <th class="ref-sort-col" data-col="fta_disparity" title="Away FTA minus Home FTA">FTA Bias</th>
                       <th class="ref-sort-col" data-col="home_win_pct">Home Win%</th>
+                      <th>Bias Meter</th>
+                      <th>Rating</th>
                     </tr>
                   </thead>
                   <tbody id="refTableBody"></tbody>
@@ -1138,26 +1141,41 @@
 
           <!-- Detail view -->
           <div id="refDetailView" style="display:none">
-            <div class="ref-detail-header">
-              <button id="refBackBtn" class="ref-back-btn">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><path d="M10 3L5 8l5 5"/></svg>
-                All Referees
-              </button>
-              <div>
-                <h3 id="refDetailName" style="margin:0;font-size:1.3rem"></h3>
-                <p id="refDetailMeta" style="margin:4px 0 0;color:var(--muted);font-size:0.85rem"></p>
+            <button id="refBackBtn" class="ref-back-btn">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><path d="M10 3L5 8l5 5"/></svg>
+              All Referees
+            </button>
+
+            <div class="ref-detail-hero" id="refDetailHero">
+              <div class="ref-detail-hero-left">
+                <div class="ref-whistle-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="28" height="28"><path d="M3 8c0 0 2-2 5-2s5 2 5 2"/><path d="M8 6v10"/><path d="M13 8l6 3-6 3"/><circle cx="19" cy="11" r="2"/></svg>
+                </div>
+                <div>
+                  <h3 id="refDetailName" style="margin:0;font-size:1.5rem;font-weight:800"></h3>
+                  <p id="refDetailMeta" style="margin:4px 0 0;color:var(--muted);font-size:0.85rem"></p>
+                </div>
               </div>
+              <div id="refDetailVerdict" class="ref-verdict-badge"></div>
             </div>
 
             <div class="ref-stat-cards" id="refStatCards"></div>
 
             <div class="ref-detail-grid">
-              <div class="panel-card">
-                <div class="panel-card-header">Team Tendencies <span class="ref-legend">(away fouls vs. ref's avg)</span></div>
+              <div class="ref-panel">
+                <div class="ref-panel-title">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2"/><path d="M8 1v14M1 8h14"/></svg>
+                  Team Tendencies
+                  <span class="ref-panel-sub">away fouls vs. this ref's average</span>
+                </div>
                 <div id="refTeamBars" class="ref-team-bars"></div>
               </div>
-              <div class="panel-card">
-                <div class="panel-card-header">Season Trend</div>
+              <div class="ref-panel">
+                <div class="ref-panel-title">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" width="14" height="14"><polyline points="2,12 5,7 8,9 11,5 14,3"/></svg>
+                  Season Trend
+                  <span class="ref-panel-sub">fouls per game by season</span>
+                </div>
                 <div id="refSeasonChart" class="ref-season-chart"></div>
               </div>
             </div>
@@ -1197,7 +1215,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260716-referee"></script>
+    <script src="app.js?v=20260717-referee2"></script>
 
     <!--Start of Tawk.to Script-->
     <script type="text/javascript">

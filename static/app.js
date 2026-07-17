@@ -3240,6 +3240,44 @@ async function loadRefereeBias() {
   }
 }
 
+function _refBiasRating(fd) {
+  if (fd > 1.5) return { label: "Strong Home Bias", cls: "ref-rating-home-strong" };
+  if (fd > 0.6) return { label: "Home Leaning", cls: "ref-rating-home" };
+  if (fd < -1.0) return { label: "Away Friendly", cls: "ref-rating-away" };
+  if (fd < -0.2) return { label: "Slight Away Lean", cls: "ref-rating-away-mild" };
+  return { label: "Neutral", cls: "ref-rating-neutral" };
+}
+
+function renderRefSpotlight(allRows) {
+  const el = $("#refSpotlight");
+  if (!el || !allRows.length) return;
+  const sorted = allRows.slice().sort((a, b) => parseFloat(b.foul_disparity) - parseFloat(a.foul_disparity));
+  const mostHome = sorted[0];
+  const mostAway = sorted[sorted.length - 1];
+  const mostWhistles = allRows.slice().sort((a, b) => parseFloat(b.avg_total_fouls) - parseFloat(a.avg_total_fouls))[0];
+  const fewestWhistles = allRows.slice().sort((a, b) => parseFloat(a.avg_total_fouls) - parseFloat(b.avg_total_fouls))[0];
+
+  const card = (icon, label, name, val, cls) => `
+    <div class="ref-spotlight-card ${cls}" onclick="_refSpotlightClick('${escapeHtml(name)}')">
+      <div class="ref-spotlight-icon">${icon}</div>
+      <div class="ref-spotlight-label">${label}</div>
+      <div class="ref-spotlight-name">${escapeHtml(name)}</div>
+      <div class="ref-spotlight-val">${val}</div>
+    </div>`;
+
+  el.innerHTML = [
+    card("🏠", "Most Home-Favoring", mostHome.ref_name,
+      `+${parseFloat(mostHome.foul_disparity).toFixed(2)} foul bias`, "ref-spot-red"),
+    card("✈️", "Most Away-Friendly", mostAway.ref_name,
+      `${parseFloat(mostAway.foul_disparity).toFixed(2)} foul bias`, "ref-spot-green"),
+    card("📢", "Most Whistles", mostWhistles.ref_name,
+      `${mostWhistles.avg_total_fouls} fouls/game`, "ref-spot-yellow"),
+    card("🤫", "Fewest Whistles", fewestWhistles.ref_name,
+      `${fewestWhistles.avg_total_fouls} fouls/game`, "ref-spot-blue"),
+  ].join("");
+}
+window._refSpotlightClick = (name) => showRefDetail(name);
+
 function renderRefList() {
   const tbody = $("#refTableBody");
   if (!tbody || !_refData) return;
@@ -3250,6 +3288,8 @@ function renderRefList() {
     return _refSortAsc ? av - bv : bv - av;
   });
 
+  if (!_refFilter) renderRefSpotlight(rows);
+
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">
       ${_refFilter ? "No referees matching filter" : "No data — run pull_referee_data.py first"}
@@ -3257,20 +3297,33 @@ function renderRefList() {
     return;
   }
 
+  // For bias meter: find max abs foul_disparity across all data for scale
+  const maxFd = Math.max(..._refData.map(r => Math.abs(parseFloat(r.foul_disparity))), 0.1);
+
   tbody.innerHTML = rows.map(r => {
     const fd = parseFloat(r.foul_disparity);
-    const fdClass = fd > 0.8 ? "ref-bias-high" : fd < -0.3 ? "ref-bias-low" : "ref-bias-neutral";
     const ftd = parseFloat(r.fta_disparity);
+    const fdClass = fd > 0.8 ? "ref-bias-high" : fd < -0.3 ? "ref-bias-low" : "ref-bias-neutral";
     const ftdClass = ftd > 1.5 ? "ref-bias-high" : ftd < -0.5 ? "ref-bias-low" : "ref-bias-neutral";
+    const rating = _refBiasRating(fd);
+    // bias meter: bar from center, width proportional to max
+    const meterPct = (Math.abs(fd) / maxFd * 45).toFixed(1);
+    const meterDir = fd >= 0 ? "left:50%" : `right:50%`;
+    const meterColor = fd > 0.6 ? "#f87171" : fd < -0.2 ? "#4ade80" : "#8899b4";
     return `<tr class="ref-row" data-name="${escapeHtml(r.ref_name)}">
       <td><button class="ref-name-btn">${escapeHtml(r.ref_name)}</button></td>
-      <td>${r.games}</td>
-      <td>${r.avg_total_fouls}</td>
-      <td>${r.home_pf_avg}</td>
-      <td>${r.away_pf_avg}</td>
+      <td class="ref-num">${r.games}</td>
+      <td class="ref-num">${r.avg_total_fouls}</td>
       <td><span class="ref-bias-badge ${fdClass}">${fd > 0 ? "+" : ""}${fd.toFixed(2)}</span></td>
       <td><span class="ref-bias-badge ${ftdClass}">${ftd > 0 ? "+" : ""}${ftd.toFixed(2)}</span></td>
-      <td>${(parseFloat(r.home_win_pct) * 100).toFixed(1)}%</td>
+      <td class="ref-num">${(parseFloat(r.home_win_pct) * 100).toFixed(1)}%</td>
+      <td class="ref-meter-cell">
+        <div class="ref-meter-wrap">
+          <div class="ref-meter-center"></div>
+          <div class="ref-meter-fill" style="${meterDir};width:${meterPct}%;background:${meterColor}"></div>
+        </div>
+      </td>
+      <td><span class="ref-rating-chip ${rating.cls}">${rating.label}</span></td>
     </tr>`;
   }).join("");
 
@@ -3285,20 +3338,28 @@ async function showRefDetail(name) {
   detail.style.display = "";
   $("#refDetailName").textContent = name;
   $("#refDetailMeta").textContent = "Loading…";
+  $("#refDetailVerdict").textContent = "";
+  $("#refDetailVerdict").className = "ref-verdict-badge";
   $("#refStatCards").innerHTML = "";
-  $("#refTeamBars").innerHTML = "";
+  $("#refTeamBars").innerHTML = `<div class="ref-loading-row"><div class="sf-spinner" style="width:24px;height:24px;border-width:3px"></div></div>`;
   $("#refSeasonChart").innerHTML = "";
 
   try {
     const res = await fetch(`/api/referee-detail?name=${encodeURIComponent(name)}`);
     const data = await res.json();
     const agg = _refData.find(r => r.ref_name === name) || {};
+    const fd = parseFloat(agg.foul_disparity) || 0;
+    const rating = _refBiasRating(fd);
     $("#refDetailMeta").textContent = `${agg.games || 0} games officiated · 2015–2025`;
+    const verdict = $("#refDetailVerdict");
+    verdict.textContent = rating.label;
+    verdict.className = `ref-verdict-badge ${rating.cls}`;
     renderRefStatCards(agg);
     renderRefTeamBars(data.team_tendencies || []);
     renderRefSeasonChart(data.seasons || []);
   } catch {
     $("#refDetailMeta").textContent = "Failed to load detail";
+    $("#refTeamBars").innerHTML = "";
   }
 }
 
@@ -3307,13 +3368,14 @@ function renderRefStatCards(agg) {
   const ftd = parseFloat(agg.fta_disparity) || 0;
   const hwp = (parseFloat(agg.home_win_pct) || 0) * 100;
   const cards = [
-    { label: "Fouls / Game", value: agg.avg_total_fouls || "—", sub: "total (both teams)" },
-    { label: "Foul Bias", value: (fd > 0 ? "+" : "") + fd.toFixed(2), sub: "away minus home PF", cls: fd > 0.8 ? "ref-stat-high" : fd < -0.3 ? "ref-stat-low" : "" },
-    { label: "FTA Bias", value: (ftd > 0 ? "+" : "") + ftd.toFixed(2), sub: "away minus home FTA", cls: ftd > 1.5 ? "ref-stat-high" : ftd < -0.5 ? "ref-stat-low" : "" },
-    { label: "Home Win %", value: hwp.toFixed(1) + "%", sub: "in games they officiated", cls: hwp > 56 ? "ref-stat-high" : hwp < 46 ? "ref-stat-low" : "" },
+    { icon: "📢", label: "Fouls / Game", value: agg.avg_total_fouls || "—", sub: "total (both teams)", cls: "" },
+    { icon: "🏠", label: "Foul Bias", value: (fd > 0 ? "+" : "") + fd.toFixed(2), sub: "away minus home PF · positive = home advantage", cls: fd > 0.8 ? "ref-stat-high" : fd < -0.3 ? "ref-stat-low" : "" },
+    { icon: "🆓", label: "FTA Bias", value: (ftd > 0 ? "+" : "") + ftd.toFixed(2), sub: "away minus home free throw attempts", cls: ftd > 1.5 ? "ref-stat-high" : ftd < -0.5 ? "ref-stat-low" : "" },
+    { icon: "🏆", label: "Home Win %", value: hwp.toFixed(1) + "%", sub: "home team wins in officiated games", cls: hwp > 56 ? "ref-stat-high" : hwp < 46 ? "ref-stat-low" : "" },
   ];
   $("#refStatCards").innerHTML = cards.map(c => `
-    <div class="ref-stat-card ${c.cls || ""}">
+    <div class="ref-stat-card ${c.cls}">
+      <div class="ref-stat-icon">${c.icon}</div>
       <div class="ref-stat-value">${c.value}</div>
       <div class="ref-stat-label">${c.label}</div>
       <div class="ref-stat-sub">${c.sub}</div>
@@ -3322,37 +3384,52 @@ function renderRefStatCards(agg) {
 
 function renderRefTeamBars(teams) {
   const el = $("#refTeamBars");
-  if (!teams.length) { el.innerHTML = `<p style="color:var(--muted);font-size:0.85rem">No team data</p>`; return; }
+  if (!teams.length) { el.innerHTML = `<p style="color:var(--muted);font-size:0.85rem;padding:16px 0">No team data</p>`; return; }
   const maxAbs = Math.max(...teams.map(t => Math.abs(parseFloat(t.pf_vs_avg))), 0.1);
   const sorted = teams.slice().sort((a, b) => parseFloat(b.pf_vs_avg) - parseFloat(a.pf_vs_avg));
   el.innerHTML = sorted.map(t => {
     const val = parseFloat(t.pf_vs_avg);
-    const pct = Math.abs(val) / maxAbs * 50;
+    const pct = (Math.abs(val) / maxAbs * 46).toFixed(1);
     const isPos = val >= 0;
+    const games = t.games || "";
     return `<div class="ref-team-row">
       <span class="ref-team-name">${escapeHtml(t.team)}</span>
       <div class="ref-team-bar-wrap">
         <div class="ref-team-bar-center"></div>
         <div class="ref-team-bar ${isPos ? "ref-bar-pos" : "ref-bar-neg"}"
-             style="${isPos ? "left:50%;width:" : "right:50%;width:"}${pct}%"></div>
+             style="${isPos ? "left:50%" : "right:50%"};width:${pct}%"></div>
       </div>
       <span class="ref-team-val ${isPos ? "ref-val-pos" : "ref-val-neg"}">${isPos ? "+" : ""}${val.toFixed(2)}</span>
+      <span class="ref-team-games">${games}g</span>
     </div>`;
   }).join("");
 }
 
 function renderRefSeasonChart(seasons) {
   const el = $("#refSeasonChart");
-  if (!seasons.length) { el.innerHTML = `<p style="color:var(--muted);font-size:0.85rem">No season data</p>`; return; }
-  const maxFouls = Math.max(...seasons.map(s => parseFloat(s.avg_total_fouls)));
+  if (!seasons.length) { el.innerHTML = `<p style="color:var(--muted);font-size:0.85rem;padding:16px 0">No season data</p>`; return; }
+  const fouls = seasons.map(s => parseFloat(s.avg_total_fouls));
+  const minF = Math.min(...fouls), maxF = Math.max(...fouls);
+  const range = maxF - minF || 1;
   el.innerHTML = `<div class="ref-season-bars">
     ${seasons.map(s => {
-      const h = (parseFloat(s.avg_total_fouls) / maxFouls * 100).toFixed(1);
+      const f = parseFloat(s.avg_total_fouls);
+      const h = ((f - minF) / range * 72 + 18).toFixed(1);
       const fd = parseFloat(s.foul_disparity);
+      const fdColor = fd > 0.6 ? "#f87171" : fd < -0.2 ? "#4ade80" : "#8899b4";
+      const yr = String(s.season);
+      const lbl = `'${yr.slice(2)}-'${String(parseInt(yr)+1).slice(2)}`;
       return `<div class="ref-season-col">
-        <div class="ref-season-tip">${s.avg_total_fouls} fouls<br>bias ${fd > 0 ? "+" : ""}${fd.toFixed(2)}</div>
-        <div class="ref-season-bar" style="height:${h}%"></div>
-        <div class="ref-season-lbl">${String(s.season).slice(2)}-${String(parseInt(s.season)+1).slice(2)}</div>
+        <div class="ref-season-tip">
+          <strong>${f}</strong> fouls/g<br>
+          bias <span style="color:${fdColor}">${fd > 0 ? "+" : ""}${fd.toFixed(2)}</span><br>
+          ${s.games} games
+        </div>
+        <div class="ref-season-bar-wrap">
+          <div class="ref-season-bar" style="height:${h}%"></div>
+        </div>
+        <div class="ref-season-fd" style="color:${fdColor};font-size:0.62rem;font-weight:700;margin-top:3px">${fd > 0 ? "+" : ""}${fd.toFixed(1)}</div>
+        <div class="ref-season-lbl">${lbl}</div>
       </div>`;
     }).join("")}
   </div>`;
