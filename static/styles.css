@@ -5130,6 +5130,21 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   border-color: var(--sidebar-active, #7c8cff); background: rgba(124,140,255,0.06);
 }
 .ref-player-input::placeholder { color: rgba(255,255,255,0.2); }
+.ref-player-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: #1a1d2e; border: 1px solid rgba(124,140,255,0.25);
+  border-radius: 10px; list-style: none; margin: 0; padding: 4px;
+  z-index: 200; box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  max-height: 280px; overflow-y: auto;
+}
+.ref-ac-item {
+  padding: 9px 12px; border-radius: 7px; cursor: pointer;
+  font-size: 0.9rem; color: var(--ink);
+  transition: background 0.1s;
+}
+.ref-ac-item:hover, .ref-ac-active {
+  background: rgba(124,140,255,0.15); color: #fff;
+}
 .ref-player-btn {
   height: 44px; padding: 0 22px; border-radius: 10px; border: none;
   background: var(--sidebar-active, #7c8cff); color: #fff; font-family: inherit;

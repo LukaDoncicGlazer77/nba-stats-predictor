@@ -1648,6 +1648,9 @@ class Handler(SimpleHTTPRequestHandler):
                 self.end_headers()
             return
 
+        if parsed.path == "/api/referee-players":
+            return self.send_json(_get_available_players())
+
         if parsed.path == "/api/referee-player":
             player_query = (params.get("player") or [""])[0].strip()
             if not player_query:
@@ -1780,6 +1783,26 @@ def _find_nba_player(query):
 
 _REF_PLAYER_CACHE = {}
 _REF_PLAYER_TTL = 3600 * 6
+
+_AVAILABLE_PLAYERS_CACHE = {"data": None, "ts": 0}
+
+def _get_available_players():
+    now = time.time()
+    if _AVAILABLE_PLAYERS_CACHE["data"] and now - _AVAILABLE_PLAYERS_CACHE["ts"] < 3600:
+        return _AVAILABLE_PLAYERS_CACHE["data"]
+    try:
+        with get_conn() as conn:
+            rows = q(conn, """
+                SELECT DISTINCT player_name
+                FROM archive_player_game_logs
+                ORDER BY player_name
+            """)
+        names = [r["player_name"] for r in rows]
+        _AVAILABLE_PLAYERS_CACHE["data"] = {"players": names}
+        _AVAILABLE_PLAYERS_CACHE["ts"] = now
+        return _AVAILABLE_PLAYERS_CACHE["data"]
+    except Exception as exc:
+        return {"players": [], "error": str(exc)}
 
 def _get_referee_player_stats(player_query: str):
     now = time.time()

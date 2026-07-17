@@ -3583,12 +3583,81 @@ function _renderRefPlayerRows(refs, sortKey, leaguePf, maxPf) {
   }).join("");
 }
 
-const refPlayerInput = $("#refPlayerInput");
-const refPlayerBtn   = $("#refPlayerSearchBtn");
-if (refPlayerBtn) refPlayerBtn.addEventListener("click", refPlayerSearch);
-if (refPlayerInput) {
-  refPlayerInput.addEventListener("keydown", e => { if (e.key === "Enter") refPlayerSearch(); });
+const refPlayerInput    = $("#refPlayerInput");
+const refPlayerBtn      = $("#refPlayerSearchBtn");
+const refPlayerDropdown = $("#refPlayerDropdown");
+
+// Autocomplete
+let _allRefPlayers = [];
+let _acIdx = -1;
+
+async function _loadRefPlayers() {
+  if (_allRefPlayers.length) return;
+  try {
+    const res = await fetch("/api/referee-players");
+    const data = await res.json();
+    _allRefPlayers = data.players || [];
+  } catch {}
 }
+
+function _showRefDropdown(matches) {
+  if (!refPlayerDropdown) return;
+  if (!matches.length) { refPlayerDropdown.style.display = "none"; return; }
+  refPlayerDropdown.innerHTML = matches.map((name, i) =>
+    `<li class="ref-ac-item" data-name="${escapeHtml(name)}">${escapeHtml(name)}</li>`
+  ).join("");
+  refPlayerDropdown.style.display = "block";
+  _acIdx = -1;
+  refPlayerDropdown.querySelectorAll(".ref-ac-item").forEach(li => {
+    li.addEventListener("mousedown", e => {
+      e.preventDefault();
+      refPlayerInput.value = li.dataset.name;
+      refPlayerDropdown.style.display = "none";
+      refPlayerSearch();
+    });
+  });
+}
+
+if (refPlayerInput) {
+  refPlayerInput.addEventListener("focus", _loadRefPlayers);
+
+  refPlayerInput.addEventListener("input", () => {
+    const q = refPlayerInput.value.trim().toLowerCase();
+    if (!q) { refPlayerDropdown.style.display = "none"; return; }
+    const matches = _allRefPlayers.filter(n => n.toLowerCase().includes(q)).slice(0, 8);
+    _showRefDropdown(matches);
+  });
+
+  refPlayerInput.addEventListener("keydown", e => {
+    const items = refPlayerDropdown ? refPlayerDropdown.querySelectorAll(".ref-ac-item") : [];
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      _acIdx = Math.min(_acIdx + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle("ref-ac-active", i === _acIdx));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      _acIdx = Math.max(_acIdx - 1, -1);
+      items.forEach((el, i) => el.classList.toggle("ref-ac-active", i === _acIdx));
+    } else if (e.key === "Enter") {
+      if (_acIdx >= 0 && items[_acIdx]) {
+        refPlayerInput.value = items[_acIdx].dataset.name;
+        refPlayerDropdown.style.display = "none";
+        _acIdx = -1;
+      }
+      refPlayerSearch();
+    } else if (e.key === "Escape") {
+      refPlayerDropdown.style.display = "none";
+    }
+  });
+
+  document.addEventListener("click", e => {
+    if (refPlayerDropdown && !refPlayerInput.contains(e.target) && !refPlayerDropdown.contains(e.target)) {
+      refPlayerDropdown.style.display = "none";
+    }
+  });
+}
+
+if (refPlayerBtn) refPlayerBtn.addEventListener("click", refPlayerSearch);
 
 // Sort headers
 document.querySelectorAll(".ref-sort-col").forEach(th => {

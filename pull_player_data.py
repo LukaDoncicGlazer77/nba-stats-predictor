@@ -55,18 +55,24 @@ def ensure_table(conn):
         conn.commit()
 
 
+def _norm(s):
+    import unicodedata
+    nfkd = unicodedata.normalize("NFKD", s.lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
 def find_player(name):
     print(f"  Looking up player: {name}")
     all_players = commonallplayers.CommonAllPlayers(
         is_only_current_season=0, league_id="00", season="2024-25"
     ).get_data_frames()[0]
-    name_lower = name.lower()
-    # exact match
-    match = all_players[all_players["DISPLAY_FIRST_LAST"].str.lower() == name_lower]
+    q = _norm(name)
+    # exact match (accent-stripped)
+    match = all_players[all_players["DISPLAY_FIRST_LAST"].apply(_norm) == q]
     if match.empty:
         # all-words match
-        words = name_lower.split()
-        mask = all_players["DISPLAY_FIRST_LAST"].str.lower().apply(
+        words = q.split()
+        mask = all_players["DISPLAY_FIRST_LAST"].apply(_norm).apply(
             lambda n: all(w in n for w in words)
         )
         match = all_players[mask]
