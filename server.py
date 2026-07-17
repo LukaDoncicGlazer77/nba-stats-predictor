@@ -1649,7 +1649,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if parsed.path == "/api/referee-player":
-            player_query = (parsed_qs.get("player") or [""])[0].strip()
+            player_query = (params.get("player") or [""])[0].strip()
             if not player_query:
                 return self.send_json({"error": "player parameter required"}, status=400)
             return self.send_json(_get_referee_player_stats(player_query))
@@ -1658,7 +1658,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(_get_referee_stats())
 
         if parsed.path == "/api/referee-detail":
-            name = (parsed_qs.get("name") or [""])[0].strip()
+            name = (params.get("name") or [""])[0].strip()
             if not name:
                 return self.send_json({"error": "name required"}, status=400)
             return self.send_json(_get_referee_detail(name))
