@@ -5300,3 +5300,55 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 @media (max-width: 700px) {
   .moment-cols { grid-template-columns: 1fr; }
 }
+
+/* ── Scatter Chart ── */
+.ref-scatter-panel {
+  background: var(--card-bg, rgba(255,255,255,0.03));
+  border: 1px solid var(--card-border, rgba(255,255,255,0.07));
+  border-radius: 14px; padding: 20px 20px 14px; margin-top: 20px;
+}
+.ref-scatter-header {
+  display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.ref-scatter-title {
+  font-size: 0.95rem; font-weight: 800; color: var(--ink);
+}
+.ref-scatter-sub {
+  font-size: 0.72rem; color: var(--muted);
+}
+.ref-scatter-wrap {
+  position: relative; width: 100%;
+}
+.ref-scatter-svg {
+  display: block; width: 100%; height: auto;
+}
+.ref-scatter-legend {
+  display: flex; gap: 18px; justify-content: center;
+  margin-top: 8px; flex-wrap: wrap;
+}
+.ref-sc-leg {
+  font-size: 0.72rem; font-weight: 600;
+}
+.ref-sc-leg-home    { color: #f87171; }
+.ref-sc-leg-neutral { color: #8899b4; }
+.ref-sc-leg-away    { color: #4ade80; }
+.ref-scatter-tooltip {
+  position: absolute; pointer-events: none;
+  background: #1a1d2e; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px; padding: 10px 13px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  min-width: 160px; z-index: 100;
+}
+.sct-name {
+  font-size: 0.88rem; font-weight: 800; color: var(--ink); margin-bottom: 6px;
+}
+.sct-row {
+  display: flex; justify-content: space-between; gap: 16px;
+  font-size: 0.78rem; color: rgba(255,255,255,0.6); margin-bottom: 3px;
+}
+.sct-row span:last-child { font-weight: 700; color: var(--ink); }
+.sct-badge {
+  margin-top: 7px; display: inline-block;
+  font-size: 0.68rem; font-weight: 800; padding: 2px 8px;
+  border-radius: 20px; letter-spacing: 0.05em; text-transform: uppercase;
+}

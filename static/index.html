@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260717-moments" />
+    <link rel="stylesheet" href="styles.css?v=20260717-scatter" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -1122,6 +1122,23 @@
             <!-- Spotlight cards -->
             <div class="ref-spotlight" id="refSpotlight"></div>
 
+            <!-- Scatter chart -->
+            <div class="ref-scatter-panel" id="refScatterPanel">
+              <div class="ref-scatter-header">
+                <span class="ref-scatter-title">Referee Bias Map</span>
+                <span class="ref-scatter-sub">Each dot is a referee · hover for details · click to open</span>
+              </div>
+              <div class="ref-scatter-wrap">
+                <svg id="refScatterSvg" class="ref-scatter-svg"></svg>
+                <div id="refScatterTooltip" class="ref-scatter-tooltip" style="display:none"></div>
+              </div>
+              <div class="ref-scatter-legend">
+                <span class="ref-sc-leg ref-sc-leg-home">▲ Home-favoring</span>
+                <span class="ref-sc-leg ref-sc-leg-neutral">● Neutral</span>
+                <span class="ref-sc-leg ref-sc-leg-away">▼ Away-favoring</span>
+              </div>
+            </div>
+
             <div class="table-panel" style="margin-top:18px">
               <div class="table-wrap">
                 <table id="refTable">
@@ -1232,7 +1249,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260717-moments"></script>
+    <script src="app.js?v=20260717-scatter"></script>
 
     <!--Start of Tawk.to Script-->
     <script type="text/javascript">

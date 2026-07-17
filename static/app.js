@@ -3288,7 +3288,7 @@ function renderRefList() {
     return _refSortAsc ? av - bv : bv - av;
   });
 
-  if (!_refFilter) renderRefSpotlight(rows);
+  if (!_refFilter) { renderRefSpotlight(rows); renderRefScatter(_refData); }
 
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">
@@ -3329,6 +3329,106 @@ function renderRefList() {
 
   tbody.querySelectorAll(".ref-name-btn").forEach(btn => {
     btn.addEventListener("click", () => showRefDetail(btn.closest("tr").dataset.name));
+  });
+}
+
+function renderRefScatter(data) {
+  const svg = $("#refScatterSvg");
+  if (!svg || !data || !data.length) return;
+
+  const W = svg.parentElement.clientWidth || 680;
+  const H = Math.min(Math.max(W * 0.52, 280), 420);
+  const PAD = { top: 24, right: 28, bottom: 46, left: 52 };
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+
+  const biases = data.map(r => parseFloat(r.foul_disparity));
+  const fouls  = data.map(r => parseFloat(r.avg_total_fouls));
+  const minB = Math.min(...biases), maxB = Math.max(...biases);
+  const minF = Math.min(...fouls),  maxF = Math.max(...fouls);
+  const padB = (maxB - minB) * 0.08 || 0.5;
+  const padF = (maxF - minF) * 0.08 || 1;
+  const xMin = minB - padB, xMax = maxB + padB;
+  const yMin = minF - padF, yMax = maxF + padF;
+
+  const xS = v => PAD.left  + (v - xMin) / (xMax - xMin) * innerW;
+  const yS = v => PAD.top   + (1 - (v - yMin) / (yMax - yMin)) * innerH;
+  const zeroX = xS(0);
+
+  // Build SVG
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="overflow:visible">`;
+
+  // Grid lines
+  const xTicks = 5, yTicks = 5;
+  for (let i = 0; i <= xTicks; i++) {
+    const v = xMin + (xMax - xMin) * i / xTicks;
+    const x = xS(v);
+    s += `<line x1="${x}" y1="${PAD.top}" x2="${x}" y2="${PAD.top + innerH}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
+    s += `<text x="${x}" y="${PAD.top + innerH + 16}" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-size="11">${v > 0 ? "+" : ""}${v.toFixed(1)}</text>`;
+  }
+  for (let i = 0; i <= yTicks; i++) {
+    const v = yMin + (yMax - yMin) * i / yTicks;
+    const y = yS(v);
+    s += `<line x1="${PAD.left}" y1="${y}" x2="${PAD.left + innerW}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
+    s += `<text x="${PAD.left - 8}" y="${y + 4}" text-anchor="end" fill="rgba(255,255,255,0.35)" font-size="11">${v.toFixed(1)}</text>`;
+  }
+
+  // Zero bias line
+  s += `<line x1="${zeroX}" y1="${PAD.top}" x2="${zeroX}" y2="${PAD.top + innerH}" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+
+  // Axis labels
+  s += `<text x="${PAD.left + innerW / 2}" y="${H - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="12">← Away-favoring · Foul Bias (Home PF − Away PF) · Home-favoring →</text>`;
+  s += `<text x="13" y="${PAD.top + innerH / 2}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="12" transform="rotate(-90,13,${PAD.top + innerH / 2})">Fouls / Game</text>`;
+
+  // Dots
+  data.forEach((r, i) => {
+    const bias = parseFloat(r.foul_disparity);
+    const fouls = parseFloat(r.avg_total_fouls);
+    const cx = xS(bias), cy = yS(fouls);
+    const color = bias > 0.6 ? "#f87171" : bias < -0.2 ? "#4ade80" : "#8899b4";
+    const radius = 6;
+    s += `<circle class="ref-sc-dot" cx="${cx}" cy="${cy}" r="${radius}" fill="${color}" fill-opacity="0.82" stroke="rgba(255,255,255,0.15)" stroke-width="1" data-idx="${i}" style="cursor:pointer;transition:r 0.1s"/>`;
+  });
+
+  s += `</svg>`;
+  svg.outerHTML = s;
+
+  // Re-grab after outerHTML swap
+  const newSvg = $("#refScatterSvg");
+  if (!newSvg) return;
+  newSvg.setAttribute("width", W);
+  newSvg.setAttribute("height", H);
+
+  const tip = $("#refScatterTooltip");
+  newSvg.querySelectorAll(".ref-sc-dot").forEach(dot => {
+    const r = data[parseInt(dot.dataset.idx)];
+    const bias = parseFloat(r.foul_disparity);
+    const rating = _refBiasRating(bias);
+
+    dot.addEventListener("mouseenter", e => {
+      dot.setAttribute("r", "9");
+      if (!tip) return;
+      tip.innerHTML = `
+        <div class="sct-name">${escapeHtml(r.ref_name)}</div>
+        <div class="sct-row"><span>Foul Bias</span><span style="color:${bias > 0.6 ? "#f87171" : bias < -0.2 ? "#4ade80" : "#8899b4"}">${bias > 0 ? "+" : ""}${bias.toFixed(2)}</span></div>
+        <div class="sct-row"><span>Fouls/Game</span><span>${r.avg_total_fouls}</span></div>
+        <div class="sct-row"><span>Games</span><span>${r.games}</span></div>
+        <div class="sct-badge ${rating.cls}">${rating.label}</div>`;
+      tip.style.display = "block";
+    });
+    dot.addEventListener("mousemove", e => {
+      if (!tip) return;
+      const rect = newSvg.getBoundingClientRect();
+      const tx = e.clientX - rect.left + 14;
+      const ty = e.clientY - rect.top  - 10;
+      tip.style.left = (tx + tip.offsetWidth > W ? tx - tip.offsetWidth - 24 : tx) + "px";
+      tip.style.top  = ty + "px";
+    });
+    dot.addEventListener("mouseleave", () => {
+      dot.setAttribute("r", "6");
+      if (tip) tip.style.display = "none";
+    });
+    dot.addEventListener("click", () => showRefDetail(r.ref_name));
   });
 }
 
@@ -3839,3 +3939,12 @@ $("#refBackBtn") && $("#refBackBtn").addEventListener("click", () => {
   ping();
   setInterval(ping, 60000);
 })();
+
+// Re-render scatter on resize
+let _scatterResizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(_scatterResizeTimer);
+  _scatterResizeTimer = setTimeout(() => {
+    if (_refData && $("#refScatterSvg")) renderRefScatter(_refData);
+  }, 150);
+});
