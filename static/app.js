@@ -3300,17 +3300,17 @@ function renderRefList() {
   // For bias meter: find max abs foul_disparity across all data for scale
   const maxFd = Math.max(..._refData.map(r => Math.abs(parseFloat(r.foul_disparity))), 0.1);
 
-  tbody.innerHTML = rows.map(r => {
+  tbody.innerHTML = rows.map((r, i) => {
     const fd = parseFloat(r.foul_disparity);
     const ftd = parseFloat(r.fta_disparity);
     const fdClass = fd > 0.8 ? "ref-bias-high" : fd < -0.3 ? "ref-bias-low" : "ref-bias-neutral";
     const ftdClass = ftd > 1.5 ? "ref-bias-high" : ftd < -0.5 ? "ref-bias-low" : "ref-bias-neutral";
     const rating = _refBiasRating(fd);
-    // bias meter: bar from center, width proportional to max
     const meterPct = (Math.abs(fd) / maxFd * 45).toFixed(1);
     const meterDir = fd >= 0 ? "left:50%" : `right:50%`;
     const meterColor = fd > 0.6 ? "#f87171" : fd < -0.2 ? "#4ade80" : "#8899b4";
     return `<tr class="ref-row" data-name="${escapeHtml(r.ref_name)}">
+      <td class="ref-rank-num">${i + 1}</td>
       <td><button class="ref-name-btn">${escapeHtml(r.ref_name)}</button></td>
       <td class="ref-num">${r.games}</td>
       <td class="ref-num">${r.avg_total_fouls}</td>

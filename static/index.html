@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260717-scatter" />
+    <link rel="stylesheet" href="styles.css?v=20260717-premium" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -1113,7 +1113,7 @@
                 <button class="ref-mode-btn active" id="refModeRefs" data-mode="refs">By Referee</button>
                 <button class="ref-mode-btn" id="refModePlayer" data-mode="player">By Player</button>
               </div>
-              <input id="refSearch" type="search" placeholder="Search referee&hellip;" class="player-filter-input" style="max-width:220px" />
+              <input id="refSearch" type="search" placeholder="Search referee&hellip;" class="player-filter-input" style="max-width:200px" />
             </div>
           </div>
 
@@ -1144,10 +1144,11 @@
                 <table id="refTable">
                   <thead>
                     <tr>
+                      <th style="width:32px;color:rgba(255,255,255,0.2)">#</th>
                       <th class="ref-sort-col" data-col="ref_name">Referee</th>
                       <th class="ref-sort-col" data-col="games">Games</th>
                       <th class="ref-sort-col" data-col="avg_total_fouls">Fouls/G</th>
-                      <th class="ref-sort-col" data-col="foul_disparity" title="Away PF minus Home PF — positive = more fouls on away team">Foul Bias</th>
+                      <th class="ref-sort-col" data-col="foul_disparity" title="Home PF minus Away PF — positive = more fouls on away team">Foul Bias</th>
                       <th class="ref-sort-col" data-col="fta_disparity" title="Away FTA minus Home FTA">FTA Bias</th>
                       <th class="ref-sort-col" data-col="home_win_pct">Home Win%</th>
                       <th>Bias Meter</th>
@@ -1249,7 +1250,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260717-scatter"></script>
+    <script src="app.js?v=20260717-premium"></script>
 
     <!--Start of Tawk.to Script-->
     <script type="text/javascript">
