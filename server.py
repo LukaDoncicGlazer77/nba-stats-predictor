@@ -1651,6 +1651,12 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/referee-players":
             return self.send_json(_get_available_players())
 
+        if parsed.path == "/api/player-moments":
+            pname = (params.get("player") or [""])[0].strip()
+            if not pname:
+                return self.send_json({"error": "player required"}, status=400)
+            return self.send_json(_get_player_moments(pname))
+
         if parsed.path == "/api/referee-player":
             player_query = (params.get("player") or [""])[0].strip()
             if not player_query:
@@ -1783,6 +1789,88 @@ def _find_nba_player(query):
 
 _REF_PLAYER_CACHE = {}
 _REF_PLAYER_TTL = 3600 * 6
+
+_PLAYER_MOMENTS_CACHE = {}
+_PLAYER_MOMENTS_TTL = 3600 * 12
+
+def _get_player_moments(player_name: str):
+    key = player_name.lower().strip()
+    now = time.time()
+    if key in _PLAYER_MOMENTS_CACHE and now - _PLAYER_MOMENTS_CACHE[key]["ts"] < _PLAYER_MOMENTS_TTL:
+        return _PLAYER_MOMENTS_CACHE[key]["data"]
+
+    like = f"%{player_name.strip()}%"
+    try:
+        with get_conn() as conn:
+            # Verify player exists in our player logs
+            check = q(conn, """
+                SELECT DISTINCT player_name FROM archive_player_game_logs
+                WHERE lower(player_name) LIKE lower(%s) LIMIT 1
+            """, (like,))
+            if not check:
+                words = player_name.strip().split()
+                wlike = " AND ".join(["lower(player_name) LIKE lower(%s)"] * len(words))
+                check = q(conn, f"SELECT DISTINCT player_name FROM archive_player_game_logs WHERE {wlike} LIMIT 1",
+                          tuple(f"%{w}%" for w in words))
+            canonical = check[0]["player_name"] if check else player_name
+
+            # INC: fouls that should have been called FOR this player (disadvantaged, not called)
+            non_calls = q(conn, """
+                SELECT game_date, season, playoff, period, time_remaining,
+                       call_type, committing, committing_team,
+                       home_team, away_team, comments,
+                       ref_1, ref_2, ref_3, decision
+                FROM archive_l2m
+                WHERE decision = 'INC'
+                  AND lower(disadvantaged) LIKE lower(%s)
+                  AND call_type ILIKE '%%foul%%'
+                ORDER BY playoff DESC, game_date DESC
+                LIMIT 20
+            """, (like,))
+
+            # IC: fouls incorrectly called AGAINST this player (committing, shouldn't have been called)
+            bad_calls = q(conn, """
+                SELECT game_date, season, playoff, period, time_remaining,
+                       call_type, disadvantaged, disadvantaged_team,
+                       home_team, away_team, comments,
+                       ref_1, ref_2, ref_3, decision
+                FROM archive_l2m
+                WHERE decision = 'IC'
+                  AND lower(committing) LIKE lower(%s)
+                  AND call_type ILIKE '%%foul%%'
+                ORDER BY playoff DESC, game_date DESC
+                LIMIT 10
+            """, (like,))
+
+    except Exception as exc:
+        return {"error": str(exc)}
+
+    def fmt(row, mode):
+        opponent = row["away_team"] if row["home_team"] and row.get("committing_team") == row["home_team"] else row["home_team"]
+        opp = row["away_team"] if mode == "non_call" else row.get("disadvantaged_team", "")
+        teams = f"{row['away_team']} @ {row['home_team']}"
+        refs = [r for r in [row.get("ref_1"), row.get("ref_2"), row.get("ref_3")] if r]
+        return {
+            "date":        str(row["game_date"]) if row["game_date"] else "",
+            "season":      row["season"] or "",
+            "playoff":     bool(row["playoff"]),
+            "period":      row["period"] or "",
+            "time":        row["time_remaining"] or "",
+            "call_type":   row["call_type"] or "",
+            "other_player": row.get("committing") or row.get("disadvantaged") or "",
+            "teams":       teams,
+            "comments":    row["comments"] or "",
+            "refs":        refs,
+        }
+
+    result = {
+        "player": canonical,
+        "non_calls": [fmt(r, "non_call") for r in non_calls],
+        "bad_calls":  [fmt(r, "bad_call")  for r in bad_calls],
+    }
+    _PLAYER_MOMENTS_CACHE[key] = {"data": result, "ts": now}
+    return result
+
 
 _AVAILABLE_PLAYERS_CACHE = {"data": None, "ts": 0}
 

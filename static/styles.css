@@ -5213,3 +5213,90 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .ref-player-header { flex-direction: column; }
   .ref-player-sort-row { flex-wrap: wrap; }
 }
+
+/* ── Memorable Moments ── */
+.ref-moments-wrap {
+  margin-top: 28px;
+}
+.moment-section-title {
+  font-size: 1rem; font-weight: 800; color: var(--ink);
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.moment-icon { font-size: 1.1rem; }
+.moment-subtitle {
+  font-size: 0.72rem; font-weight: 500;
+  color: var(--muted); margin-left: 4px;
+  flex-basis: 100%;
+}
+.moment-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+.moment-col-head {
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; margin: 0 0 10px;
+  padding: 6px 10px; border-radius: 6px;
+}
+.moment-col-head-missed {
+  background: rgba(248,113,113,0.12); color: #f87171;
+}
+.moment-col-head-bad {
+  background: rgba(251,191,36,0.12); color: #fbbf24;
+}
+.moment-card {
+  border-radius: 10px; padding: 14px 16px;
+  margin-bottom: 10px;
+  border-left: 3px solid transparent;
+  transition: background 0.15s;
+}
+.moment-card-missed {
+  background: rgba(248,113,113,0.07);
+  border-left-color: #f87171;
+}
+.moment-card-bad {
+  background: rgba(251,191,36,0.07);
+  border-left-color: #fbbf24;
+}
+.moment-card-top {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.moment-badge {
+  font-size: 0.65rem; font-weight: 700; padding: 2px 7px;
+  border-radius: 20px; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.moment-badge-playoff  { background: rgba(168,85,247,0.2);  color: #c084fc; }
+.moment-badge-regular  { background: rgba(148,163,184,0.15); color: #94a3b8; }
+.moment-type {
+  font-size: 0.65rem; font-weight: 800; padding: 2px 7px;
+  border-radius: 20px; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.moment-type-missed { background: rgba(248,113,113,0.18); color: #f87171; }
+.moment-type-bad    { background: rgba(251,191,36,0.18);  color: #fbbf24; }
+.moment-date {
+  font-size: 0.72rem; color: var(--muted); margin-left: auto;
+}
+.moment-teams {
+  font-size: 0.85rem; font-weight: 700; color: var(--ink);
+  margin-bottom: 2px;
+}
+.moment-context {
+  font-size: 0.72rem; color: var(--muted); margin-bottom: 8px;
+}
+.moment-desc {
+  font-size: 0.85rem; color: rgba(255,255,255,0.75);
+  margin: 0 0 8px; line-height: 1.5;
+}
+.moment-refs {
+  font-size: 0.7rem; color: var(--muted);
+}
+.moment-empty {
+  font-size: 0.85rem; color: var(--muted); font-style: italic;
+}
+@media (max-width: 700px) {
+  .moment-cols { grid-template-columns: 1fr; }
+}

@@ -3459,22 +3459,26 @@ async function refPlayerSearch() {
   const query = (input && input.value.trim()) || "";
   if (!query) return;
   const resultEl = $("#refPlayerResult");
-  resultEl.innerHTML = `<div class="ref-player-loading"><div class="sf-spinner" style="width:28px;height:28px;border-width:3px"></div><span>Fetching game logs for <strong>${escapeHtml(query)}</strong> across 10 seasons&hellip; (~10 seconds)</span></div>`;
+  resultEl.innerHTML = `<div class="ref-player-loading"><div class="sf-spinner" style="width:28px;height:28px;border-width:3px"></div><span>Loading data for <strong>${escapeHtml(query)}</strong>…</span></div>`;
 
   try {
-    const res = await fetch(`/api/referee-player?player=${encodeURIComponent(query)}`);
-    const data = await res.json();
+    const [statsRes, momentsRes] = await Promise.all([
+      fetch(`/api/referee-player?player=${encodeURIComponent(query)}`),
+      fetch(`/api/player-moments?player=${encodeURIComponent(query)}`),
+    ]);
+    const data    = await statsRes.json();
+    const moments = await momentsRes.json();
     if (data.error) {
       resultEl.innerHTML = `<div class="ref-player-error">${escapeHtml(data.error)}</div>`;
       return;
     }
-    renderRefPlayerResult(data);
+    renderRefPlayerResult(data, moments);
   } catch {
     resultEl.innerHTML = `<div class="ref-player-error">Network error — please try again.</div>`;
   }
 }
 
-function renderRefPlayerResult(data) {
+function renderRefPlayerResult(data, moments) {
   const resultEl = $("#refPlayerResult");
   const refs = data.referees || [];
   const leaguePf  = data.avg_pf_all;
@@ -3556,6 +3560,70 @@ function renderRefPlayerResult(data) {
       _renderRefPlayerRows(sorted, btn.dataset.sort, leaguePf, maxPf);
     });
   });
+
+  // Moments section
+  if (moments && !moments.error) {
+    const momentsEl = document.createElement("div");
+    momentsEl.className = "ref-moments-wrap";
+    momentsEl.innerHTML = _renderMoments(moments);
+    resultEl.appendChild(momentsEl);
+  }
+}
+
+function _momentCard(m, type) {
+  const isPlayoff = m.playoff;
+  const badge = isPlayoff
+    ? `<span class="moment-badge moment-badge-playoff">Playoffs</span>`
+    : `<span class="moment-badge moment-badge-regular">Regular Season</span>`;
+  const typeLabel = type === "non_call"
+    ? `<span class="moment-type moment-type-missed">Missed Call</span>`
+    : `<span class="moment-type moment-type-bad">Phantom Call</span>`;
+  const date = m.date ? new Date(m.date).toLocaleDateString("en-US", {month:"short", day:"numeric", year:"numeric"}) : "";
+  const refs = m.refs && m.refs.length ? `<span class="moment-refs">Refs: ${escapeHtml(m.refs.join(", "))}</span>` : "";
+  return `
+    <div class="moment-card ${type === "non_call" ? "moment-card-missed" : "moment-card-bad"}">
+      <div class="moment-card-top">
+        ${typeLabel}${badge}
+        <span class="moment-date">${escapeHtml(date)}</span>
+      </div>
+      <div class="moment-teams">${escapeHtml(m.teams)}</div>
+      <div class="moment-context">${escapeHtml(m.period)} · ${escapeHtml(m.time)} remaining${m.other_player ? ` · ${escapeHtml(m.other_player)}` : ""}</div>
+      <p class="moment-desc">${escapeHtml(m.comments)}</p>
+      ${refs}
+    </div>`;
+}
+
+function _renderMoments(moments) {
+  const firstName = (moments.player || "").split(" ")[0];
+  const nonCalls = (moments.non_calls || []).slice(0, 6);
+  const badCalls = (moments.bad_calls || []).slice(0, 4);
+
+  if (!nonCalls.length && !badCalls.length) return "";
+
+  const ncHtml = nonCalls.length
+    ? nonCalls.map(m => _momentCard(m, "non_call")).join("")
+    : `<p class="moment-empty">No missed calls found for ${escapeHtml(firstName)} in L2M reports.</p>`;
+
+  const bcHtml = badCalls.length
+    ? badCalls.map(m => _momentCard(m, "bad_call")).join("")
+    : "";
+
+  return `
+    <div class="moment-section-title">
+      <span class="moment-icon">🚨</span> Official Review: ${escapeHtml(moments.player)}
+      <span class="moment-subtitle">From NBA Last Two Minute Reports (official game reviews)</span>
+    </div>
+    <div class="moment-cols">
+      <div class="moment-col">
+        <h4 class="moment-col-head moment-col-head-missed">Fouls That Should've Been Called (${nonCalls.length})</h4>
+        ${ncHtml}
+      </div>
+      ${badCalls.length ? `
+      <div class="moment-col">
+        <h4 class="moment-col-head moment-col-head-bad">Fouls Incorrectly Called (${badCalls.length})</h4>
+        ${bcHtml}
+      </div>` : ""}
+    </div>`;
 }
 
 function _renderRefPlayerRows(refs, sortKey, leaguePf, maxPf) {
