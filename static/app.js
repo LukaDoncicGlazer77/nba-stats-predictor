@@ -3584,13 +3584,16 @@ function renderRefPlayerResult(data, moments) {
   const leaguePf  = data.avg_pf_all;
   const leagueFta = data.avg_fta_all;
 
-  // Sort options
   const maxPf  = Math.max(...refs.map(r => r.avg_pf),  0.01);
-  const maxFta = Math.max(...refs.map(r => r.avg_fta), 0.01);
-
   const topPf  = refs.slice().sort((a, b) => b.avg_pf  - a.avg_pf)[0];
   const topFta = refs.slice().sort((a, b) => b.avg_fta - a.avg_fta)[0];
   const botPf  = refs.slice().sort((a, b) => a.avg_pf  - b.avg_pf)[0];
+
+  const hasMoments = moments && !moments.error &&
+    ((moments.non_calls || []).length > 0 || (moments.bad_calls || []).length > 0);
+  const reviewCount = hasMoments
+    ? (moments.non_calls || []).length + (moments.bad_calls || []).length
+    : 0;
 
   resultEl.innerHTML = `
     <div class="ref-player-header">
@@ -3598,53 +3601,67 @@ function renderRefPlayerResult(data, moments) {
         <h3 class="ref-player-name">${escapeHtml(data.player)}</h3>
         <p class="ref-player-meta">${data.matched_games} games matched · ${refs.length} referees with 5+ games · League avg: ${leaguePf} PF, ${leagueFta} FTA per game</p>
       </div>
-      <div class="ref-player-sort-row">
-        <span style="font-size:0.75rem;color:var(--muted);font-weight:600">Sort by:</span>
+    </div>
+
+    <div class="rp-tabs">
+      <button class="rp-tab active" data-tab="stats">Referee Stats</button>
+      <button class="rp-tab" data-tab="review">
+        Official Review
+        ${hasMoments ? `<span class="rp-tab-badge">${reviewCount}</span>` : ""}
+      </button>
+    </div>
+
+    <div id="rpPaneStats" class="rp-pane">
+      <div class="ref-player-spotlights">
+        <div class="ref-pspot ref-pspot-bad">
+          <div class="ref-pspot-label">Most Whistles On ${escapeHtml(data.player.split(" ")[0])}</div>
+          <div class="ref-pspot-name">${escapeHtml(topPf?.referee || "—")}</div>
+          <div class="ref-pspot-val">${topPf?.avg_pf ?? "—"} PF/g <span style="opacity:0.6">in ${topPf?.games ?? 0} games</span></div>
+        </div>
+        <div class="ref-pspot ref-pspot-fta">
+          <div class="ref-pspot-label">Most FTA Given</div>
+          <div class="ref-pspot-name">${escapeHtml(topFta?.referee || "—")}</div>
+          <div class="ref-pspot-val">${topFta?.avg_fta ?? "—"} FTA/g <span style="opacity:0.6">in ${topFta?.games ?? 0} games</span></div>
+        </div>
+        <div class="ref-pspot ref-pspot-good">
+          <div class="ref-pspot-label">Fewest Whistles</div>
+          <div class="ref-pspot-name">${escapeHtml(botPf?.referee || "—")}</div>
+          <div class="ref-pspot-val">${botPf?.avg_pf ?? "—"} PF/g <span style="opacity:0.6">in ${botPf?.games ?? 0} games</span></div>
+        </div>
+      </div>
+
+      <div class="rp-sort-row">
+        <span class="rp-sort-label">Sort by:</span>
         <button class="ref-psort-btn active" data-sort="pf">Personal Fouls</button>
         <button class="ref-psort-btn" data-sort="fta">Free Throws Drawn</button>
         <button class="ref-psort-btn" data-sort="games">Games</button>
       </div>
+
+      <div class="table-panel" id="refPlayerTable">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:32px;color:rgba(255,255,255,0.2)">#</th>
+                <th>Referee</th>
+                <th>Games</th>
+                <th>Avg PF/Game</th>
+                <th>vs League Avg</th>
+                <th>Avg FTA/Game</th>
+                <th>Avg PTS/Game</th>
+                <th>Foul Meter</th>
+              </tr>
+            </thead>
+            <tbody id="refPlayerTableBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <div class="ref-player-spotlights">
-      <div class="ref-pspot ref-pspot-bad">
-        <div class="ref-pspot-label">Most Whistles On ${escapeHtml(data.player.split(" ")[0])}</div>
-        <div class="ref-pspot-name">${escapeHtml(topPf?.referee || "—")}</div>
-        <div class="ref-pspot-val">${topPf?.avg_pf ?? "—"} PF/g <span style="opacity:0.6">in ${topPf?.games ?? 0} games</span></div>
-      </div>
-      <div class="ref-pspot ref-pspot-fta">
-        <div class="ref-pspot-label">Most FTA Given</div>
-        <div class="ref-pspot-name">${escapeHtml(topFta?.referee || "—")}</div>
-        <div class="ref-pspot-val">${topFta?.avg_fta ?? "—"} FTA/g <span style="opacity:0.6">in ${topFta?.games ?? 0} games</span></div>
-      </div>
-      <div class="ref-pspot ref-pspot-good">
-        <div class="ref-pspot-label">Fewest Whistles</div>
-        <div class="ref-pspot-name">${escapeHtml(botPf?.referee || "—")}</div>
-        <div class="ref-pspot-val">${botPf?.avg_pf ?? "—"} PF/g <span style="opacity:0.6">in ${botPf?.games ?? 0} games</span></div>
-      </div>
-    </div>
-
-    <div class="table-panel" id="refPlayerTable">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Referee</th>
-              <th>Games</th>
-              <th>Avg PF/Game</th>
-              <th>vs League Avg</th>
-              <th>Avg FTA/Game</th>
-              <th>Avg PTS/Game</th>
-              <th>Foul Meter</th>
-            </tr>
-          </thead>
-          <tbody id="refPlayerTableBody"></tbody>
-        </table>
-      </div>
+    <div id="rpPaneReview" class="rp-pane" style="display:none">
+      ${hasMoments ? _renderMoments(moments) : `<p class="moment-empty" style="padding:32px 0">No official review data found for ${escapeHtml(data.player)} in NBA Last Two Minute reports.</p>`}
     </div>`;
 
-  // Initial render sorted by PF
   _renderRefPlayerRows(refs, "pf", leaguePf, maxPf);
 
   // Sort buttons
@@ -3653,21 +3670,24 @@ function renderRefPlayerResult(data, moments) {
       resultEl.querySelectorAll(".ref-psort-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const sorted = refs.slice().sort((a, b) => {
-        if (btn.dataset.sort === "pf")    return b.avg_pf - a.avg_pf;
-        if (btn.dataset.sort === "fta")   return b.avg_fta - a.avg_fta;
+        if (btn.dataset.sort === "pf")  return b.avg_pf  - a.avg_pf;
+        if (btn.dataset.sort === "fta") return b.avg_fta - a.avg_fta;
         return b.games - a.games;
       });
       _renderRefPlayerRows(sorted, btn.dataset.sort, leaguePf, maxPf);
     });
   });
 
-  // Moments section
-  if (moments && !moments.error) {
-    const momentsEl = document.createElement("div");
-    momentsEl.className = "ref-moments-wrap";
-    momentsEl.innerHTML = _renderMoments(moments);
-    resultEl.appendChild(momentsEl);
-  }
+  // Tab switching
+  resultEl.querySelectorAll(".rp-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      resultEl.querySelectorAll(".rp-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const pane = tab.dataset.tab;
+      $("#rpPaneStats").style.display   = pane === "stats"  ? "" : "none";
+      $("#rpPaneReview").style.display  = pane === "review" ? "" : "none";
+    });
+  });
 }
 
 function _momentCard(m, type) {
@@ -3695,10 +3715,8 @@ function _momentCard(m, type) {
 
 function _renderMoments(moments) {
   const firstName = (moments.player || "").split(" ")[0];
-  const nonCalls = (moments.non_calls || []).slice(0, 6);
-  const badCalls = (moments.bad_calls || []).slice(0, 4);
-
-  if (!nonCalls.length && !badCalls.length) return "";
+  const nonCalls = (moments.non_calls || []).slice(0, 10);
+  const badCalls = (moments.bad_calls || []).slice(0, 6);
 
   const ncHtml = nonCalls.length
     ? nonCalls.map(m => _momentCard(m, "non_call")).join("")
@@ -3706,23 +3724,19 @@ function _renderMoments(moments) {
 
   const bcHtml = badCalls.length
     ? badCalls.map(m => _momentCard(m, "bad_call")).join("")
-    : "";
+    : `<p class="moment-empty">No phantom calls found.</p>`;
 
   return `
-    <div class="moment-section-title">
-      <span class="moment-icon">🚨</span> Official Review: ${escapeHtml(moments.player)}
-      <span class="moment-subtitle">From NBA Last Two Minute Reports (official game reviews)</span>
-    </div>
+    <p class="moment-source-note">Data from NBA Last Two Minute Reports — official reviews of every call in the final 2 minutes of close games.</p>
     <div class="moment-cols">
       <div class="moment-col">
         <h4 class="moment-col-head moment-col-head-missed">Fouls That Should've Been Called (${nonCalls.length})</h4>
         ${ncHtml}
       </div>
-      ${badCalls.length ? `
       <div class="moment-col">
         <h4 class="moment-col-head moment-col-head-bad">Fouls Incorrectly Called (${badCalls.length})</h4>
         ${bcHtml}
-      </div>` : ""}
+      </div>
     </div>`;
 }
 
