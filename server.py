@@ -1790,7 +1790,7 @@ def _find_nba_player(query):
 _REF_PLAYER_CACHE = {}
 _REF_PLAYER_TTL = 3600 * 6
 
-_PLAYER_MOMENTS_CACHE = {}
+_PLAYER_MOMENTS_CACHE: dict = {}
 _PLAYER_MOMENTS_TTL = 3600 * 12
 
 def _get_player_moments(player_name: str):
@@ -1799,7 +1799,8 @@ def _get_player_moments(player_name: str):
     if key in _PLAYER_MOMENTS_CACHE and now - _PLAYER_MOMENTS_CACHE[key]["ts"] < _PLAYER_MOMENTS_TTL:
         return _PLAYER_MOMENTS_CACHE[key]["data"]
 
-    like = f"%{player_name.strip()}%"
+    like        = f"%{player_name.strip()}%"
+    like_ascii  = f"%{_normalize_player_name(player_name.strip())}%"  # accent-stripped for L2M table
     try:
         with get_conn() as conn:
             # Verify player exists in our player logs
@@ -1826,7 +1827,7 @@ def _get_player_moments(player_name: str):
                   AND call_type ILIKE '%%foul%%'
                 ORDER BY playoff DESC, game_date DESC
                 LIMIT 20
-            """, (like,))
+            """, (like_ascii,))
 
             # IC: fouls incorrectly called AGAINST this player (committing, shouldn't have been called)
             bad_calls = q(conn, """
@@ -1840,7 +1841,7 @@ def _get_player_moments(player_name: str):
                   AND call_type ILIKE '%%foul%%'
                 ORDER BY playoff DESC, game_date DESC
                 LIMIT 10
-            """, (like,))
+            """, (like_ascii,))
 
     except Exception as exc:
         return {"error": str(exc)}
