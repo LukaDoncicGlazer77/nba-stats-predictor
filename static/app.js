@@ -3241,21 +3241,25 @@ async function loadRefereeBias() {
 }
 
 function _refBiasRating(fd) {
-  if (fd > 1.5) return { label: "Strong Home Bias", cls: "ref-rating-home-strong" };
-  if (fd > 0.6) return { label: "Home Leaning", cls: "ref-rating-home" };
+  // fd is now adjusted foul disparity (ref minus league avg), so thresholds are tighter
+  if (fd > 1.0) return { label: "Strong Home Bias", cls: "ref-rating-home-strong" };
+  if (fd > 0.4) return { label: "Home Leaning", cls: "ref-rating-home" };
   if (fd < -1.0) return { label: "Away Friendly", cls: "ref-rating-away" };
-  if (fd < -0.2) return { label: "Slight Away Lean", cls: "ref-rating-away-mild" };
+  if (fd < -0.4) return { label: "Slight Away Lean", cls: "ref-rating-away-mild" };
   return { label: "Neutral", cls: "ref-rating-neutral" };
 }
 
 function renderRefSpotlight(allRows) {
   const el = $("#refSpotlight");
   if (!el || !allRows.length) return;
-  const sorted = allRows.slice().sort((a, b) => parseFloat(b.foul_disparity) - parseFloat(a.foul_disparity));
+  const sorted = allRows.slice().sort((a, b) => parseFloat(b.adjusted_foul_disparity ?? b.foul_disparity) - parseFloat(a.adjusted_foul_disparity ?? a.foul_disparity));
   const mostHome = sorted[0];
   const mostAway = sorted[sorted.length - 1];
   const mostWhistles = allRows.slice().sort((a, b) => parseFloat(b.avg_total_fouls) - parseFloat(a.avg_total_fouls))[0];
   const fewestWhistles = allRows.slice().sort((a, b) => parseFloat(a.avg_total_fouls) - parseFloat(b.avg_total_fouls))[0];
+  const l2mRows = allRows.filter(r => r.l2m_total > 0);
+  const mostAccurate   = l2mRows.slice().sort((a, b) => parseFloat(a.error_rate_pct) - parseFloat(b.error_rate_pct))[0];
+  const leastAccurate  = l2mRows.slice().sort((a, b) => parseFloat(b.error_rate_pct) - parseFloat(a.error_rate_pct))[0];
 
   const card = (icon, label, name, val, cls) => `
     <div class="ref-spotlight-card ${cls}" onclick="_refSpotlightClick('${escapeHtml(name)}')">
@@ -3265,15 +3269,19 @@ function renderRefSpotlight(allRows) {
       <div class="ref-spotlight-val">${val}</div>
     </div>`;
 
+  const homeFd = parseFloat(mostHome.adjusted_foul_disparity ?? mostHome.foul_disparity);
+  const awayFd = parseFloat(mostAway.adjusted_foul_disparity ?? mostAway.foul_disparity);
   el.innerHTML = [
     card("🏠", "Most Home-Favoring", mostHome.ref_name,
-      `+${parseFloat(mostHome.foul_disparity).toFixed(2)} foul bias`, "ref-spot-red"),
+      `${homeFd > 0 ? "+" : ""}${homeFd.toFixed(2)} adj. bias`, "ref-spot-red"),
     card("✈️", "Most Away-Friendly", mostAway.ref_name,
-      `${parseFloat(mostAway.foul_disparity).toFixed(2)} foul bias`, "ref-spot-green"),
+      `${awayFd > 0 ? "+" : ""}${awayFd.toFixed(2)} adj. bias`, "ref-spot-green"),
     card("📢", "Most Whistles", mostWhistles.ref_name,
       `${mostWhistles.avg_total_fouls} fouls/game`, "ref-spot-yellow"),
     card("🤫", "Fewest Whistles", fewestWhistles.ref_name,
       `${fewestWhistles.avg_total_fouls} fouls/game`, "ref-spot-blue"),
+    ...(mostAccurate  ? [card("✅", "Most Accurate (L2M)",  mostAccurate.ref_name,  `${parseFloat(mostAccurate.error_rate_pct).toFixed(1)}% error rate`,  "ref-spot-green")] : []),
+    ...(leastAccurate ? [card("❌", "Least Accurate (L2M)", leastAccurate.ref_name, `${parseFloat(leastAccurate.error_rate_pct).toFixed(1)}% error rate`, "ref-spot-red")]  : []),
   ].join("");
 }
 window._refSpotlightClick = (name) => showRefDetail(name);
@@ -3291,24 +3299,27 @@ function renderRefList() {
   if (!_refFilter) { renderRefSpotlight(rows); renderRefScatter(_refData); }
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:32px">
       ${_refFilter ? "No referees matching filter" : "No data — run pull_referee_data.py first"}
     </td></tr>`;
     return;
   }
 
-  // For bias meter: find max abs foul_disparity across all data for scale
-  const maxFd = Math.max(..._refData.map(r => Math.abs(parseFloat(r.foul_disparity))), 0.1);
+  // Use adjusted disparity (normalized vs league avg) for meter scale
+  const maxFd = Math.max(..._refData.map(r => Math.abs(parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity))), 0.1);
 
   tbody.innerHTML = rows.map((r, i) => {
-    const fd = parseFloat(r.foul_disparity);
-    const ftd = parseFloat(r.fta_disparity);
-    const fdClass = fd > 0.8 ? "ref-bias-high" : fd < -0.3 ? "ref-bias-low" : "ref-bias-neutral";
-    const ftdClass = ftd > 1.5 ? "ref-bias-high" : ftd < -0.5 ? "ref-bias-low" : "ref-bias-neutral";
+    const fd  = parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity);
+    const ftd = parseFloat(r.adjusted_fta_disparity  ?? r.fta_disparity);
+    const fdClass  = fd  > 0.5 ? "ref-bias-high" : fd  < -0.5 ? "ref-bias-low" : "ref-bias-neutral";
+    const ftdClass = ftd > 1.0 ? "ref-bias-high" : ftd < -1.0 ? "ref-bias-low" : "ref-bias-neutral";
     const rating = _refBiasRating(fd);
     const meterPct = (Math.abs(fd) / maxFd * 45).toFixed(1);
     const meterDir = fd >= 0 ? "left:50%" : `right:50%`;
-    const meterColor = fd > 0.6 ? "#f87171" : fd < -0.2 ? "#4ade80" : "#8899b4";
+    const meterColor = fd > 0.5 ? "#f87171" : fd < -0.5 ? "#4ade80" : "#8899b4";
+    const erPct = r.error_rate_pct != null ? parseFloat(r.error_rate_pct) : null;
+    const erStr = erPct != null ? `${erPct.toFixed(1)}%` : "—";
+    const erCls = erPct != null ? (erPct > 35 ? "ref-bias-high" : erPct < 25 ? "ref-bias-low" : "ref-bias-neutral") : "";
     return `<tr class="ref-row" data-name="${escapeHtml(r.ref_name)}">
       <td class="ref-rank-num">${i + 1}</td>
       <td><button class="ref-name-btn">${escapeHtml(r.ref_name)}</button></td>
@@ -3317,6 +3328,7 @@ function renderRefList() {
       <td><span class="ref-bias-badge ${fdClass}">${fd > 0 ? "+" : ""}${fd.toFixed(2)}</span></td>
       <td><span class="ref-bias-badge ${ftdClass}">${ftd > 0 ? "+" : ""}${ftd.toFixed(2)}</span></td>
       <td class="ref-num">${(parseFloat(r.home_win_pct) * 100).toFixed(1)}%</td>
+      <td><span class="ref-bias-badge ${erCls}">${erStr}</span></td>
       <td class="ref-meter-cell">
         <div class="ref-meter-wrap">
           <div class="ref-meter-center"></div>
@@ -3342,7 +3354,7 @@ function renderRefScatter(data) {
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
 
-  const biases = data.map(r => parseFloat(r.foul_disparity));
+  const biases = data.map(r => parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity));
   const fouls  = data.map(r => parseFloat(r.avg_total_fouls));
   const minB = Math.min(...biases), maxB = Math.max(...biases);
   const minF = Math.min(...fouls),  maxF = Math.max(...fouls);
@@ -3377,7 +3389,7 @@ function renderRefScatter(data) {
   s += `<line x1="${zeroX}" y1="${PAD.top}" x2="${zeroX}" y2="${PAD.top + innerH}" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-dasharray="4,3"/>`;
 
   // Axis labels
-  s += `<text x="${PAD.left + innerW / 2}" y="${H - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="12">← Away-favoring · Foul Bias (Home PF − Away PF) · Home-favoring →</text>`;
+  s += `<text x="${PAD.left + innerW / 2}" y="${H - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="12">← Away-favoring · Adj. Foul Bias (vs league avg) · Home-favoring →</text>`;
   s += `<text x="13" y="${PAD.top + innerH / 2}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="12" transform="rotate(-90,13,${PAD.top + innerH / 2})">Fouls / Game</text>`;
 
   // Dots
@@ -3385,7 +3397,7 @@ function renderRefScatter(data) {
     const bias = parseFloat(r.foul_disparity);
     const fouls = parseFloat(r.avg_total_fouls);
     const cx = xS(bias), cy = yS(fouls);
-    const color = bias > 0.6 ? "#f87171" : bias < -0.2 ? "#4ade80" : "#8899b4";
+    const color = bias > 0.5 ? "#f87171" : bias < -0.5 ? "#4ade80" : "#8899b4";
     const radius = 6;
     s += `<circle class="ref-sc-dot" cx="${cx}" cy="${cy}" r="${radius}" fill="${color}" fill-opacity="0.82" stroke="rgba(255,255,255,0.15)" stroke-width="1" data-idx="${i}" style="cursor:pointer;transition:r 0.1s"/>`;
   });
@@ -3402,17 +3414,19 @@ function renderRefScatter(data) {
   const tip = $("#refScatterTooltip");
   newSvg.querySelectorAll(".ref-sc-dot").forEach(dot => {
     const r = data[parseInt(dot.dataset.idx)];
-    const bias = parseFloat(r.foul_disparity);
+    const bias = parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity);
     const rating = _refBiasRating(bias);
 
     dot.addEventListener("mouseenter", e => {
       dot.setAttribute("r", "9");
       if (!tip) return;
+      const erPct = r.error_rate_pct != null ? parseFloat(r.error_rate_pct) : null;
       tip.innerHTML = `
         <div class="sct-name">${escapeHtml(r.ref_name)}</div>
-        <div class="sct-row"><span>Foul Bias</span><span style="color:${bias > 0.6 ? "#f87171" : bias < -0.2 ? "#4ade80" : "#8899b4"}">${bias > 0 ? "+" : ""}${bias.toFixed(2)}</span></div>
+        <div class="sct-row"><span>Adj. Foul Bias</span><span style="color:${bias > 0.5 ? "#f87171" : bias < -0.5 ? "#4ade80" : "#8899b4"}">${bias > 0 ? "+" : ""}${bias.toFixed(2)}</span></div>
         <div class="sct-row"><span>Fouls/Game</span><span>${r.avg_total_fouls}</span></div>
         <div class="sct-row"><span>Games</span><span>${r.games}</span></div>
+        ${erPct != null ? `<div class="sct-row"><span>L2M Error Rate</span><span style="color:${erPct > 35 ? "#f87171" : erPct < 25 ? "#4ade80" : "#8899b4"}">${erPct.toFixed(1)}%</span></div>` : ""}
         <div class="sct-badge ${rating.cls}">${rating.label}</div>`;
       tip.style.display = "block";
     });
@@ -3454,7 +3468,7 @@ async function showRefDetail(name) {
     const verdict = $("#refDetailVerdict");
     verdict.textContent = rating.label;
     verdict.className = `ref-verdict-badge ${rating.cls}`;
-    renderRefStatCards(agg);
+    renderRefStatCards(agg, data.l2m || null);
     renderRefTeamBars(data.team_tendencies || []);
     renderRefSeasonChart(data.seasons || []);
   } catch {
@@ -3463,15 +3477,20 @@ async function showRefDetail(name) {
   }
 }
 
-function renderRefStatCards(agg) {
-  const fd = parseFloat(agg.foul_disparity) || 0;
-  const ftd = parseFloat(agg.fta_disparity) || 0;
+function renderRefStatCards(agg, l2m) {
+  const fd  = parseFloat(agg.adjusted_foul_disparity ?? agg.foul_disparity) || 0;
+  const ftd = parseFloat(agg.adjusted_fta_disparity  ?? agg.fta_disparity)  || 0;
   const hwp = (parseFloat(agg.home_win_pct) || 0) * 100;
+  const erPct = l2m && l2m.error_rate_pct != null ? parseFloat(l2m.error_rate_pct) : null;
+  const l2mTotal = l2m ? (parseInt(l2m.total) || 0) : 0;
   const cards = [
     { icon: "📢", label: "Fouls / Game", value: agg.avg_total_fouls || "—", sub: "total (both teams)", cls: "" },
-    { icon: "🏠", label: "Foul Bias", value: (fd > 0 ? "+" : "") + fd.toFixed(2), sub: "away minus home PF · positive = home advantage", cls: fd > 0.8 ? "ref-stat-high" : fd < -0.3 ? "ref-stat-low" : "" },
-    { icon: "🆓", label: "FTA Bias", value: (ftd > 0 ? "+" : "") + ftd.toFixed(2), sub: "away minus home free throw attempts", cls: ftd > 1.5 ? "ref-stat-high" : ftd < -0.5 ? "ref-stat-low" : "" },
+    { icon: "🏠", label: "Adj. Foul Bias", value: (fd > 0 ? "+" : "") + fd.toFixed(2), sub: "vs league avg · positive = more home advantage than normal", cls: fd > 0.5 ? "ref-stat-high" : fd < -0.5 ? "ref-stat-low" : "" },
+    { icon: "🆓", label: "Adj. FTA Bias",  value: (ftd > 0 ? "+" : "") + ftd.toFixed(2), sub: "vs league avg free throw disparity", cls: ftd > 1.0 ? "ref-stat-high" : ftd < -1.0 ? "ref-stat-low" : "" },
     { icon: "🏆", label: "Home Win %", value: hwp.toFixed(1) + "%", sub: "home team wins in officiated games", cls: hwp > 56 ? "ref-stat-high" : hwp < 46 ? "ref-stat-low" : "" },
+    erPct != null
+      ? { icon: "🎯", label: "L2M Error Rate", value: erPct.toFixed(1) + "%", sub: `${l2mTotal} late-game calls reviewed · lower = more accurate`, cls: erPct > 35 ? "ref-stat-high" : erPct < 25 ? "ref-stat-low" : "" }
+      : { icon: "🎯", label: "L2M Error Rate", value: "—", sub: "no L2M report data for this referee", cls: "" },
   ];
   $("#refStatCards").innerHTML = cards.map(c => `
     <div class="ref-stat-card ${c.cls}">
@@ -3744,16 +3763,20 @@ function _renderRefPlayerRows(refs, sortKey, leaguePf, maxPf) {
   const tbody = $("#refPlayerTableBody");
   if (!tbody) return;
   tbody.innerHTML = refs.map((r, i) => {
-    const diff = (r.avg_pf - leaguePf).toFixed(2);
-    const diffCls = parseFloat(diff) > 0.3 ? "ref-val-pos" : parseFloat(diff) < -0.3 ? "ref-val-neg" : "";
+    // Prefer ref-relative delta (controls for this ref's overall calling style); fall back to league avg
+    const hasDelta = r.delta_pf != null;
+    const delta = hasDelta ? r.delta_pf : (r.avg_pf - leaguePf);
+    const deltaLabel = hasDelta ? "vs ref avg" : "vs league avg";
+    const diff = parseFloat(delta).toFixed(2);
+    const diffCls = parseFloat(diff) > 0.2 ? "ref-val-pos" : parseFloat(diff) < -0.2 ? "ref-val-neg" : "";
     const pct = (r.avg_pf / maxPf * 100).toFixed(1);
-    const barColor = r.avg_pf > leaguePf + 0.5 ? "#f87171" : r.avg_pf < leaguePf - 0.3 ? "#4ade80" : "#8899b4";
+    const barColor = parseFloat(diff) > 0.3 ? "#f87171" : parseFloat(diff) < -0.3 ? "#4ade80" : "#8899b4";
     return `<tr>
       <td style="color:var(--muted);font-size:0.8rem;width:36px">#${i + 1}</td>
       <td style="font-weight:700">${escapeHtml(r.referee)}</td>
       <td style="color:var(--muted)">${r.games}</td>
       <td style="font-weight:700;font-variant-numeric:tabular-nums">${r.avg_pf}</td>
-      <td><span class="${diffCls}" style="font-weight:700;font-variant-numeric:tabular-nums">${parseFloat(diff) > 0 ? "+" : ""}${diff}</span></td>
+      <td title="${deltaLabel}"><span class="${diffCls}" style="font-weight:700;font-variant-numeric:tabular-nums">${parseFloat(diff) > 0 ? "+" : ""}${diff}</span><span style="color:var(--muted);font-size:0.72rem;margin-left:3px">${deltaLabel}</span></td>
       <td style="font-variant-numeric:tabular-nums">${r.avg_fta}</td>
       <td style="color:var(--muted);font-variant-numeric:tabular-nums">${r.avg_pts}</td>
       <td style="min-width:90px">

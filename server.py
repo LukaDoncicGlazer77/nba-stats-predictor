@@ -1956,18 +1956,25 @@ def _get_referee_player_stats(player_query: str):
             s["fta"]   += (row["fta"] or 0)
             s["pts"]   += (row["pts"] or 0)
 
+    baselines = _get_ref_baselines()
+
     MIN_GAMES = 5
     result_list = []
     for ref, s in ref_stats.items():
         g = s["games"]
         if g < MIN_GAMES:
             continue
+        avg_pf  = round(s["pf"]  / g, 2)
+        avg_fta = round(s["fta"] / g, 2)
+        bl = baselines.get(ref, {})
         result_list.append({
-            "referee":  ref,
-            "games":    g,
-            "avg_pf":   round(s["pf"]  / g, 2),
-            "avg_fta":  round(s["fta"] / g, 2),
-            "avg_pts":  round(s["pts"] / g, 1),
+            "referee":   ref,
+            "games":     g,
+            "avg_pf":    avg_pf,
+            "avg_fta":   avg_fta,
+            "avg_pts":   round(s["pts"] / g, 1),
+            "delta_pf":  round(avg_pf  - bl.get("avg_pf",  avg_pf),  2),
+            "delta_fta": round(avg_fta - bl.get("avg_fta", avg_fta), 2),
         })
 
     result_list.sort(key=lambda x: -x["avg_pf"])
@@ -1994,6 +2001,9 @@ _REF_STATS_TTL = 3600  # 1 hour
 _REF_DETAIL_CACHE = {}
 _REF_DETAIL_TTL = 600
 
+_REF_BASELINE_CACHE = {"data": None, "ts": 0}
+_REF_BASELINE_TTL = 3600
+
 _REF_AGGS_SQL = """
 WITH ref_games AS (
     SELECT ref1 AS ref_name, season, home_team, away_team,
@@ -2007,24 +2017,100 @@ WITH ref_games AS (
     SELECT ref3, season, home_team, away_team,
            home_pf, away_pf, home_fta, away_fta, home_pts, away_pts
     FROM archive_referee_games WHERE ref3 IS NOT NULL AND ref3 != ''
+),
+league_avg AS (
+    SELECT
+        AVG(CAST(away_pf  AS float) - home_pf)  AS avg_foul_disp,
+        AVG(CAST(away_fta AS float) - home_fta) AS avg_fta_disp
+    FROM archive_referee_games
+),
+l2m_stats AS (
+    SELECT lower(ref_name) AS ref_lower,
+        COUNT(*) AS l2m_total,
+        SUM(CASE WHEN decision IN ('INC','IC') THEN 1 ELSE 0 END) AS l2m_errors,
+        SUM(CASE WHEN decision = 'INC' THEN 1 ELSE 0 END) AS l2m_missed,
+        SUM(CASE WHEN decision = 'IC'  THEN 1 ELSE 0 END) AS l2m_wrong
+    FROM (
+        SELECT ref_1 AS ref_name, decision FROM archive_l2m
+        WHERE ref_1 IS NOT NULL AND ref_1 != '' AND decision IN ('CC','CNC','INC','IC')
+        UNION ALL
+        SELECT ref_2, decision FROM archive_l2m
+        WHERE ref_2 IS NOT NULL AND ref_2 != '' AND decision IN ('CC','CNC','INC','IC')
+        UNION ALL
+        SELECT ref_3, decision FROM archive_l2m
+        WHERE ref_3 IS NOT NULL AND ref_3 != '' AND decision IN ('CC','CNC','INC','IC')
+    ) l
+    GROUP BY lower(ref_name)
+),
+ref_aggs AS (
+    SELECT
+        ref_name,
+        COUNT(*) AS games,
+        ROUND(AVG(home_pf + away_pf)::numeric, 2) AS avg_total_fouls,
+        ROUND(AVG(home_pf)::numeric, 2) AS home_pf_avg,
+        ROUND(AVG(away_pf)::numeric, 2) AS away_pf_avg,
+        ROUND(AVG(CAST(away_pf  AS float) - home_pf)::numeric,  2) AS foul_disparity,
+        ROUND(AVG(home_fta)::numeric, 2) AS home_fta_avg,
+        ROUND(AVG(away_fta)::numeric, 2) AS away_fta_avg,
+        ROUND(AVG(CAST(away_fta AS float) - home_fta)::numeric, 2) AS fta_disparity,
+        ROUND(AVG(CASE WHEN home_pts > away_pts THEN 1.0 ELSE 0.0 END)::numeric, 3) AS home_win_pct
+    FROM ref_games
+    WHERE ref_name IS NOT NULL AND ref_name != ''
+    GROUP BY ref_name
+    HAVING COUNT(*) >= 20
 )
 SELECT
-    ref_name,
-    COUNT(*) AS games,
-    ROUND(AVG(home_pf + away_pf)::numeric, 2) AS avg_total_fouls,
-    ROUND(AVG(home_pf)::numeric, 2) AS home_pf_avg,
-    ROUND(AVG(away_pf)::numeric, 2) AS away_pf_avg,
-    ROUND(AVG(CAST(away_pf AS float) - home_pf)::numeric, 2) AS foul_disparity,
-    ROUND(AVG(home_fta)::numeric, 2) AS home_fta_avg,
-    ROUND(AVG(away_fta)::numeric, 2) AS away_fta_avg,
-    ROUND(AVG(CAST(away_fta AS float) - home_fta)::numeric, 2) AS fta_disparity,
-    ROUND(AVG(CASE WHEN home_pts > away_pts THEN 1.0 ELSE 0.0 END)::numeric, 3) AS home_win_pct
-FROM ref_games
-WHERE ref_name IS NOT NULL AND ref_name != ''
-GROUP BY ref_name
-HAVING COUNT(*) >= 20
-ORDER BY games DESC
+    r.ref_name,
+    r.games,
+    r.avg_total_fouls,
+    r.home_pf_avg,
+    r.away_pf_avg,
+    r.foul_disparity,
+    r.home_fta_avg,
+    r.away_fta_avg,
+    r.fta_disparity,
+    r.home_win_pct,
+    ROUND((r.foul_disparity - la.avg_foul_disp)::numeric,  2) AS adjusted_foul_disparity,
+    ROUND((r.fta_disparity  - la.avg_fta_disp)::numeric,   2) AS adjusted_fta_disparity,
+    COALESCE(l.l2m_total,  0) AS l2m_total,
+    COALESCE(l.l2m_errors, 0) AS l2m_errors,
+    COALESCE(l.l2m_missed, 0) AS l2m_missed,
+    COALESCE(l.l2m_wrong,  0) AS l2m_wrong,
+    ROUND((CAST(COALESCE(l.l2m_errors, 0) AS float) / NULLIF(COALESCE(l.l2m_total, 0), 0) * 100)::numeric, 1) AS error_rate_pct
+FROM ref_aggs r
+CROSS JOIN league_avg la
+LEFT JOIN l2m_stats l ON l.ref_lower = lower(r.ref_name)
+ORDER BY r.games DESC
 """
+
+def _get_ref_baselines():
+    """Per-ref avg PF and FTA per player per game, across all players. Used for ref-relative delta."""
+    now = time.time()
+    if _REF_BASELINE_CACHE["data"] is not None and now - _REF_BASELINE_CACHE["ts"] < _REF_BASELINE_TTL:
+        return _REF_BASELINE_CACHE["data"]
+    try:
+        with get_conn() as conn:
+            rows = q(conn, """
+                SELECT r.ref_name,
+                    ROUND(AVG(p.pf::float)::numeric,  3) AS avg_pf,
+                    ROUND(AVG(p.fta::float)::numeric, 3) AS avg_fta
+                FROM (
+                    SELECT ref1 AS ref_name, game_id FROM archive_referee_games WHERE ref1 IS NOT NULL AND ref1 != ''
+                    UNION ALL
+                    SELECT ref2, game_id FROM archive_referee_games WHERE ref2 IS NOT NULL AND ref2 != ''
+                    UNION ALL
+                    SELECT ref3, game_id FROM archive_referee_games WHERE ref3 IS NOT NULL AND ref3 != ''
+                ) r
+                JOIN archive_player_game_logs p ON p.game_id = r.game_id
+                GROUP BY r.ref_name
+            """)
+        data = {row["ref_name"]: {"avg_pf": float(row["avg_pf"] or 0), "avg_fta": float(row["avg_fta"] or 0)} for row in rows}
+        _REF_BASELINE_CACHE["data"] = data
+        _REF_BASELINE_CACHE["ts"] = now
+        return data
+    except Exception as exc:
+        print(f"ref baseline error: {exc}")
+        return {}
 
 def _get_referee_stats():
     now = time.time()
@@ -2088,10 +2174,29 @@ def _get_referee_detail(name: str):
                 ORDER BY pf_vs_avg DESC
             """, (name, name, name, name, name, name))
 
+            # L2M accuracy for this ref
+            l2m_rows = q(conn, """
+                SELECT
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN decision IN ('INC','IC') THEN 1 ELSE 0 END) AS errors,
+                    SUM(CASE WHEN decision = 'INC' THEN 1 ELSE 0 END) AS missed,
+                    SUM(CASE WHEN decision = 'IC'  THEN 1 ELSE 0 END) AS wrong,
+                    SUM(CASE WHEN decision = 'CC'  THEN 1 ELSE 0 END) AS correct_calls,
+                    SUM(CASE WHEN decision = 'CNC' THEN 1 ELSE 0 END) AS correct_non_calls
+                FROM archive_l2m
+                WHERE (lower(ref_1) = lower(%s) OR lower(ref_2) = lower(%s) OR lower(ref_3) = lower(%s))
+                  AND decision IN ('CC','CNC','INC','IC')
+            """, (name, name, name))
+            l2m = dict(l2m_rows[0]) if l2m_rows else {}
+            l2m_total = int(l2m.get("total") or 0)
+            l2m_errors = int(l2m.get("errors") or 0)
+            l2m["error_rate_pct"] = round(l2m_errors / l2m_total * 100, 1) if l2m_total else None
+
         data = {
             "name": name,
             "seasons": [dict(r) for r in season_rows],
             "team_tendencies": [dict(r) for r in team_rows],
+            "l2m": l2m,
         }
         _REF_DETAIL_CACHE[cache_key] = {"data": data, "ts": now}
         return data

@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260717-rptabs" />
+    <link rel="stylesheet" href="styles.css?v=20260725-refbias" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -1148,9 +1148,10 @@
                       <th class="ref-sort-col" data-col="ref_name">Referee</th>
                       <th class="ref-sort-col" data-col="games">Games</th>
                       <th class="ref-sort-col" data-col="avg_total_fouls">Fouls/G</th>
-                      <th class="ref-sort-col" data-col="foul_disparity" title="Home PF minus Away PF — positive = more fouls on away team">Foul Bias</th>
-                      <th class="ref-sort-col" data-col="fta_disparity" title="Away FTA minus Home FTA">FTA Bias</th>
+                      <th class="ref-sort-col" data-col="adjusted_foul_disparity" title="Foul disparity minus league average — isolates this ref's home bias from the universal home-court effect">Foul Bias†</th>
+                      <th class="ref-sort-col" data-col="adjusted_fta_disparity" title="FTA disparity minus league average">FTA Bias†</th>
                       <th class="ref-sort-col" data-col="home_win_pct">Home Win%</th>
+                      <th class="ref-sort-col" data-col="error_rate_pct" title="% of late-game calls graded Incorrect or Missed per NBA L2M reports">Error Rate</th>
                       <th>Bias Meter</th>
                       <th>Rating</th>
                     </tr>
@@ -1250,7 +1251,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260717-rptabs"></script>
+    <script src="app.js?v=20260725-refbias"></script>
 
     <!--Start of Tawk.to Script-->
     <script type="text/javascript">
