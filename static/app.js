@@ -973,21 +973,50 @@ function renderArchetypePanel(report, player) {
   const weights = Object.entries(report.archetype_weights)
     .filter(([, w]) => w > 1)
     .sort((a, b) => b[1] - a[1]);
+  const maxW = weights.length ? weights[0][1] : 100;
   const weightBars = weights
-    .map(
-      ([label, w]) => `<div><dt>${escapeHtml(label)}</dt><dd>${w}%</dd></div>`
-    )
+    .map(([label, w]) => {
+      const color = ARCHETYPE_COLOR[label] || "#7c5cff";
+      const barW = Math.round((w / maxW) * 100);
+      return `
+        <div class="arch-bar-row">
+          <div class="arch-bar-header">
+            <span class="arch-bar-dot" style="background:${color}"></span>
+            <span class="arch-bar-label">${escapeHtml(label)}</span>
+            <span class="arch-bar-pct">${w}%</span>
+          </div>
+          <div class="arch-bar-track">
+            <div class="arch-bar-fill" style="width:${barW}%;background:${color}"></div>
+          </div>
+        </div>`;
+    })
     .join("");
 
   const sameStageRows = (report.same_stage_comps || [])
-    .map(
-      (c) => `<li>${escapeHtml(c.player)} (${c.season}) &mdash; ${c.similarity}%<br><span class="comp-explanation">${escapeHtml(c.explanation || "")}</span></li>`
-    )
+    .map(c => `
+      <div class="comp-card">
+        <div class="comp-card-top">
+          <div>
+            <span class="comp-card-name">${escapeHtml(c.player)}</span>
+            <span class="comp-card-season">${c.season}</span>
+          </div>
+          <span class="comp-card-score">${c.similarity}%</span>
+        </div>
+        <p class="comp-card-explain">${escapeHtml(c.explanation || "")}</p>
+      </div>`)
     .join("");
   const projectedRows = (report.projected_engine_comps || [])
-    .map(
-      (c) => `<li>${escapeHtml(c.player)} (${c.season}) &mdash; ${c.engine_similarity}% engine match<br><span class="comp-explanation">${escapeHtml(c.explanation || "")}</span></li>`
-    )
+    .map(c => `
+      <div class="comp-card">
+        <div class="comp-card-top">
+          <div>
+            <span class="comp-card-name">${escapeHtml(c.player)}</span>
+            <span class="comp-card-season">${c.season}</span>
+          </div>
+          <span class="comp-card-score comp-card-score-engine">${c.engine_similarity}%</span>
+        </div>
+        <p class="comp-card-explain">${escapeHtml(c.explanation || "")}</p>
+      </div>`)
     .join("");
 
   const shotCreationHtml = report.college_shot_creation ? `
@@ -1040,15 +1069,15 @@ function renderArchetypePanel(report, player) {
   panel.innerHTML = `
     <div class="overview-top-row">
       <div class="profile-col">
-        <div class="pfact-grid">${weightBars}</div>
+        <div class="arch-bars-panel">${weightBars}</div>
         ${creationSignalsHtml}
         ${shotCreationHtml}
       </div>
       <div class="profile-col">
-        <p class="pcard-summary"><strong>Same-stage comps</strong> &mdash; strict &plusmn;2yr age/experience band, true statistical comparison:</p>
-        <ul class="pcard-notes">${sameStageRows}</ul>
-        <p class="pcard-summary" style="margin-top:14px;"><strong>Projected engine comps</strong> &mdash; scouting layer, no age band, offensive-engine match only:</p>
-        <ul class="pcard-notes">${projectedRows}</ul>
+        <p class="comp-section-label">Same-stage comps <span>±2yr age/experience band · statistical</span></p>
+        <div class="comp-cards">${sameStageRows}</div>
+        <p class="comp-section-label" style="margin-top:18px">Projected engine comps <span>scouting layer · engine match</span></p>
+        <div class="comp-cards">${projectedRows}</div>
       </div>
     </div>
   `;

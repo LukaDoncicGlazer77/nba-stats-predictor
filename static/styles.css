@@ -776,18 +776,18 @@ button, input, select { font: inherit; }
 .player-card:hover::before { opacity: 1; }
 
 .player-card-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 12px;
+  width: 76px;
+  height: 76px;
+  border-radius: 13px;
   display: grid;
   place-items: center;
   color: #fff;
   font-weight: 900;
-  font-size: 1.1rem;
-  margin-bottom: 12px;
+  font-size: 1.2rem;
+  margin-bottom: 14px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 .player-card-avatar img {
   position: absolute;
@@ -1740,8 +1740,8 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   transition: background 0.15s;
 }
 .profile-hero-statrow .hero-stat:hover { background: rgba(255,255,255,0.07); }
-.profile-hero-statrow .hero-stat strong { font-size: 1.5rem; }
-.profile-hero-statrow .hero-stat span { color: rgba(220,232,255,0.45); }
+.profile-hero-statrow .hero-stat strong { font-size: 1.6rem; }
+.profile-hero-statrow .hero-stat span { color: rgba(220,232,255,0.55); font-size: 0.72rem; letter-spacing: 0.04em; }
 
 /* Panes */
 .profile-pane {
@@ -5411,4 +5411,110 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .moment-source-note {
   font-size: 0.75rem; color: rgba(255,255,255,0.3);
   margin: 0 0 18px; font-style: italic;
+}
+
+/* ── Archetype bars (player profile archetype tab) ──────────────────────── */
+.arch-bars-panel { display: flex; flex-direction: column; gap: 10px; }
+.arch-bar-row { }
+.arch-bar-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+.arch-bar-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.arch-bar-label {
+  flex: 1;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(220,232,255,0.80);
+}
+.arch-bar-pct {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(220,232,255,0.90);
+  min-width: 36px;
+  text-align: right;
+}
+.arch-bar-track {
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.07);
+  overflow: hidden;
+}
+.arch-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  opacity: 0.75;
+  transition: width 0.4s cubic-bezier(.2,.8,.2,1);
+}
+
+/* ── Comp cards (same-stage + projected engine comps) ───────────────────── */
+.comp-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(220,232,255,0.40);
+  margin: 0 0 8px;
+}
+.comp-section-label span {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: rgba(220,232,255,0.28);
+  margin-left: 4px;
+}
+.comp-cards { display: flex; flex-direction: column; gap: 7px; }
+.comp-card {
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.comp-card:hover {
+  border-color: rgba(124,140,255,0.25);
+  background: rgba(255,255,255,0.05);
+}
+.comp-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.comp-card-name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: rgba(220,232,255,0.90);
+  margin-right: 6px;
+}
+.comp-card-season {
+  font-size: 0.72rem;
+  color: rgba(220,232,255,0.38);
+}
+.comp-card-score {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--accent-3);
+  background: rgba(34,211,238,0.10);
+  border-radius: 20px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.comp-card-score-engine {
+  color: var(--accent-1);
+  background: rgba(124,92,255,0.12);
+}
+.comp-card-explain {
+  margin: 0;
+  font-size: 0.74rem;
+  color: rgba(220,232,255,0.42);
+  line-height: 1.5;
 }
