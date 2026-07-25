@@ -2273,16 +2273,22 @@ def _prewarm_pool():
         print(f"Pre-warm failed (non-fatal): {exc}")
 
 
-def main():
+def _startup_tasks():
+    """Run all blocking startup work in a background thread so the server
+    binds and passes Railway's health check immediately."""
     ensure_users_table()
     ensure_feedback_table()
     ensure_referee_table()
     ensure_player_game_logs_table()
-    threading.Thread(target=_prewarm_pool, daemon=True).start()
-    threading.Thread(target=_flush_heartbeats, daemon=True).start()
+    _prewarm_pool()
+
+
+def main():
     port = int(os.environ.get("PORT", 8000))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Serving NBA predictor at http://0.0.0.0:{port}")
+    threading.Thread(target=_startup_tasks, daemon=True).start()
+    threading.Thread(target=_flush_heartbeats, daemon=True).start()
     server.serve_forever()
 
 
