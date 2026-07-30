@@ -5664,10 +5664,12 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   height: 100%; border-radius: 3px;
   transition: width .5s ease;
 }
-.grav-fill-3pt      { background: #7c5cff; }
-.grav-fill-contact  { background: #5b8cff; }
-.grav-fill-usage    { background: #1fe3a0; }
-.grav-fill-scoring  { background: #22d3ee; }
+.grav-fill-3pt        { background: #7c5cff; }
+.grav-fill-contact    { background: #5b8cff; }
+.grav-fill-usage      { background: #1fe3a0; }
+.grav-fill-scoring    { background: #22d3ee; }
+.grav-fill-diversity  { background: #f59e0b; }
+.grav-fill-playmaking { background: #a78bfa; }
 .grav-comp-val {
   font-size: 0.63rem;
   color: var(--muted);

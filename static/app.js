@@ -4201,6 +4201,16 @@ function renderGravitySpotlight(players) {
             <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-scoring" style="width:${p.pct_ts || 0}%"></div></div>
             <span class="grav-comp-val">${p.pct_ts || 0}th</span>
           </div>
+          <div class="grav-comp-row">
+            <span class="grav-comp-lbl">Zone Diversity</span>
+            <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-diversity" style="width:${p.pct_diversity || 0}%"></div></div>
+            <span class="grav-comp-val">${p.pct_diversity || 0}th</span>
+          </div>
+          <div class="grav-comp-row">
+            <span class="grav-comp-lbl">Playmaking</span>
+            <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-playmaking" style="width:${p.pct_playmaking || 0}%"></div></div>
+            <span class="grav-comp-val">${p.pct_playmaking || 0}th</span>
+          </div>
         </div>
       </div>`;
   }).join("");
@@ -4288,8 +4298,18 @@ function _gravityTooltip(p) {
   if (p.pct_ts >= 75)
     reasons.push(`highly efficient scorer (TS% ${p.pct_ts}th pct) — defenses can't sag`);
 
+  if ((p.pct_diversity || 0) >= 80)
+    reasons.push(`threatens from multiple zones — forces complex defensive assignments`);
+  else if ((p.pct_diversity || 0) >= 60)
+    reasons.push(`solid zone diversity — attacks both arc and rim`);
+
+  if ((p.pct_playmaking || 0) >= 75)
+    reasons.push(`elite playmaking gravity (${(p.ast_per_g||0).toFixed(1)} AST/G) — kick-out threat compounds scoring pressure`);
+  else if ((p.pct_playmaking || 0) >= 55)
+    reasons.push(`above-avg playmaking — can kick out to shooters`);
+
   if (p.versatility_bonus)
-    reasons.push(`⚡ Two-Way bonus: dangerous from both arc and contact`);
+    reasons.push(`⚡ Versatility bonus — elite in two complementary dimensions`);
 
   const why = reasons.length
     ? reasons.map(r => `<li>${r}</li>`).join("")
@@ -4309,6 +4329,8 @@ function _gravityTooltip(p) {
       <span style="color:#7c5cff">3PT ${p.pct_3pt}th</span>
       <span style="color:#5b8cff">Contact ${p.pct_contact}th</span>
       <span style="color:#1fe3a0">Usage ${p.pct_usage||0}th</span>
+      <span style="color:#f59e0b">Diversity ${p.pct_diversity||0}th</span>
+      <span style="color:#a78bfa">Playmaking ${p.pct_playmaking||0}th</span>
     </div>`;
 }
 
@@ -4537,7 +4559,19 @@ async function showGravityDetail(player) {
         <div class="grav-comp-card-bar"><div style="width:${player.pct_ts||0}%;background:#22d3ee"></div></div>
         <div class="grav-comp-card-stat">${(player.pts_per_g||0).toFixed(1)} PPG</div>
       </div>
-      ${player.versatility_bonus ? `<div class="grav-comp-card grav-comp-card-bonus"><span>⚡</span> Two-Way Threat bonus applied — elite in both perimeter and contact</div>` : ""}
+      <div class="grav-comp-card">
+        <div class="grav-comp-card-label" style="color:#f59e0b">Zone Diversity</div>
+        <div class="grav-comp-card-pct" style="color:#f59e0b">${player.pct_diversity||0}th pct</div>
+        <div class="grav-comp-card-bar"><div style="width:${player.pct_diversity||0}%;background:#f59e0b"></div></div>
+        <div class="grav-comp-card-stat">Arc rate + rim rate — threats from multiple zones</div>
+      </div>
+      <div class="grav-comp-card">
+        <div class="grav-comp-card-label" style="color:#a78bfa">Playmaking</div>
+        <div class="grav-comp-card-pct" style="color:#a78bfa">${player.pct_playmaking||0}th pct</div>
+        <div class="grav-comp-card-bar"><div style="width:${player.pct_playmaking||0}%;background:#a78bfa"></div></div>
+        <div class="grav-comp-card-stat">${(player.ast_per_g||0).toFixed(1)} AST/G — kick-out threat compounds scoring</div>
+      </div>
+      ${player.versatility_bonus ? `<div class="grav-comp-card grav-comp-card-bonus"><span>⚡</span> Versatility bonus — elite in two complementary dimensions</div>` : ""}
     `;
   }
 

@@ -1844,56 +1844,122 @@ def _pct_rank(vals, v):
         return 0.5
     return sum(1 for x in vals if x < v) / len(vals)
 
-def _compute_gravity_scores(rows, min_gp=20):
-    qualified = [r for r in rows if (r.get("gp") or 0) >= min_gp]
-    if len(qualified) < 3:
-        return qualified
+def _era_weights(season_year):
+    """Component weights that shift as the 3PT era evolved."""
+    if season_year <= 1980:   # pre-3PT: interior scoring was gravity
+        return {"3pt": 0.00, "contact": 0.38, "usage": 0.32, "ts": 0.14, "diversity": 0.16, "playmaking": 0.00}
+    elif season_year <= 1995: # early 3PT: minor arc threat, interior still dominant
+        return {"3pt": 0.12, "contact": 0.33, "usage": 0.28, "ts": 0.13, "diversity": 0.09, "playmaking": 0.05}
+    elif season_year <= 2010: # mid 3PT: arc threat growing
+        return {"3pt": 0.22, "contact": 0.28, "usage": 0.24, "ts": 0.12, "diversity": 0.09, "playmaking": 0.05}
+    else:                     # modern: 3PT is the primary defensive attention driver
+        return {"3pt": 0.30, "contact": 0.24, "usage": 0.21, "ts": 0.11, "diversity": 0.09, "playmaking": 0.05}
 
-    # Derive composite sub-metrics for each player
-    for r in qualified:
+def _score_season_group(group):
+    """Score one era-homogenous group (all from the same season) and return scored rows."""
+    if len(group) < 3:
+        for r in group:
+            r.update(gravity=50.0, pct_3pt=50.0, pct_contact=50.0,
+                     pct_usage=50.0, pct_ts=50.0, pct_diversity=50.0,
+                     pct_playmaking=50.0, versatility_bonus=False)
+        return group
+
+    season_year = group[0].get("season") or 2025
+    w = _era_weights(season_year)
+    pre_3pt = season_year <= 1980
+
+    for r in group:
         fga    = float(r.get("fga_per_g")  or 0)
         fta    = float(r.get("fta_per_g")  or 0)
         ft_pct = float(r.get("ft_pct")     or 0)
         pts    = float(r.get("pts_per_g")  or 0)
         tov    = float(r.get("tov_per_g")  or 0)
         mpg    = float(r.get("min_per_g")  or 1)
+        fg3a   = float(r.get("fg3a_per_g") or 0)
+        ast    = float(r.get("ast_per_g")  or 0)
 
-        # FTA × FT%: expected free-throw points from contact (quality-adjusted contact)
         r["_contact_quality"] = fta * ft_pct
 
-        # Possession usage per 48 min: captures ball-dominant stars who draw schemes/doubles
         possessions_used = fga + 0.44 * fta + tov
         r["_usage_rate"] = (possessions_used / max(mpg, 1)) * 48
 
-        # True Shooting %: efficient scorers create more gravity than chuckers
         ts_denom = 2 * (fga + 0.44 * fta)
         r["_ts_pct"] = pts / ts_denom if ts_denom > 0 else 0
 
-    # Build percentile distributions
-    perim_vals   = [float(r.get("fg3m_per_g") or 0) for r in qualified]
-    contact_vals = [r["_contact_quality"] for r in qualified]
-    usage_vals   = [r["_usage_rate"]      for r in qualified]
-    ts_vals      = [r["_ts_pct"]          for r in qualified]
+        # Zone diversity: reward players who threaten both the arc and the rim
+        perim_rate   = (fg3a / max(fga, 0.01)) if not pre_3pt else 0.0
+        interior_rate = min(fta / max(fga, 0.01), 1.5)
+        r["_diversity"] = perim_rate * 50 + interior_rate * 50
 
-    for r in qualified:
-        p_perim   = _pct_rank(perim_vals,   float(r.get("fg3m_per_g") or 0))
-        p_contact = _pct_rank(contact_vals, r["_contact_quality"])
-        p_usage   = _pct_rank(usage_vals,   r["_usage_rate"])
-        p_ts      = _pct_rank(ts_vals,      r["_ts_pct"])
+        # Playmaking gravity: assists relative to possessions consumed
+        r["_playmaking"] = ast / max(possessions_used, 0.01)
 
-        raw = 0.35 * p_perim + 0.28 * p_contact + 0.22 * p_usage + 0.15 * p_ts
+    perim_vals      = [float(r.get("fg3m_per_g") or 0) for r in group]
+    contact_vals    = [r["_contact_quality"] for r in group]
+    usage_vals      = [r["_usage_rate"]      for r in group]
+    ts_vals         = [r["_ts_pct"]          for r in group]
+    diversity_vals  = [r["_diversity"]       for r in group]
+    playmaking_vals = [r["_playmaking"]      for r in group]
 
-        # Versatility bonus: elite at both perimeter AND interior = extra defensive complexity
-        bonus = 0.05 if (p_perim >= 0.60 and p_contact >= 0.60) else 0
+    for r in group:
+        p_perim      = _pct_rank(perim_vals,      float(r.get("fg3m_per_g") or 0))
+        p_contact    = _pct_rank(contact_vals,    r["_contact_quality"])
+        p_usage      = _pct_rank(usage_vals,      r["_usage_rate"])
+        p_ts         = _pct_rank(ts_vals,         r["_ts_pct"])
+        p_diversity  = _pct_rank(diversity_vals,  r["_diversity"])
+        p_playmaking = _pct_rank(playmaking_vals, r["_playmaking"])
 
-        r["gravity"]     = min(round((raw + bonus) * 100, 1), 100.0)
-        r["pct_3pt"]     = round(p_perim   * 100, 1)
-        r["pct_contact"] = round(p_contact * 100, 1)
-        r["pct_usage"]   = round(p_usage   * 100, 1)
-        r["pct_ts"]      = round(p_ts      * 100, 1)
+        raw = (w["3pt"]        * p_perim
+             + w["contact"]    * p_contact
+             + w["usage"]      * p_usage
+             + w["ts"]         * p_ts
+             + w["diversity"]  * p_diversity
+             + w["playmaking"] * p_playmaking)
+
+        # Versatility bonus adapts to era
+        if pre_3pt:
+            bonus = 0.05 if (p_contact >= 0.65 and p_usage >= 0.65) else 0
+        else:
+            bonus = 0.05 if (p_perim >= 0.60 and p_contact >= 0.60) else 0
+
+        r["gravity"]          = min(round((raw + bonus) * 100, 1), 100.0)
+        r["pct_3pt"]          = round(p_perim      * 100, 1)
+        r["pct_contact"]      = round(p_contact    * 100, 1)
+        r["pct_usage"]        = round(p_usage      * 100, 1)
+        r["pct_ts"]           = round(p_ts         * 100, 1)
+        r["pct_diversity"]    = round(p_diversity  * 100, 1)
+        r["pct_playmaking"]   = round(p_playmaking * 100, 1)
         r["versatility_bonus"] = bonus > 0
 
-    return sorted(qualified, key=lambda x: -x["gravity"])
+    return group
+
+def _compute_gravity_scores(rows, min_gp=20, dedup=False):
+    """
+    Score players using era-normalized within-season percentile ranking.
+    If dedup=True, keep only each player's best season (for All Time view).
+    """
+    from collections import defaultdict
+    qualified = [r for r in rows if (r.get("gp") or 0) >= min_gp]
+    if not qualified:
+        return []
+
+    by_season = defaultdict(list)
+    for r in qualified:
+        by_season[r.get("season") or 0].append(r)
+
+    all_scored = []
+    for season_rows in by_season.values():
+        all_scored.extend(_score_season_group(season_rows))
+
+    if dedup:
+        best = {}
+        for r in all_scored:
+            pid = r.get("player_id")
+            if pid not in best or r["gravity"] > best[pid]["gravity"]:
+                best[pid] = r
+        all_scored = list(best.values())
+
+    return sorted(all_scored, key=lambda x: -x["gravity"])
 
 def _get_gravity_leaderboard(season=None):
     cache_key = str(season) if season else "all"
@@ -1923,26 +1989,29 @@ def _get_gravity_leaderboard(season=None):
                     GROUP BY player_id, season
                 """, (season,))
             else:
+                # Return one row per player+season so era-normalization works correctly
                 rows = q(conn, """
                     SELECT player_id,
                            MAX(player_name) AS player_name,
-                           NULL::text AS team_abbr,
-                           NULL::int AS season,
+                           STRING_AGG(DISTINCT team_abbr, '/') AS team_abbr,
+                           season,
                            SUM(gp)::int AS gp,
                            ROUND((SUM(gp * COALESCE(pts_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS pts_per_g,
+                           ROUND((SUM(gp * COALESCE(fga_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fga_per_g,
                            ROUND((SUM(gp * COALESCE(fg3m_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 2) AS fg3m_per_g,
                            ROUND((SUM(gp * COALESCE(fg3a_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fg3a_per_g,
                            ROUND((SUM(gp * COALESCE(fta_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fta_per_g,
                            ROUND((SUM(gp * COALESCE(fg3_pct, 0)) / NULLIF(SUM(gp), 0))::numeric, 3) AS fg3_pct,
                            ROUND((SUM(gp * COALESCE(ft_pct, 0)) / NULLIF(SUM(gp), 0))::numeric, 3) AS ft_pct,
                            ROUND((SUM(gp * COALESCE(ast_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS ast_per_g,
+                           ROUND((SUM(gp * COALESCE(tov_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS tov_per_g,
                            ROUND((SUM(gp * COALESCE(min_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS min_per_g
                     FROM archive_player_season_stats
-                    GROUP BY player_id
+                    GROUP BY player_id, season
                 """)
         rows = [dict(r) for r in rows]
-        min_gp = 20 if season else 100
-        scored = _compute_gravity_scores(rows, min_gp=min_gp)
+        # All Time: score within each era, then keep each player's peak season
+        scored = _compute_gravity_scores(rows, min_gp=20, dedup=(not season))
         result = {"players": scored, "season": season, "count": len(scored)}
         if scored:  # never cache an empty result — data may not be loaded yet
             _GRAVITY_CACHE[cache_key] = {"data": result, "ts": now}
@@ -1988,6 +2057,8 @@ def _get_gravity_player_career(player_id: str):
                     "pct_contact": player_row.get("pct_contact"),
                     "pct_usage": player_row.get("pct_usage"),
                     "pct_ts": player_row.get("pct_ts"),
+                    "pct_diversity": player_row.get("pct_diversity"),
+                    "pct_playmaking": player_row.get("pct_playmaking"),
                     "pts_per_g": float(s.get("pts_per_g") or 0),
                     "fg3m_per_g": float(s.get("fg3m_per_g") or 0),
                     "fg3a_per_g": float(s.get("fg3a_per_g") or 0),
