@@ -1938,7 +1938,8 @@ def _get_gravity_leaderboard(season=None):
         min_gp = 20 if season else 100
         scored = _compute_gravity_scores(rows, min_gp=min_gp)
         result = {"players": scored, "season": season, "count": len(scored)}
-        _GRAVITY_CACHE[cache_key] = {"data": result, "ts": now}
+        if scored:  # never cache an empty result — data may not be loaded yet
+            _GRAVITY_CACHE[cache_key] = {"data": result, "ts": now}
         return result
     except Exception as exc:
         return {"players": [], "error": str(exc), "season": season, "count": 0}
