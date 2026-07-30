@@ -4224,11 +4224,19 @@ function renderGravityTable(players, filter) {
   let rows = players;
   if (filter) {
     const q = filter.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    rows = players.filter(p => {
-      const name = p.player_name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-      const parts = name.split(/\s+/);
-      return parts.some(part => part.startsWith(q)) || name.includes(q);
-    });
+    rows = players
+      .filter(p => {
+        const name = p.player_name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        return name.split(/\s+/).some(part => part.startsWith(q)) || name.includes(q);
+      })
+      .sort((a, b) => {
+        const na = a.player_name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        const nb = b.player_name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        const aStarts = na.split(/\s+/).some(p => p.startsWith(q));
+        const bStarts = nb.split(/\s+/).some(p => p.startsWith(q));
+        if (aStarts !== bStarts) return aStarts ? -1 : 1;
+        return b.gravity - a.gravity; // within same group, keep gravity order
+      });
   }
 
   if (!rows.length) {
