@@ -1845,12 +1845,12 @@ def _compute_gravity_scores(rows, min_gp=20):
 
     # Derive composite sub-metrics for each player
     for r in qualified:
-        fga = r.get("fga_per_g") or 0
-        fta = r.get("fta_per_g") or 0
-        ft_pct = r.get("ft_pct") or 0
-        pts = r.get("pts_per_g") or 0
-        tov = r.get("tov_per_g") or 0
-        mpg = r.get("min_per_g") or 1
+        fga    = float(r.get("fga_per_g")  or 0)
+        fta    = float(r.get("fta_per_g")  or 0)
+        ft_pct = float(r.get("ft_pct")     or 0)
+        pts    = float(r.get("pts_per_g")  or 0)
+        tov    = float(r.get("tov_per_g")  or 0)
+        mpg    = float(r.get("min_per_g")  or 1)
 
         # FTA × FT%: expected free-throw points from contact (quality-adjusted contact)
         r["_contact_quality"] = fta * ft_pct
@@ -1864,13 +1864,13 @@ def _compute_gravity_scores(rows, min_gp=20):
         r["_ts_pct"] = pts / ts_denom if ts_denom > 0 else 0
 
     # Build percentile distributions
-    perim_vals   = [r.get("fg3m_per_g") or 0 for r in qualified]
+    perim_vals   = [float(r.get("fg3m_per_g") or 0) for r in qualified]
     contact_vals = [r["_contact_quality"] for r in qualified]
     usage_vals   = [r["_usage_rate"]      for r in qualified]
     ts_vals      = [r["_ts_pct"]          for r in qualified]
 
     for r in qualified:
-        p_perim   = _pct_rank(perim_vals,   r.get("fg3m_per_g") or 0)
+        p_perim   = _pct_rank(perim_vals,   float(r.get("fg3m_per_g") or 0))
         p_contact = _pct_rank(contact_vals, r["_contact_quality"])
         p_usage   = _pct_rank(usage_vals,   r["_usage_rate"])
         p_ts      = _pct_rank(ts_vals,      r["_ts_pct"])
