@@ -4223,11 +4223,11 @@ function renderGravityTable(players, filter) {
 
   let rows = players;
   if (filter) {
-    const q = filter.toLowerCase();
+    const q = filter.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     rows = players.filter(p => {
-      const name = p.player_name.toLowerCase();
-      const parts = name.split(" ");
-      return parts.some(part => part.startsWith(q));
+      const name = p.player_name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const parts = name.split(/\s+/);
+      return parts.some(part => part.startsWith(q)) || name.includes(q);
     });
   }
 
