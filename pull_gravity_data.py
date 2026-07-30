@@ -18,7 +18,7 @@ DATABASE_URL = os.environ.get(
     "postgresql://postgres.ovgnihzycxdjzouurpfz:statfuel.online@aws-1-us-west-2.pooler.supabase.com:6543/postgres?sslmode=require"
 )
 
-SEASONS = [f"{y}-{str(y+1)[2:]}" for y in range(2014, 2025)]  # 2014-15 → 2024-25
+SEASONS = [f"{y}-{str(y+1)[2:]}" for y in range(2014, 2026)]  # 2014-15 → 2025-26
 SLEEP = 1.2
 
 
