@@ -4318,7 +4318,7 @@ function renderGravityScatter(players) {
 
   const W = svgEl.parentElement.clientWidth || 680;
   const H = Math.min(Math.max(W * 0.55, 280), 440);
-  const PAD = { top: 28, right: 32, bottom: 50, left: 56 };
+  const PAD = { top: 28, right: 72, bottom: 50, left: 56 };
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
 
@@ -4365,6 +4365,31 @@ function renderGravityScatter(players) {
   // Axis labels
   s += `<text x="${PAD.left + innerW / 2}" y="${H - 4}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="11">Usage Rate Percentile →</text>`;
   s += `<text x="13" y="${PAD.top + innerH / 2}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="11" transform="rotate(-90,13,${PAD.top + innerH / 2})">Contact Quality Percentile →</text>`;
+
+  // Legend — color scale (gravity) + size guide (3PT threat)
+  const lgX = PAD.left + innerW + 8;
+  const lgY = PAD.top;
+  s += `<text x="${lgX}" y="${lgY - 2}" fill="rgba(255,255,255,0.5)" font-size="9" font-weight="600">Gravity</text>`;
+  const colorStops = [
+    { label: "Elite", color: "#22c55e" },
+    { label: "High",  color: "#84cc16" },
+    { label: "Solid", color: "#eab308" },
+    { label: "Avg",   color: "#f97316" },
+    { label: "Low",   color: "#ef4444" },
+  ];
+  colorStops.forEach((stop, i) => {
+    const cy2 = lgY + 10 + i * 16;
+    s += `<circle cx="${lgX + 5}" cy="${cy2}" r="5" fill="${stop.color}" fill-opacity="0.85"/>`;
+    s += `<text x="${lgX + 13}" y="${cy2 + 4}" fill="rgba(255,255,255,0.45)" font-size="9">${stop.label}</text>`;
+  });
+
+  const szY = lgY + 10 + colorStops.length * 16 + 10;
+  s += `<text x="${lgX}" y="${szY}" fill="rgba(255,255,255,0.5)" font-size="9" font-weight="600">3PT Threat</text>`;
+  [{ r: 3.5, label: "Low" }, { r: 6, label: "Mid" }, { r: 8.5, label: "High" }].forEach((item, i) => {
+    const cy2 = szY + 12 + i * 18;
+    s += `<circle cx="${lgX + 5}" cy="${cy2}" r="${item.r}" fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>`;
+    s += `<text x="${lgX + 13}" y="${cy2 + 4}" fill="rgba(255,255,255,0.4)" font-size="9">${item.label}</text>`;
+  });
 
   // Dots — sorted so high-gravity dots render on top; size = 3PT threat
   const sorted = [...players].sort((a, b) => a.gravity - b.gravity);
