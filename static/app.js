@@ -4600,6 +4600,16 @@ function _renderGravityCareerChart(seasons) {
 // Wire up gravity controls
 document.addEventListener("DOMContentLoaded", () => {
   const seasonSel = $("#gravitySeason");
+
+  // Populate season dropdown: 2026 down to 1976
+  if (seasonSel) {
+    for (let y = 2026; y >= 1976; y--) {
+      const opt = document.createElement("option");
+      opt.value = String(y);
+      opt.textContent = `${y - 1}–${String(y).slice(2)}`;
+      seasonSel.appendChild(opt);
+    }
+  }
   const searchEl  = $("#gravitySearch");
   const backBtn   = $("#gravBackBtn");
 

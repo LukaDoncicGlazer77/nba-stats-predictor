@@ -1,24 +1,24 @@
 """
-Pull per-game season stats for all NBA players using LeagueDashPlayerStats.
-Run locally (stats.nba.com blocks datacenter IPs — cannot run on Railway).
+Pull per-game season stats for all NBA players using LeagueLeaders (Totals).
+Supports seasons back to 1975-76. Run locally (stats.nba.com blocked on Railway).
 
-~11 API calls total, completes in under 60 seconds.
+~51 API calls, completes in ~2 minutes.
 
 Usage:
-    python3 pull_gravity_data.py              # all seasons 2014-15 to 2024-25
-    python3 pull_gravity_data.py --season 2025  # single season (integer year)
+    python3 pull_gravity_data.py              # all seasons 1975-76 to 2025-26
+    python3 pull_gravity_data.py --season 2026  # single season (integer year)
 """
 
 import os, sys, time
 import psycopg2, psycopg2.extras
-from nba_api.stats.endpoints import LeagueDashPlayerStats
+from nba_api.stats.endpoints import LeagueLeaders
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://postgres.ovgnihzycxdjzouurpfz:statfuel.online@aws-1-us-west-2.pooler.supabase.com:6543/postgres?sslmode=require"
-)
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise SystemExit("Set DATABASE_URL environment variable before running.")
 
-SEASONS = [f"{y}-{str(y+1)[2:]}" for y in range(2014, 2026)]  # 2014-15 → 2025-26
+# 1975-76 → 2025-26  (season integer = ending year)
+SEASONS = [f"{y}-{str(y+1)[2:]}" for y in range(1975, 2026)]
 SLEEP = 1.2
 
 
@@ -60,11 +60,12 @@ def pull_season(season_str, conn):
     year = int(season_str.split("-")[0]) + 1  # "2024-25" → 2025
     print(f"  Fetching {season_str} (season={year})…", end=" ", flush=True)
     try:
-        df = LeagueDashPlayerStats(
+        df = LeagueLeaders(
             season=season_str,
-            per_mode_detailed="PerGame",
-            measure_type_detailed_defense="Base",
+            stat_category_abbreviation="PTS",
+            per_mode48="Totals",
             season_type_all_star="Regular Season",
+            league_id="00",
         ).get_data_frames()[0]
     except Exception as exc:
         print(f"ERROR: {exc}")
@@ -72,28 +73,41 @@ def pull_season(season_str, conn):
 
     rows = []
     for _, r in df.iterrows():
-        if (r.get("GP") or 0) < 5:
+        gp = int(r.get("GP") or 0)
+        if gp < 5:
             continue
-        fg3_pct = float(r["FG3_PCT"]) if r.get("FG3_PCT") is not None else 0.0
-        ft_pct  = float(r["FT_PCT"])  if r.get("FT_PCT")  is not None else 0.0
+        mn  = float(r.get("MIN") or 0)
+        pts = float(r.get("PTS") or 0)
+        fgm = float(r.get("FGM") or 0)
+        fga = float(r.get("FGA") or 0)
+        fg3m = float(r.get("FG3M") or 0)
+        fg3a = float(r.get("FG3A") or 0)
+        ftm  = float(r.get("FTM") or 0)
+        fta  = float(r.get("FTA") or 0)
+        ast  = float(r.get("AST") or 0)
+        tov  = float(r.get("TOV") or 0)
+
+        fg3_pct = (fg3m / fg3a) if fg3a > 0 else 0.0
+        ft_pct  = (ftm  / fta)  if fta  > 0 else 0.0
+
         rows.append((
             str(int(r["PLAYER_ID"])),
-            str(r["PLAYER_NAME"]),
-            str(r.get("TEAM_ABBREVIATION") or ""),
+            str(r["PLAYER"]),
+            str(r.get("TEAM") or ""),
             year,
-            int(r["GP"]),
-            round(float(r.get("MIN") or 0), 1),
-            round(float(r.get("PTS") or 0), 1),
-            round(float(r.get("FGM") or 0), 2),
-            round(float(r.get("FGA") or 0), 1),
-            round(float(r.get("FG3M") or 0), 2),
-            round(float(r.get("FG3A") or 0), 1),
-            round(float(r.get("FTM") or 0), 2),
-            round(float(r.get("FTA") or 0), 1),
-            fg3_pct,
-            ft_pct,
-            round(float(r.get("AST") or 0), 1),
-            round(float(r.get("TOV") or 0), 1),
+            gp,
+            round(mn  / gp, 1),
+            round(pts / gp, 1),
+            round(fgm / gp, 2),
+            round(fga / gp, 1),
+            round(fg3m / gp, 2),
+            round(fg3a / gp, 1),
+            round(ftm  / gp, 2),
+            round(fta  / gp, 1),
+            round(fg3_pct, 3),
+            round(ft_pct,  3),
+            round(ast  / gp, 1),
+            round(tov  / gp, 1),
         ))
 
     with conn.cursor() as cur:
