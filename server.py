@@ -2285,6 +2285,8 @@ def _get_referee_player_stats(player_query: str):
     if not rows:
         return {"error": f"No matched games found for {player_name}. Data may not be loaded yet."}
 
+    import math
+
     all_game_ids = set()
     ref_stats = {}
     for row in rows:
@@ -2295,14 +2297,23 @@ def _get_referee_player_stats(player_query: str):
             if not ref:
                 continue
             if ref not in ref_stats:
-                ref_stats[ref] = {"games": 0, "pf": 0, "fta": 0, "pts": 0}
-            s = ref_stats[ref]
-            s["games"] += 1
-            s["pf"]    += (row["pf"]  or 0)
-            s["fta"]   += (row["fta"] or 0)
-            s["pts"]   += (row["pts"] or 0)
+                ref_stats[ref] = {"games": 0, "pf": 0, "fta": 0, "pts": 0,
+                                  "pf_sq": 0, "fta_sq": 0}
+            s  = ref_stats[ref]
+            pf  = float(row["pf"]  or 0)
+            fta = float(row["fta"] or 0)
+            s["games"]  += 1
+            s["pf"]     += pf
+            s["fta"]    += fta
+            s["pts"]    += float(row["pts"] or 0)
+            s["pf_sq"]  += pf  * pf
+            s["fta_sq"] += fta * fta
 
-    baselines = _get_ref_baselines()
+    # Player's own career averages across ALL matched games — used as baseline
+    # for opponent-adjusted delta (better than cross-player league average).
+    total_games_in_refs = sum(s["games"] for s in ref_stats.values())
+    avg_pf_all  = sum(s["pf"]  for s in ref_stats.values()) / max(total_games_in_refs, 1)
+    avg_fta_all = sum(s["fta"] for s in ref_stats.values()) / max(total_games_in_refs, 1)
 
     MIN_GAMES = 5
     result_list = []
@@ -2310,24 +2321,40 @@ def _get_referee_player_stats(player_query: str):
         g = s["games"]
         if g < MIN_GAMES:
             continue
-        avg_pf  = round(s["pf"]  / g, 2)
-        avg_fta = round(s["fta"] / g, 2)
-        bl = baselines.get(ref, {})
+        avg_pf  = s["pf"]  / g
+        avg_fta = s["fta"] / g
+
+        # Opponent-adjusted delta: how much more/less does this ref call on THIS
+        # player vs this player's average across all referees.
+        delta_pf  = avg_pf  - avg_pf_all
+        delta_fta = avg_fta - avg_fta_all
+
+        # Per-ref standard deviation and two-tailed p-value for PF delta
+        var_pf = (s["pf_sq"] / g) - (avg_pf ** 2)
+        sd_pf  = math.sqrt(max(var_pf, 0))
+        se_pf  = sd_pf / math.sqrt(g) if g > 1 else 0
+        if se_pf > 0:
+            z = abs(delta_pf) / se_pf
+            p_pf = math.erfc(z / math.sqrt(2))
+        else:
+            p_pf = None
+
         result_list.append({
             "referee":   ref,
             "games":     g,
-            "avg_pf":    avg_pf,
-            "avg_fta":   avg_fta,
+            "avg_pf":    round(avg_pf,  2),
+            "avg_fta":   round(avg_fta, 2),
             "avg_pts":   round(s["pts"] / g, 1),
-            "delta_pf":  round(avg_pf  - bl.get("avg_pf",  avg_pf),  2),
-            "delta_fta": round(avg_fta - bl.get("avg_fta", avg_fta), 2),
+            "delta_pf":  round(delta_pf,  2),
+            "delta_fta": round(delta_fta, 2),
+            "p_value":   round(p_pf, 4) if p_pf is not None else None,
+            "sig":       _sig_label(p_pf),
         })
 
     result_list.sort(key=lambda x: -x["avg_pf"])
 
-    total_games_in_refs = sum(s["games"] for s in ref_stats.values())
-    avg_pf_all  = round(sum(s["pf"]  for s in ref_stats.values()) / max(total_games_in_refs, 1), 2)
-    avg_fta_all = round(sum(s["fta"] for s in ref_stats.values()) / max(total_games_in_refs, 1), 2)
+    avg_pf_all  = round(avg_pf_all,  2)
+    avg_fta_all = round(avg_fta_all, 2)
 
     result = {
         "player":        player_name,
@@ -2430,9 +2457,11 @@ ref_aggs AS (
         ROUND(AVG(home_pf)::numeric, 2) AS home_pf_avg,
         ROUND(AVG(away_pf)::numeric, 2) AS away_pf_avg,
         ROUND(AVG(CAST(away_pf  AS float) - home_pf)::numeric,  2) AS foul_disparity,
+        ROUND(STDDEV(CAST(away_pf  AS float) - home_pf)::numeric, 3) AS foul_disp_sd,
         ROUND(AVG(home_fta)::numeric, 2) AS home_fta_avg,
         ROUND(AVG(away_fta)::numeric, 2) AS away_fta_avg,
         ROUND(AVG(CAST(away_fta AS float) - home_fta)::numeric, 2) AS fta_disparity,
+        ROUND(STDDEV(CAST(away_fta AS float) - home_fta)::numeric, 3) AS fta_disp_sd,
         ROUND(AVG(CASE WHEN home_pts > away_pts THEN 1.0 ELSE 0.0 END)::numeric, 3) AS home_win_pct
     FROM ref_games
     WHERE ref_name IS NOT NULL AND ref_name != ''
@@ -2446,9 +2475,11 @@ SELECT
     r.home_pf_avg,
     r.away_pf_avg,
     r.foul_disparity,
+    r.foul_disp_sd,
     r.home_fta_avg,
     r.away_fta_avg,
     r.fta_disparity,
+    r.fta_disp_sd,
     r.home_win_pct,
     ROUND((r.foul_disparity - la.avg_foul_disp)::numeric,  2) AS adjusted_foul_disparity,
     ROUND((r.fta_disparity  - la.avg_fta_disp)::numeric,   2) AS adjusted_fta_disparity,
@@ -2503,6 +2534,24 @@ def _get_ref_baselines():
         print(f"ref baseline error: {exc}")
         return {}
 
+def _p_value_two_tailed(mean, sd, n):
+    """Approximate two-tailed p-value for H0: mean=0 using normal approximation."""
+    import math
+    if not sd or sd <= 0 or n < 2:
+        return None
+    se = sd / math.sqrt(n)
+    z = abs(mean) / se
+    # erfc(z/sqrt(2)) gives the two-tailed p-value under normal approx
+    p = math.erfc(z / math.sqrt(2))
+    return round(p, 4)
+
+def _sig_label(p):
+    if p is None:    return "unknown"
+    if p < 0.01:     return "very_high"
+    if p < 0.05:     return "high"
+    if p < 0.10:     return "moderate"
+    return "low"
+
 def _get_referee_stats():
     now = time.time()
     if _REF_STATS_CACHE["data"] is not None and now - _REF_STATS_CACHE["ts"] < _REF_STATS_TTL:
@@ -2510,7 +2559,16 @@ def _get_referee_stats():
     try:
         with get_conn() as conn:
             rows = q(conn, _REF_AGGS_SQL)
-        result = [dict(r) for r in rows]
+        result = []
+        for r in rows:
+            d = dict(r)
+            n   = d.get("games") or 0
+            sd  = float(d.get("foul_disp_sd") or 0)
+            adj = float(d.get("adjusted_foul_disparity") or 0)
+            p   = _p_value_two_tailed(adj, sd, n)
+            d["foul_disp_p"]   = p
+            d["foul_disp_sig"] = _sig_label(p)
+            result.append(d)
         _REF_STATS_CACHE["data"] = result
         _REF_STATS_CACHE["ts"] = now
         return result

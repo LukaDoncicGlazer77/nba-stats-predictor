@@ -5844,6 +5844,17 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 
 .grav-table-row:hover { background: rgba(255,255,255,0.03); }
 
+.ref-sig-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: help;
+}
+
 @media (max-width: 900px) {
   .grav-detail-components { grid-template-columns: repeat(2, 1fr); }
   .grav-detail-stats-grid  { grid-template-columns: repeat(4, 1fr); }

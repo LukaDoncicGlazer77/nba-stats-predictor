@@ -3808,9 +3808,10 @@ function renderRefPlayerResult(data, moments) {
                 <th>Referee</th>
                 <th>Games</th>
                 <th>Avg PF/Game</th>
-                <th>vs League Avg</th>
+                <th title="Player's avg PF under this ref vs their career avg across all refs">vs Player Avg</th>
                 <th>Avg FTA/Game</th>
                 <th>Avg PTS/Game</th>
+                <th title="Statistical confidence that the bias is real, not noise">Confidence</th>
                 <th>Foul Meter</th>
               </tr>
             </thead>
@@ -3905,23 +3906,30 @@ function _renderMoments(moments) {
 function _renderRefPlayerRows(refs, sortKey, leaguePf, maxPf) {
   const tbody = $("#refPlayerTableBody");
   if (!tbody) return;
+  const sigMeta = {
+    very_high: { label: "p<1%",  color: "#22c55e", title: "Very high confidence — result is statistically significant at p<0.01" },
+    high:      { label: "p<5%",  color: "#84cc16", title: "High confidence — significant at p<0.05" },
+    moderate:  { label: "p<10%", color: "#eab308", title: "Moderate confidence — significant at p<0.10" },
+    low:       { label: "noisy", color: "#6b7280", title: "Low confidence — could be random variation (p≥0.10). More games needed." },
+    unknown:   { label: "—",     color: "#6b7280", title: "Insufficient data to compute significance" },
+  };
   tbody.innerHTML = refs.map((r, i) => {
-    // Prefer ref-relative delta (controls for this ref's overall calling style); fall back to league avg
-    const hasDelta = r.delta_pf != null;
-    const delta = hasDelta ? r.delta_pf : (r.avg_pf - leaguePf);
-    const deltaLabel = hasDelta ? "vs ref avg" : "vs league avg";
-    const diff = parseFloat(delta).toFixed(2);
-    const diffCls = parseFloat(diff) > 0.2 ? "ref-val-pos" : parseFloat(diff) < -0.2 ? "ref-val-neg" : "";
-    const pct = (r.avg_pf / maxPf * 100).toFixed(1);
+    const delta    = r.delta_pf != null ? r.delta_pf : (r.avg_pf - leaguePf);
+    const diff     = parseFloat(delta).toFixed(2);
+    const diffCls  = parseFloat(diff) > 0.2 ? "ref-val-pos" : parseFloat(diff) < -0.2 ? "ref-val-neg" : "";
+    const pct      = (r.avg_pf / maxPf * 100).toFixed(1);
     const barColor = parseFloat(diff) > 0.3 ? "#f87171" : parseFloat(diff) < -0.3 ? "#4ade80" : "#8899b4";
+    const sig      = sigMeta[r.sig || "unknown"];
+    const pTip     = r.p_value != null ? ` (p=${r.p_value})` : "";
     return `<tr>
       <td style="color:var(--muted);font-size:0.8rem;width:36px">#${i + 1}</td>
       <td style="font-weight:700">${escapeHtml(r.referee)}</td>
       <td style="color:var(--muted)">${r.games}</td>
       <td style="font-weight:700;font-variant-numeric:tabular-nums">${r.avg_pf}</td>
-      <td title="${deltaLabel}"><span class="${diffCls}" style="font-weight:700;font-variant-numeric:tabular-nums">${parseFloat(diff) > 0 ? "+" : ""}${diff}</span><span style="color:var(--muted);font-size:0.72rem;margin-left:3px">${deltaLabel}</span></td>
+      <td><span class="${diffCls}" style="font-weight:700;font-variant-numeric:tabular-nums">${parseFloat(diff) > 0 ? "+" : ""}${diff}</span><span style="color:var(--muted);font-size:0.72rem;margin-left:3px">vs player avg</span></td>
       <td style="font-variant-numeric:tabular-nums">${r.avg_fta}</td>
       <td style="color:var(--muted);font-variant-numeric:tabular-nums">${r.avg_pts}</td>
+      <td><span class="ref-sig-badge" style="background:${sig.color}22;color:${sig.color};border:1px solid ${sig.color}44" title="${sig.title}${pTip}">${sig.label}</span></td>
       <td style="min-width:90px">
         <div class="ref-pmeter-wrap">
           <div class="ref-pmeter-fill" style="width:${pct}%;background:${barColor}"></div>
