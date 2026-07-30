@@ -3971,7 +3971,10 @@ if (refPlayerInput) {
   refPlayerInput.addEventListener("input", () => {
     const q = refPlayerInput.value.trim().toLowerCase();
     if (!q) { refPlayerDropdown.style.display = "none"; return; }
-    const matches = _allRefPlayers.filter(n => n.toLowerCase().includes(q)).slice(0, 8);
+    const ql = q.toLowerCase();
+    const starts = _allRefPlayers.filter(n => n.toLowerCase().startsWith(ql));
+    const contains = _allRefPlayers.filter(n => !n.toLowerCase().startsWith(ql) && n.toLowerCase().includes(ql));
+    const matches = [...starts, ...contains].slice(0, 10);
     _showRefDropdown(matches);
   });
 

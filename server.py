@@ -1877,21 +1877,26 @@ _AVAILABLE_PLAYERS_CACHE = {"data": None, "ts": 0}
 
 def _get_available_players():
     now = time.time()
-    if _AVAILABLE_PLAYERS_CACHE["data"] and now - _AVAILABLE_PLAYERS_CACHE["ts"] < 3600:
+    if _AVAILABLE_PLAYERS_CACHE["data"] and now - _AVAILABLE_PLAYERS_CACHE["ts"] < 86400:
         return _AVAILABLE_PLAYERS_CACHE["data"]
     try:
-        with get_conn() as conn:
-            rows = q(conn, """
-                SELECT DISTINCT player_name
-                FROM archive_player_game_logs
-                ORDER BY player_name
-            """)
-        names = [r["player_name"] for r in rows]
+        from nba_api.stats.static import players as nba_players
+        all_players = nba_players.get_players()
+        names = sorted(p["full_name"] for p in all_players)
         _AVAILABLE_PLAYERS_CACHE["data"] = {"players": names}
         _AVAILABLE_PLAYERS_CACHE["ts"] = now
         return _AVAILABLE_PLAYERS_CACHE["data"]
     except Exception as exc:
-        return {"players": [], "error": str(exc)}
+        # Fallback to DB if static list unavailable
+        try:
+            with get_conn() as conn:
+                rows = q(conn, "SELECT DISTINCT player_name FROM archive_player_game_logs ORDER BY player_name")
+            names = [r["player_name"] for r in rows]
+            _AVAILABLE_PLAYERS_CACHE["data"] = {"players": names}
+            _AVAILABLE_PLAYERS_CACHE["ts"] = now
+            return _AVAILABLE_PLAYERS_CACHE["data"]
+        except Exception as exc2:
+            return {"players": [], "error": str(exc2)}
 
 def _get_referee_player_stats(player_query: str):
     now = time.time()
@@ -1921,7 +1926,24 @@ def _get_referee_player_stats(player_query: str):
                 """, tuple(f"%{w}%" for w in words))
 
             if not player_rows:
-                return {"error": f"Player not found: {player_query}. Try a star player like LeBron James, Luka Doncic, or Stephen Curry."}
+                # Check if they exist in the static NBA player list (for better error messaging)
+                try:
+                    from nba_api.stats.static import players as nba_players
+                    import unicodedata
+                    def _norm(s):
+                        nfkd = unicodedata.normalize("NFKD", s.lower())
+                        return "".join(c for c in nfkd if not unicodedata.combining(c))
+                    q_norm = _norm(player_query.strip())
+                    all_nba = nba_players.get_players()
+                    matched = next((p for p in all_nba if _norm(p["full_name"]) == q_norm), None)
+                    if not matched:
+                        matched = next((p for p in all_nba if q_norm in _norm(p["full_name"])), None)
+                    if matched:
+                        era = "active" if matched["is_active"] else "historic"
+                        return {"error": f"Game-level data for {matched['full_name']} isn't loaded yet. Only star players from 2014–2025 are currently available."}
+                except Exception:
+                    pass
+                return {"error": f"Player not found: {player_query}. Try LeBron James, Luka Doncic, or Stephen Curry."}
 
             player_name = player_rows[0]["player_name"]
             player_id   = player_rows[0]["player_id"]
