@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260730-playersearch" />
+    <link rel="stylesheet" href="styles.css?v=20260730-gravity" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -423,6 +423,10 @@
           </button></li>
 
           <li class="nav-heading">LEAGUE TOOLS</li>
+          <li><button class="nav-item" data-section="gravity">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 4v4l2.5 2.5"/><path d="M4.5 4.5l7 7"/></svg>
+            Defensive Gravity
+          </button></li>
           <li><button class="nav-item" data-section="referee-bias">
             <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>
             Referee Bias
@@ -1101,6 +1105,67 @@
           </div>
         </section>
 
+        <!-- Defensive Gravity Section -->
+        <section class="page hidden" id="page-gravity">
+          <div class="page-header">
+            <div>
+              <h2>Defensive Gravity</h2>
+              <p class="page-subtitle" id="gravitySubtitle">Loading gravity data&hellip;</p>
+            </div>
+            <div class="page-controls" style="gap:10px">
+              <select id="gravitySeason" class="sf-select" style="min-width:130px">
+                <option value="">All Time</option>
+                <option value="2025">2024-25</option>
+                <option value="2024">2023-24</option>
+                <option value="2023">2022-23</option>
+                <option value="2022">2021-22</option>
+                <option value="2021">2020-21</option>
+                <option value="2020">2019-20</option>
+                <option value="2019">2018-19</option>
+                <option value="2018">2017-18</option>
+                <option value="2017">2016-17</option>
+                <option value="2016">2015-16</option>
+                <option value="2015">2014-15</option>
+              </select>
+              <input id="gravitySearch" type="search" placeholder="Search player&hellip;" class="player-filter-input" style="max-width:180px" />
+            </div>
+          </div>
+
+          <!-- Spotlight top 3 -->
+          <div class="grav-spotlight" id="gravSpotlight"></div>
+
+          <!-- Gravity methodology note -->
+          <div class="grav-method-note">
+            <strong>How it&rsquo;s calculated:</strong> Gravity Score combines three percentile ranks:
+            <span class="grav-method-pill grav-pill-3pt">3PT Threat</span> (FG3M/G &mdash; volume &times; efficiency, 40%)&nbsp;&middot;&nbsp;
+            <span class="grav-method-pill grav-pill-contact">Contact Rate</span> (FTA/G, 35%)&nbsp;&middot;&nbsp;
+            <span class="grav-method-pill grav-pill-scoring">Scoring Load</span> (PPG, 25%).
+            Higher = more defensive attention demanded.
+          </div>
+
+          <!-- Leaderboard table -->
+          <div class="table-panel">
+            <table class="data-table" id="gravTable">
+              <thead>
+                <tr>
+                  <th style="width:40px">#</th>
+                  <th>Player</th>
+                  <th>Team</th>
+                  <th>GP</th>
+                  <th title="Composite Defensive Gravity Score (0–100)">Gravity</th>
+                  <th title="3-point makes per game (volume × efficiency)">3PM/G</th>
+                  <th title="3-point attempts per game">3PA/G</th>
+                  <th title="3-point percentage">3P%</th>
+                  <th title="Free throw attempts per game">FTA/G</th>
+                  <th title="Points per game">PPG</th>
+                </tr>
+              </thead>
+              <tbody id="gravTableBody"></tbody>
+            </table>
+            <div id="gravEmpty" class="ref-no-data" style="display:none">No data yet — run <code>python3 pull_gravity_data.py</code> locally to populate.</div>
+          </div>
+        </section>
+
         <!-- Referee Bias Section -->
         <section class="page hidden" id="page-referee-bias">
           <div class="page-header">
@@ -1271,7 +1336,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260730-playersearch"></script>
+    <script src="app.js?v=20260730-gravity"></script>
 
     <!--Start of Tawk.to Script-->
     <script type="text/javascript">

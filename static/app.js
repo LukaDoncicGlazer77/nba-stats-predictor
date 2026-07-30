@@ -149,6 +149,7 @@ function navigate(section) {
     else renderCareerOutcomeBar();
     renderCareerOutcomePage();
   }
+  if (section === "gravity") loadGravity();
   if (section === "referee-bias") loadRefereeBias();
   if (section === "draft-projection") {
     if (!prospectsLoaded) loadProspects().then(() => renderDraftProjectionBar());
@@ -4129,4 +4130,161 @@ window.addEventListener("resize", () => {
   _scatterResizeTimer = setTimeout(() => {
     if (_refData && $("#refScatterSvg")) renderRefScatter(_refData);
   }, 150);
+});
+
+// ─── Defensive Gravity ────────────────────────────────────────────────────────
+
+let _gravityData = null;
+
+function _gravityTier(score) {
+  if (score >= 85) return { label: "Elite Gravity", cls: "grav-tier-elite" };
+  if (score >= 70) return { label: "High Gravity",  cls: "grav-tier-high"  };
+  if (score >= 55) return { label: "Solid Gravity", cls: "grav-tier-solid" };
+  if (score >= 40) return { label: "Average",       cls: "grav-tier-avg"   };
+  return                { label: "Low Gravity",   cls: "grav-tier-low"   };
+}
+
+function _gravityColor(score) {
+  if (score >= 80) return "#22c55e";
+  if (score >= 65) return "#84cc16";
+  if (score >= 50) return "#eab308";
+  if (score >= 35) return "#f97316";
+  return "#ef4444";
+}
+
+function renderGravitySpotlight(players) {
+  const el = $("#gravSpotlight");
+  if (!el) return;
+  const top3 = players.slice(0, 3);
+  if (!top3.length) { el.innerHTML = ""; return; }
+
+  el.innerHTML = top3.map((p, i) => {
+    const tier = _gravityTier(p.gravity);
+    const col  = _gravityColor(p.gravity);
+    const ini  = p.player_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+    const team = p.team_abbr || "—";
+    const fg3pct = p.fg3_pct != null ? (p.fg3_pct * 100).toFixed(1) + "%" : "—";
+    const label = i === 0 ? "Highest Gravity" : i === 1 ? "2nd" : "3rd";
+    return `
+      <div class="grav-card">
+        <div class="grav-card-label">${label}</div>
+        <div class="grav-avatar" style="background:${col}22;color:${col}">${ini}</div>
+        <div class="grav-name">${escapeHtml(p.player_name)}</div>
+        <div class="grav-team">${escapeHtml(team)}</div>
+        <div class="grav-score" style="color:${col}">${p.gravity}</div>
+        <div class="grav-tier ${tier.cls}">${tier.label}</div>
+        <div class="grav-mini-stats">
+          <span title="3-point makes per game"><strong>${(p.fg3m_per_g || 0).toFixed(1)}</strong> 3PM/G</span>
+          <span title="Free throw attempts per game"><strong>${(p.fta_per_g || 0).toFixed(1)}</strong> FTA/G</span>
+          <span title="Points per game"><strong>${(p.pts_per_g || 0).toFixed(1)}</strong> PPG</span>
+        </div>
+        <div class="grav-component-bars">
+          <div class="grav-comp-row">
+            <span class="grav-comp-lbl">3PT Threat</span>
+            <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-3pt" style="width:${p.pct_3pt}%"></div></div>
+            <span class="grav-comp-val">${p.pct_3pt}th</span>
+          </div>
+          <div class="grav-comp-row">
+            <span class="grav-comp-lbl">Contact Rate</span>
+            <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-contact" style="width:${p.pct_contact}%"></div></div>
+            <span class="grav-comp-val">${p.pct_contact}th</span>
+          </div>
+          <div class="grav-comp-row">
+            <span class="grav-comp-lbl">Scoring Load</span>
+            <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-scoring" style="width:${p.pct_scoring}%"></div></div>
+            <span class="grav-comp-val">${p.pct_scoring}th</span>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function renderGravityTable(players, filter) {
+  const tbody = $("#gravTableBody");
+  const empty = $("#gravEmpty");
+  if (!tbody) return;
+
+  let rows = players;
+  if (filter) {
+    const q = filter.toLowerCase();
+    rows = players.filter(p => p.player_name.toLowerCase().includes(q));
+  }
+
+  if (!rows.length) {
+    tbody.innerHTML = "";
+    if (empty) empty.style.display = "";
+    return;
+  }
+  if (empty) empty.style.display = "none";
+
+  tbody.innerHTML = rows.map((p, i) => {
+    const col   = _gravityColor(p.gravity);
+    const tier  = _gravityTier(p.gravity);
+    const barW  = p.gravity;
+    const team  = p.team_abbr || "—";
+    const fg3pct = p.fg3_pct != null ? (p.fg3_pct * 100).toFixed(1) + "%" : "—";
+    return `<tr>
+      <td class="grav-rank">${i + 1}</td>
+      <td class="grav-player-cell">
+        <div class="grav-player-name">${escapeHtml(p.player_name)}</div>
+        <div class="grav-player-tier ${tier.cls}">${tier.label}</div>
+      </td>
+      <td><span class="team-badge">${escapeHtml(team)}</span></td>
+      <td>${p.gp}</td>
+      <td>
+        <div class="grav-score-cell">
+          <span class="grav-score-num" style="color:${col}">${p.gravity}</span>
+          <div class="grav-score-bar-track"><div class="grav-score-bar-fill" style="width:${barW}%;background:${col}"></div></div>
+        </div>
+      </td>
+      <td>${(p.fg3m_per_g || 0).toFixed(1)}</td>
+      <td>${(p.fg3a_per_g || 0).toFixed(1)}</td>
+      <td>${fg3pct}</td>
+      <td>${(p.fta_per_g || 0).toFixed(1)}</td>
+      <td>${(p.pts_per_g || 0).toFixed(1)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderGravity(data) {
+  const subtitle = $("#gravitySubtitle");
+  const players  = data.players || [];
+  const season   = data.season;
+  const label    = season ? `${season - 1}–${String(season).slice(-2)}` : "All Time";
+
+  if (subtitle) {
+    subtitle.textContent = players.length
+      ? `${players.length} players ranked · ${label}`
+      : data.error ? `Error: ${data.error}` : "No data — run pull_gravity_data.py locally first";
+  }
+
+  renderGravitySpotlight(players);
+  const filter = ($("#gravitySearch") || {}).value || "";
+  renderGravityTable(players, filter);
+}
+
+async function loadGravity(season) {
+  _gravityData = null;
+  const seasonVal = season !== undefined ? season : (($("#gravitySeason") || {}).value || "");
+  const url = `/api/gravity-leaderboard${seasonVal ? `?season=${seasonVal}` : ""}`;
+  const subtitle = $("#gravitySubtitle");
+  if (subtitle) subtitle.textContent = "Loading…";
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    _gravityData = data;
+    renderGravity(data);
+  } catch (e) {
+    if (subtitle) subtitle.textContent = "Network error";
+  }
+}
+
+// Wire up gravity controls
+document.addEventListener("DOMContentLoaded", () => {
+  const seasonSel = $("#gravitySeason");
+  const searchEl  = $("#gravitySearch");
+  if (seasonSel) seasonSel.addEventListener("change", () => loadGravity(seasonSel.value));
+  if (searchEl)  searchEl.addEventListener("input",  () => {
+    if (_gravityData) renderGravityTable(_gravityData.players || [], searchEl.value);
+  });
 });

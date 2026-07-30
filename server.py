@@ -1672,6 +1672,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "name required"}, status=400)
             return self.send_json(_get_referee_detail(name))
 
+        if parsed.path == "/api/gravity-leaderboard":
+            season_raw = (params.get("season") or [""])[0].strip()
+            season = int(season_raw) if season_raw.isdigit() else None
+            return self.send_json(_get_gravity_leaderboard(season))
+
         if parsed.path.startswith("/api/"):
             return self.send_json({"error": "Not found"}, status=404)
 
@@ -1792,6 +1797,119 @@ _REF_PLAYER_TTL = 3600 * 6
 
 _PLAYER_MOMENTS_CACHE: dict = {}
 _PLAYER_MOMENTS_TTL = 3600 * 12
+
+_GRAVITY_CACHE: dict = {}  # cache_key -> {"data": ..., "ts": ...}
+_GRAVITY_TTL = 3600 * 6
+
+def _ensure_gravity_table():
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS archive_player_season_stats (
+                        player_id   TEXT NOT NULL,
+                        player_name TEXT NOT NULL,
+                        team_abbr   TEXT NOT NULL DEFAULT '',
+                        season      INTEGER NOT NULL,
+                        gp          INTEGER,
+                        min_per_g   FLOAT,
+                        pts_per_g   FLOAT,
+                        fgm_per_g   FLOAT,
+                        fga_per_g   FLOAT,
+                        fg3m_per_g  FLOAT,
+                        fg3a_per_g  FLOAT,
+                        ftm_per_g   FLOAT,
+                        fta_per_g   FLOAT,
+                        fg3_pct     FLOAT,
+                        ft_pct      FLOAT,
+                        ast_per_g   FLOAT,
+                        tov_per_g   FLOAT,
+                        PRIMARY KEY (player_id, team_abbr, season)
+                    )
+                """)
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_apss_season ON archive_player_season_stats(season)")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_apss_player ON archive_player_season_stats(player_id)")
+            conn.commit()
+    except Exception as exc:
+        print(f"gravity table migration skipped: {exc}")
+
+def _pct_rank(vals, v):
+    if not vals:
+        return 0.5
+    return sum(1 for x in vals if x < v) / len(vals)
+
+def _compute_gravity_scores(rows, min_gp=20):
+    qualified = [r for r in rows if (r.get("gp") or 0) >= min_gp]
+    if len(qualified) < 3:
+        return qualified
+    fg3m_vals = [r["fg3m_per_g"] or 0 for r in qualified]
+    fta_vals  = [r["fta_per_g"]  or 0 for r in qualified]
+    pts_vals  = [r["pts_per_g"]  or 0 for r in qualified]
+    for r in qualified:
+        p3 = _pct_rank(fg3m_vals, r["fg3m_per_g"] or 0)
+        pc = _pct_rank(fta_vals,  r["fta_per_g"]  or 0)
+        ps = _pct_rank(pts_vals,  r["pts_per_g"]  or 0)
+        r["gravity"]     = round((0.40 * p3 + 0.35 * pc + 0.25 * ps) * 100, 1)
+        r["pct_3pt"]     = round(p3 * 100, 1)
+        r["pct_contact"] = round(pc * 100, 1)
+        r["pct_scoring"] = round(ps * 100, 1)
+    return sorted(qualified, key=lambda x: -x["gravity"])
+
+def _get_gravity_leaderboard(season=None):
+    cache_key = str(season) if season else "all"
+    now = time.time()
+    cached = _GRAVITY_CACHE.get(cache_key)
+    if cached and now - cached["ts"] < _GRAVITY_TTL:
+        return cached["data"]
+    try:
+        with get_conn() as conn:
+            if season:
+                rows = q(conn, """
+                    SELECT player_id,
+                           MAX(player_name) AS player_name,
+                           STRING_AGG(DISTINCT team_abbr, '/') AS team_abbr,
+                           season,
+                           SUM(gp)::int AS gp,
+                           ROUND((SUM(gp * COALESCE(pts_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS pts_per_g,
+                           ROUND((SUM(gp * COALESCE(fg3m_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 2) AS fg3m_per_g,
+                           ROUND((SUM(gp * COALESCE(fg3a_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fg3a_per_g,
+                           ROUND((SUM(gp * COALESCE(fta_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fta_per_g,
+                           ROUND((SUM(gp * COALESCE(fg3_pct, 0)) / NULLIF(SUM(gp), 0))::numeric, 3) AS fg3_pct,
+                           ROUND((SUM(gp * COALESCE(ft_pct, 0)) / NULLIF(SUM(gp), 0))::numeric, 3) AS ft_pct,
+                           ROUND((SUM(gp * COALESCE(ast_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS ast_per_g,
+                           ROUND((SUM(gp * COALESCE(min_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS min_per_g
+                    FROM archive_player_season_stats
+                    WHERE season = %s
+                    GROUP BY player_id, season
+                """, (season,))
+            else:
+                rows = q(conn, """
+                    SELECT player_id,
+                           MAX(player_name) AS player_name,
+                           NULL::text AS team_abbr,
+                           NULL::int AS season,
+                           SUM(gp)::int AS gp,
+                           ROUND((SUM(gp * COALESCE(pts_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS pts_per_g,
+                           ROUND((SUM(gp * COALESCE(fg3m_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 2) AS fg3m_per_g,
+                           ROUND((SUM(gp * COALESCE(fg3a_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fg3a_per_g,
+                           ROUND((SUM(gp * COALESCE(fta_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fta_per_g,
+                           ROUND((SUM(gp * COALESCE(fg3_pct, 0)) / NULLIF(SUM(gp), 0))::numeric, 3) AS fg3_pct,
+                           ROUND((SUM(gp * COALESCE(ft_pct, 0)) / NULLIF(SUM(gp), 0))::numeric, 3) AS ft_pct,
+                           ROUND((SUM(gp * COALESCE(ast_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS ast_per_g,
+                           ROUND((SUM(gp * COALESCE(min_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS min_per_g
+                    FROM archive_player_season_stats
+                    GROUP BY player_id
+                """)
+        rows = [dict(r) for r in rows]
+        min_gp = 20 if season else 100
+        scored = _compute_gravity_scores(rows, min_gp=min_gp)
+        result = {"players": scored, "season": season, "count": len(scored)}
+        _GRAVITY_CACHE[cache_key] = {"data": result, "ts": now}
+        return result
+    except Exception as exc:
+        return {"players": [], "error": str(exc), "season": season, "count": 0}
+
+_ensure_gravity_table()
 
 def _get_player_moments(player_name: str):
     key = player_name.lower().strip()

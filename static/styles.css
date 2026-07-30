@@ -5573,3 +5573,139 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   color: rgba(220,232,255,0.42);
   line-height: 1.5;
 }
+
+/* ── Defensive Gravity ───────────────────────────────────────────────────── */
+.grav-spotlight {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.grav-card {
+  background: var(--panel);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 20px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.grav-card-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  align-self: flex-start;
+}
+.grav-avatar {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; font-weight: 800;
+  margin: 4px 0;
+}
+.grav-name {
+  font-size: 0.95rem; font-weight: 700;
+  color: rgba(220,232,255,0.95);
+  text-align: center;
+}
+.grav-team {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.grav-score {
+  font-size: 2.4rem; font-weight: 900;
+  line-height: 1;
+  margin: 4px 0 2px;
+}
+.grav-tier {
+  font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em;
+  padding: 2px 10px; border-radius: 20px;
+}
+.grav-tier-elite  { background: rgba(34,197,94,.18);  color: #22c55e; }
+.grav-tier-high   { background: rgba(132,204,22,.15);  color: #84cc16; }
+.grav-tier-solid  { background: rgba(234,179,8,.15);   color: #eab308; }
+.grav-tier-avg    { background: rgba(249,115,22,.15);  color: #f97316; }
+.grav-tier-low    { background: rgba(239,68,68,.15);   color: #ef4444; }
+
+.grav-mini-stats {
+  display: flex; gap: 12px;
+  margin: 6px 0 2px;
+}
+.grav-mini-stats span {
+  font-size: 0.72rem;
+  color: rgba(220,232,255,0.55);
+}
+.grav-mini-stats strong {
+  color: rgba(220,232,255,0.9);
+}
+
+.grav-component-bars {
+  width: 100%;
+  display: flex; flex-direction: column; gap: 5px;
+  margin-top: 8px;
+}
+.grav-comp-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.grav-comp-lbl {
+  font-size: 0.65rem; color: var(--muted);
+  width: 68px; flex-shrink: 0;
+}
+.grav-comp-track {
+  flex: 1; height: 5px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 3px; overflow: hidden;
+}
+.grav-comp-fill {
+  height: 100%; border-radius: 3px;
+  transition: width .5s ease;
+}
+.grav-fill-3pt      { background: #7c5cff; }
+.grav-fill-contact  { background: #5b8cff; }
+.grav-fill-scoring  { background: #22d3ee; }
+.grav-comp-val {
+  font-size: 0.63rem;
+  color: var(--muted);
+  width: 28px; text-align: right; flex-shrink: 0;
+}
+
+.grav-method-note {
+  background: rgba(124,92,255,0.06);
+  border: 1px solid rgba(124,92,255,0.15);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 0.73rem;
+  color: rgba(220,232,255,0.55);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+.grav-method-pill {
+  display: inline-block;
+  padding: 1px 8px; border-radius: 20px;
+  font-size: 0.68rem; font-weight: 700;
+}
+.grav-pill-3pt      { background: rgba(124,92,255,0.18); color: #7c5cff; }
+.grav-pill-contact  { background: rgba(91,140,255,0.18); color: #5b8cff; }
+.grav-pill-scoring  { background: rgba(34,211,238,0.15); color: #22d3ee; }
+
+/* table */
+.grav-rank { color: var(--muted); font-size: 0.78rem; font-weight: 600; }
+.grav-player-cell { min-width: 140px; }
+.grav-player-name { font-size: 0.86rem; font-weight: 700; color: rgba(220,232,255,0.95); }
+.grav-player-tier { font-size: 0.64rem; font-weight: 600; margin-top: 1px; }
+.grav-score-cell { display: flex; align-items: center; gap: 8px; }
+.grav-score-num { font-size: 0.88rem; font-weight: 800; min-width: 34px; }
+.grav-score-bar-track { flex: 1; min-width: 60px; height: 5px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; }
+.grav-score-bar-fill { height: 100%; border-radius: 3px; }
+
+@media (max-width: 800px) {
+  .grav-spotlight { grid-template-columns: 1fr; }
+  .grav-score-bar-track { display: none; }
+}
+@media (max-width: 600px) {
+  .grav-method-note { font-size: 0.68rem; }
+}
