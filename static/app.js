@@ -4123,12 +4123,13 @@ $("#refBackBtn") && $("#refBackBtn").addEventListener("click", () => {
   setInterval(ping, 60000);
 })();
 
-// Re-render scatter on resize
+// Re-render scatters on resize
 let _scatterResizeTimer;
 window.addEventListener("resize", () => {
   clearTimeout(_scatterResizeTimer);
   _scatterResizeTimer = setTimeout(() => {
     if (_refData && $("#refScatterSvg")) renderRefScatter(_refData);
+    if (_gravityData && $("#gravScatterSvg")) renderGravityScatter(_gravityData.players || []);
   }, 150);
 });
 
@@ -4252,6 +4253,165 @@ function renderGravityTable(players, filter) {
   }).join("");
 }
 
+function _gravityTooltip(p) {
+  const col    = _gravityColor(p.gravity);
+  const tier   = _gravityTier(p.gravity);
+  const team   = p.team_abbr || "—";
+  const fg3pct = p.fg3_pct != null ? (p.fg3_pct * 100).toFixed(1) + "%" : "—";
+  const ftpct  = p.ft_pct  != null ? (p.ft_pct  * 100).toFixed(1) + "%" : "—";
+
+  // Build a natural-language explanation of why this player is positioned here
+  const reasons = [];
+  if (p.pct_3pt >= 80)
+    reasons.push(`elite 3PT threat (${(p.fg3m_per_g||0).toFixed(1)} 3PM/G at ${fg3pct})`);
+  else if (p.pct_3pt >= 55)
+    reasons.push(`solid perimeter threat (${(p.fg3m_per_g||0).toFixed(1)} 3PM/G)`);
+  else if (p.pct_3pt < 30)
+    reasons.push(`limited 3PT threat — defense can sag off the arc`);
+
+  if (p.pct_contact >= 80)
+    reasons.push(`draws elite contact (${(p.fta_per_g||0).toFixed(1)} FTA/G at ${ftpct} FT%)`);
+  else if (p.pct_contact >= 55)
+    reasons.push(`draws consistent fouls (${(p.fta_per_g||0).toFixed(1)} FTA/G)`);
+  else if (p.pct_contact < 30)
+    reasons.push(`rarely draws fouls — low interior pressure`);
+
+  if (p.pct_usage >= 80)
+    reasons.push(`commands an enormous share of possessions (top ${100 - Math.round(p.pct_usage)}th percentile usage)`);
+  else if (p.pct_usage >= 60)
+    reasons.push(`high usage — defense must scheme around him`);
+
+  if (p.pct_ts >= 75)
+    reasons.push(`highly efficient scorer (TS% ${p.pct_ts}th pct) — defenses can't sag`);
+
+  if (p.versatility_bonus)
+    reasons.push(`⚡ Two-Way bonus: dangerous from both arc and contact`);
+
+  const why = reasons.length
+    ? reasons.map(r => `<li>${r}</li>`).join("")
+    : "<li>Below-average across all gravity components</li>";
+
+  return `
+    <div class="grav-tip-name">${escapeHtml(p.player_name)}</div>
+    <div class="grav-tip-team">${escapeHtml(team)}</div>
+    <div class="grav-tip-score" style="color:${col}">${p.gravity} <span class="grav-tip-tier">${tier.label}</span></div>
+    <ul class="grav-tip-why">${why}</ul>
+    <div class="grav-tip-stats">
+      <span>${(p.fg3m_per_g||0).toFixed(1)} 3PM/G</span>
+      <span>${(p.fta_per_g||0).toFixed(1)} FTA/G</span>
+      <span>${(p.pts_per_g||0).toFixed(1)} PPG</span>
+    </div>
+    <div class="grav-tip-pcts">
+      <span style="color:#7c5cff">3PT ${p.pct_3pt}th</span>
+      <span style="color:#5b8cff">Contact ${p.pct_contact}th</span>
+      <span style="color:#1fe3a0">Usage ${p.pct_usage||0}th</span>
+    </div>`;
+}
+
+function renderGravityScatter(players) {
+  const svgEl = $("#gravScatterSvg");
+  if (!svgEl || !players || !players.length) return;
+
+  const W = svgEl.parentElement.clientWidth || 680;
+  const H = Math.min(Math.max(W * 0.55, 280), 440);
+  const PAD = { top: 28, right: 32, bottom: 50, left: 56 };
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+
+  // X = pct_3pt (0–100), Y = pct_contact (0–100)
+  const xS = v => PAD.left + (v / 100) * innerW;
+  const yS = v => PAD.top  + (1 - v / 100) * innerH;
+
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="overflow:visible">`;
+
+  // Quadrant shading
+  const midX = xS(50), midY = yS(50);
+  s += `<rect x="${PAD.left}" y="${PAD.top}" width="${midX - PAD.left}" height="${midY - PAD.top}" fill="rgba(91,140,255,0.04)"/>`;
+  s += `<rect x="${midX}" y="${PAD.top}" width="${PAD.left + innerW - midX}" height="${midY - PAD.top}" fill="rgba(34,197,94,0.05)"/>`;
+  s += `<rect x="${PAD.left}" y="${midY}" width="${midX - PAD.left}" height="${PAD.top + innerH - midY}" fill="rgba(239,68,68,0.04)"/>`;
+  s += `<rect x="${midX}" y="${midY}" width="${PAD.left + innerW - midX}" height="${PAD.top + innerH - midY}" fill="rgba(234,179,8,0.04)"/>`;
+
+  // Quadrant labels
+  s += `<text x="${PAD.left + 6}" y="${PAD.top + 14}" fill="rgba(91,140,255,0.45)" font-size="10">Interior Only</text>`;
+  s += `<text x="${midX + 6}" y="${PAD.top + 14}" fill="rgba(34,197,94,0.55)" font-size="10">Elite Gravity</text>`;
+  s += `<text x="${PAD.left + 6}" y="${PAD.top + innerH - 6}" fill="rgba(239,68,68,0.4)" font-size="10">Low Gravity</text>`;
+  s += `<text x="${midX + 6}" y="${PAD.top + innerH - 6}" fill="rgba(234,179,8,0.45)" font-size="10">Perimeter Only</text>`;
+
+  // Grid lines
+  [25, 50, 75].forEach(v => {
+    s += `<line x1="${xS(v)}" y1="${PAD.top}" x2="${xS(v)}" y2="${PAD.top + innerH}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+    s += `<line x1="${PAD.left}" y1="${yS(v)}" x2="${PAD.left + innerW}" y2="${yS(v)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+  });
+
+  // Mid-lines
+  s += `<line x1="${midX}" y1="${PAD.top}" x2="${midX}" y2="${PAD.top + innerH}" stroke="rgba(255,255,255,0.14)" stroke-width="1" stroke-dasharray="4,3"/>`;
+  s += `<line x1="${PAD.left}" y1="${midY}" x2="${PAD.left + innerW}" y2="${midY}" stroke="rgba(255,255,255,0.14)" stroke-width="1" stroke-dasharray="4,3"/>`;
+
+  // Axis ticks
+  [0, 25, 50, 75, 100].forEach(v => {
+    s += `<text x="${xS(v)}" y="${PAD.top + innerH + 16}" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-size="10">${v}</text>`;
+    s += `<text x="${PAD.left - 8}" y="${yS(v) + 4}" text-anchor="end" fill="rgba(255,255,255,0.3)" font-size="10">${v}</text>`;
+  });
+
+  // Axis labels
+  s += `<text x="${PAD.left + innerW / 2}" y="${H - 4}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="11">3PT Threat Percentile →</text>`;
+  s += `<text x="13" y="${PAD.top + innerH / 2}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="11" transform="rotate(-90,13,${PAD.top + innerH / 2})">Contact Quality Percentile →</text>`;
+
+  // Dots — sorted so high-gravity dots render on top
+  const sorted = [...players].sort((a, b) => a.gravity - b.gravity);
+  sorted.forEach((p, i) => {
+    const x = xS(p.pct_3pt || 0);
+    const y = yS(p.pct_contact || 0);
+    const r = 4 + ((p.pct_usage || 0) / 100) * 5;  // 4–9px radius based on usage
+    const col = _gravityColor(p.gravity);
+    const origIdx = players.indexOf(p);
+    s += `<circle class="grav-sc-dot" cx="${x}" cy="${y}" r="${r}" fill="${col}" fill-opacity="0.78" stroke="rgba(255,255,255,0.15)" stroke-width="1" data-idx="${origIdx}" style="cursor:pointer"/>`;
+  });
+
+  s += `</svg>`;
+  svgEl.outerHTML = s;
+
+  const newSvg = $("#gravScatterSvg");
+  if (!newSvg) return;
+
+  const tip = $("#gravScatterTooltip");
+  const wrap = newSvg.parentElement;
+
+  newSvg.querySelectorAll(".grav-sc-dot").forEach(dot => {
+    const p = players[parseInt(dot.dataset.idx)];
+
+    dot.addEventListener("mouseenter", e => {
+      dot.setAttribute("r", parseFloat(dot.getAttribute("r")) + 3);
+      dot.setAttribute("fill-opacity", "1");
+      dot.setAttribute("stroke", "rgba(255,255,255,0.7)");
+      dot.setAttribute("stroke-width", "2");
+      if (!tip) return;
+      tip.innerHTML = _gravityTooltip(p);
+      tip.style.display = "block";
+    });
+
+    dot.addEventListener("mousemove", e => {
+      if (!tip || !wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      let tx = e.clientX - rect.left + 14;
+      let ty = e.clientY - rect.top  - 10;
+      if (tx + 230 > rect.width)  tx = e.clientX - rect.left - 230;
+      if (ty + 180 > rect.height) ty = e.clientY - rect.top  - 180;
+      tip.style.left = tx + "px";
+      tip.style.top  = ty + "px";
+    });
+
+    dot.addEventListener("mouseleave", () => {
+      const origR = 4 + ((p.pct_usage || 0) / 100) * 5;
+      dot.setAttribute("r", origR);
+      dot.setAttribute("fill-opacity", "0.78");
+      dot.setAttribute("stroke", "rgba(255,255,255,0.15)");
+      dot.setAttribute("stroke-width", "1");
+      if (tip) tip.style.display = "none";
+    });
+  });
+}
+
 function renderGravity(data) {
   const subtitle = $("#gravitySubtitle");
   const players  = data.players || [];
@@ -4265,6 +4425,7 @@ function renderGravity(data) {
   }
 
   renderGravitySpotlight(players);
+  renderGravityScatter(players);
   const filter = ($("#gravitySearch") || {}).value || "";
   renderGravityTable(players, filter);
 }

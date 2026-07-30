@@ -5713,9 +5713,67 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .grav-score-bar-track { flex: 1; min-width: 60px; height: 5px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; }
 .grav-score-bar-fill { height: 100%; border-radius: 3px; }
 
+/* scatter */
+.grav-scatter-panel {
+  background: var(--panel);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 18px 20px 12px;
+  margin-bottom: 20px;
+}
+.grav-scatter-header {
+  display: flex; align-items: baseline; gap: 12px;
+  margin-bottom: 12px;
+}
+.grav-scatter-title {
+  font-size: 0.9rem; font-weight: 700;
+  color: rgba(220,232,255,0.9);
+}
+.grav-scatter-sub {
+  font-size: 0.72rem; color: var(--muted);
+}
+.grav-scatter-wrap {
+  position: relative;
+  width: 100%;
+}
+.grav-scatter-svg { width: 100%; display: block; }
+.grav-scatter-tooltip {
+  position: absolute;
+  background: rgba(10,14,26,0.96);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-width: 210px;
+  max-width: 260px;
+  pointer-events: none;
+  z-index: 20;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+.grav-tip-name { font-size: 0.92rem; font-weight: 800; color: rgba(220,232,255,0.95); }
+.grav-tip-team { font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
+.grav-tip-score { font-size: 1.4rem; font-weight: 900; line-height: 1.1; }
+.grav-tip-tier  { font-size: 0.65rem; font-weight: 600; color: rgba(220,232,255,0.5); vertical-align: middle; margin-left: 4px; }
+.grav-tip-why {
+  margin: 8px 0 6px; padding-left: 14px;
+  font-size: 0.71rem; color: rgba(220,232,255,0.65);
+  line-height: 1.55;
+}
+.grav-tip-why li { margin-bottom: 2px; }
+.grav-tip-stats {
+  display: flex; gap: 10px;
+  font-size: 0.7rem; color: rgba(220,232,255,0.55);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding-top: 6px; margin-top: 4px;
+}
+.grav-tip-pcts {
+  display: flex; gap: 8px;
+  font-size: 0.65rem; margin-top: 4px;
+}
+
 @media (max-width: 800px) {
   .grav-spotlight { grid-template-columns: 1fr; }
   .grav-score-bar-track { display: none; }
+  .grav-scatter-sub { display: none; }
 }
 @media (max-width: 600px) {
   .grav-method-note { font-size: 0.68rem; }

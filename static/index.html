@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260730-gravity3" />
+    <link rel="stylesheet" href="styles.css?v=20260730-gravity4" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -1135,6 +1135,18 @@
           <!-- Spotlight top 3 -->
           <div class="grav-spotlight" id="gravSpotlight"></div>
 
+          <!-- Gravity scatter chart -->
+          <div class="grav-scatter-panel" id="gravScatterPanel">
+            <div class="grav-scatter-header">
+              <span class="grav-scatter-title">Gravity Map</span>
+              <span class="grav-scatter-sub">X = Perimeter Threat &nbsp;·&nbsp; Y = Contact Quality &nbsp;·&nbsp; Size = Usage &nbsp;·&nbsp; hover for breakdown</span>
+            </div>
+            <div class="grav-scatter-wrap">
+              <svg id="gravScatterSvg" class="grav-scatter-svg"></svg>
+              <div id="gravScatterTooltip" class="grav-scatter-tooltip" style="display:none"></div>
+            </div>
+          </div>
+
           <!-- Gravity methodology note -->
           <div class="grav-method-note">
             <strong>How it&rsquo;s calculated:</strong> Gravity Score combines three percentile ranks:
@@ -1338,7 +1350,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260730-gravity3"></script>
+    <script src="app.js?v=20260730-gravity4"></script>
 
     <!--Start of Tawk.to Script-->
     <script type="text/javascript">
