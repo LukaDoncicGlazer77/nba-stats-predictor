@@ -4665,6 +4665,11 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .profile-topnav { flex-wrap: wrap; padding: 10px 16px; gap: 8px; }
   .profile-tab-group { flex: 1 1 100%; order: 3; overflow-x: auto; justify-content: flex-start; }
   .profile-hero-statrow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  /* Referee page: controls (mode toggle + search) wrap below the title */
+  #page-referee-bias .page-controls { flex-wrap: wrap; width: 100%; }
+  .ref-mode-toggle { flex: 1; }
+  #refSearch { flex: 1 1 100%; max-width: none !important; }
 }
 
 @media (max-width: 480px) {
@@ -5356,6 +5361,10 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .moment-empty  { font-size: 0.84rem; color: rgba(255,255,255,0.3); font-style: italic; }
 
 /* ── Responsive ── */
+
+/* Ref table has 10 columns — needs a wider floor than the global 600px */
+#refTable { min-width: 900px; }
+
 @media (max-width: 1100px) {
   .ref-spotlight { grid-template-columns: repeat(2, 1fr); }
 }
@@ -5366,6 +5375,8 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 @media (max-width: 700px) {
   .ref-spotlight { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ref-spotlight-card { padding: 14px 16px; }
+  .ref-spotlight-icon { font-size: 1.2rem; margin-bottom: 8px; }
   .ref-stat-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
   .ref-stat-value { font-size: 1.5rem; }
   .ref-player-spotlights { grid-template-columns: 1fr; }
@@ -5373,7 +5384,20 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   .ref-player-sort-row { flex-wrap: wrap; }
   .moment-cols { grid-template-columns: 1fr; }
   #refDetailName { font-size: 1.3rem; }
-  .ref-detail-hero { padding: 22px 20px; }
+  .ref-detail-hero { padding: 18px 16px; }
+  #page-referee-bias h2 { font-size: 1.5rem; }
+}
+@media (max-width: 480px) {
+  /* Single-column spotlight on very small screens */
+  .ref-spotlight { grid-template-columns: 1fr; gap: 8px; }
+  .ref-stat-cards { grid-template-columns: 1fr; }
+  .ref-stat-card { padding: 16px 14px; }
+  /* Mode toggle full-width with equal buttons */
+  .ref-mode-toggle { width: 100%; }
+  .ref-mode-btn { flex: 1; text-align: center; padding: 7px 10px; font-size: 0.78rem; }
+  /* Ref detail hero: hide badge chip, only show name + meta */
+  .ref-verdict-badge { display: none; }
+  #refDetailName { font-size: 1.1rem; }
 }
 
 /* ── Player result tabs ── */
