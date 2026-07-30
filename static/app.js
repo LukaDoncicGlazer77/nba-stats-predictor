@@ -4224,7 +4224,11 @@ function renderGravityTable(players, filter) {
   let rows = players;
   if (filter) {
     const q = filter.toLowerCase();
-    rows = players.filter(p => p.player_name.toLowerCase().includes(q));
+    rows = players.filter(p => {
+      const name = p.player_name.toLowerCase();
+      const parts = name.split(" ");
+      return parts.some(part => part.startsWith(q));
+    });
   }
 
   if (!rows.length) {
