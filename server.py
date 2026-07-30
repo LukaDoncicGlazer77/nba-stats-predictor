@@ -1886,13 +1886,17 @@ def _score_season_group(group):
         ts_denom = 2 * (fga + 0.44 * fta)
         r["_ts_pct"] = pts / ts_denom if ts_denom > 0 else 0
 
-        # Zone diversity: reward players who threaten both the arc and the rim
-        perim_rate   = (fg3a / max(fga, 0.01)) if not pre_3pt else 0.0
-        interior_rate = min(fta / max(fga, 0.01), 1.5)
-        r["_diversity"] = perim_rate * 50 + interior_rate * 50
+        # Zone diversity: reward players threatening both arc AND rim.
+        # Guard against near-zero fga (missing data) — require at least 1 FGA/G.
+        if fga >= 1.0:
+            perim_rate    = (fg3a / fga) if not pre_3pt else 0.0
+            interior_rate = min(fta / fga, 1.5)
+            r["_diversity"] = perim_rate * 50 + interior_rate * 50
+        else:
+            r["_diversity"] = 0.0
 
-        # Playmaking gravity: assists relative to possessions consumed
-        r["_playmaking"] = ast / max(possessions_used, 0.01)
+        # Playmaking gravity: absolute AST/G — higher = more kick-out threat
+        r["_playmaking"] = ast
 
     perim_vals      = [float(r.get("fg3m_per_g") or 0) for r in group]
     contact_vals    = [r["_contact_quality"] for r in group]
@@ -1916,11 +1920,11 @@ def _score_season_group(group):
              + w["diversity"]  * p_diversity
              + w["playmaking"] * p_playmaking)
 
-        # Versatility bonus adapts to era
+        # Versatility bonus adapts to era (capped small so it can't single-handedly push to 100)
         if pre_3pt:
-            bonus = 0.05 if (p_contact >= 0.65 and p_usage >= 0.65) else 0
+            bonus = 0.03 if (p_contact >= 0.70 and p_usage >= 0.70) else 0
         else:
-            bonus = 0.05 if (p_perim >= 0.60 and p_contact >= 0.60) else 0
+            bonus = 0.03 if (p_perim >= 0.65 and p_contact >= 0.65) else 0
 
         r["gravity"]          = min(round((raw + bonus) * 100, 1), 100.0)
         r["pct_3pt"]          = round(p_perim      * 100, 1)
@@ -1977,12 +1981,14 @@ def _get_gravity_leaderboard(season=None):
                            season,
                            SUM(gp)::int AS gp,
                            ROUND((SUM(gp * COALESCE(pts_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS pts_per_g,
+                           ROUND((SUM(gp * COALESCE(fga_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fga_per_g,
                            ROUND((SUM(gp * COALESCE(fg3m_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 2) AS fg3m_per_g,
                            ROUND((SUM(gp * COALESCE(fg3a_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fg3a_per_g,
                            ROUND((SUM(gp * COALESCE(fta_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS fta_per_g,
                            ROUND((SUM(gp * COALESCE(fg3_pct, 0)) / NULLIF(SUM(gp), 0))::numeric, 3) AS fg3_pct,
                            ROUND((SUM(gp * COALESCE(ft_pct, 0)) / NULLIF(SUM(gp), 0))::numeric, 3) AS ft_pct,
                            ROUND((SUM(gp * COALESCE(ast_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS ast_per_g,
+                           ROUND((SUM(gp * COALESCE(tov_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS tov_per_g,
                            ROUND((SUM(gp * COALESCE(min_per_g, 0)) / NULLIF(SUM(gp), 0))::numeric, 1) AS min_per_g
                     FROM archive_player_season_stats
                     WHERE season = %s
