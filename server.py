@@ -2018,6 +2018,44 @@ def _get_gravity_leaderboard(season=None):
         rows = [dict(r) for r in rows]
         # All Time: score within each era, then keep each player's peak season
         scored = _compute_gravity_scores(rows, min_gp=20, dedup=(not season))
+
+        # For All Time view, replace display stats with career averages so the
+        # table doesn't just show the player's single peak season numbers.
+        if not season and scored:
+            with get_conn() as conn:
+                career_rows = q(conn, """
+                    SELECT player_id,
+                           MAX(player_name) AS player_name,
+                           STRING_AGG(DISTINCT team_abbr, '/') AS team_abbr,
+                           SUM(gp)::int AS career_gp,
+                           ROUND((SUM(gp * COALESCE(pts_per_g,  0)) / NULLIF(SUM(gp),0))::numeric,1) AS pts_per_g,
+                           ROUND((SUM(gp * COALESCE(fga_per_g,  0)) / NULLIF(SUM(gp),0))::numeric,1) AS fga_per_g,
+                           ROUND((SUM(gp * COALESCE(fg3m_per_g, 0)) / NULLIF(SUM(gp),0))::numeric,2) AS fg3m_per_g,
+                           ROUND((SUM(gp * COALESCE(fg3a_per_g, 0)) / NULLIF(SUM(gp),0))::numeric,1) AS fg3a_per_g,
+                           ROUND((SUM(gp * COALESCE(fta_per_g,  0)) / NULLIF(SUM(gp),0))::numeric,1) AS fta_per_g,
+                           ROUND((SUM(gp * COALESCE(fg3_pct,    0)) / NULLIF(SUM(gp),0))::numeric,3) AS fg3_pct,
+                           ROUND((SUM(gp * COALESCE(ft_pct,     0)) / NULLIF(SUM(gp),0))::numeric,3) AS ft_pct,
+                           ROUND((SUM(gp * COALESCE(ast_per_g,  0)) / NULLIF(SUM(gp),0))::numeric,1) AS ast_per_g,
+                           ROUND((SUM(gp * COALESCE(min_per_g,  0)) / NULLIF(SUM(gp),0))::numeric,1) AS min_per_g
+                    FROM archive_player_season_stats
+                    GROUP BY player_id
+                """)
+            career_map = {str(r["player_id"]): dict(r) for r in career_rows}
+            for p in scored:
+                c = career_map.get(str(p.get("player_id")))
+                if c:
+                    p["gp"]         = c["career_gp"]
+                    p["team_abbr"]  = c.get("team_abbr") or p.get("team_abbr") or "—"
+                    p["pts_per_g"]  = float(c["pts_per_g"]  or 0)
+                    p["fga_per_g"]  = float(c["fga_per_g"]  or 0)
+                    p["fg3m_per_g"] = float(c["fg3m_per_g"] or 0)
+                    p["fg3a_per_g"] = float(c["fg3a_per_g"] or 0)
+                    p["fta_per_g"]  = float(c["fta_per_g"]  or 0)
+                    p["fg3_pct"]    = float(c["fg3_pct"]    or 0)
+                    p["ft_pct"]     = float(c["ft_pct"]     or 0)
+                    p["ast_per_g"]  = float(c["ast_per_g"]  or 0)
+                    p["min_per_g"]  = float(c["min_per_g"]  or 0)
+
         result = {"players": scored, "season": season, "count": len(scored)}
         if scored:  # never cache an empty result — data may not be loaded yet
             _GRAVITY_CACHE[cache_key] = {"data": result, "ts": now}
