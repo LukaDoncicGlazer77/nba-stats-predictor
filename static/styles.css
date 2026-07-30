@@ -5666,6 +5666,7 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 .grav-fill-3pt      { background: #7c5cff; }
 .grav-fill-contact  { background: #5b8cff; }
+.grav-fill-usage    { background: #1fe3a0; }
 .grav-fill-scoring  { background: #22d3ee; }
 .grav-comp-val {
   font-size: 0.63rem;
@@ -5690,7 +5691,17 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 }
 .grav-pill-3pt      { background: rgba(124,92,255,0.18); color: #7c5cff; }
 .grav-pill-contact  { background: rgba(91,140,255,0.18); color: #5b8cff; }
+.grav-pill-usage    { background: rgba(31,227,160,0.15); color: #1fe3a0; }
 .grav-pill-scoring  { background: rgba(34,211,238,0.15); color: #22d3ee; }
+.grav-versatility-badge {
+  font-size: 0.67rem; font-weight: 700;
+  background: linear-gradient(90deg, rgba(124,92,255,0.2), rgba(91,140,255,0.2));
+  border: 1px solid rgba(124,92,255,0.3);
+  color: #a78bfa;
+  border-radius: 20px;
+  padding: 2px 10px;
+  margin-bottom: 2px;
+}
 
 /* table */
 .grav-rank { color: var(--muted); font-size: 0.78rem; font-weight: 600; }

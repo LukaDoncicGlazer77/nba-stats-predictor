@@ -4178,6 +4178,7 @@ function renderGravitySpotlight(players) {
           <span title="Free throw attempts per game"><strong>${(p.fta_per_g || 0).toFixed(1)}</strong> FTA/G</span>
           <span title="Points per game"><strong>${(p.pts_per_g || 0).toFixed(1)}</strong> PPG</span>
         </div>
+        ${p.versatility_bonus ? `<div class="grav-versatility-badge">&#9889; Two-Way Threat</div>` : ""}
         <div class="grav-component-bars">
           <div class="grav-comp-row">
             <span class="grav-comp-lbl">3PT Threat</span>
@@ -4185,14 +4186,19 @@ function renderGravitySpotlight(players) {
             <span class="grav-comp-val">${p.pct_3pt}th</span>
           </div>
           <div class="grav-comp-row">
-            <span class="grav-comp-lbl">Contact Rate</span>
+            <span class="grav-comp-lbl">Contact Quality</span>
             <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-contact" style="width:${p.pct_contact}%"></div></div>
             <span class="grav-comp-val">${p.pct_contact}th</span>
           </div>
           <div class="grav-comp-row">
-            <span class="grav-comp-lbl">Scoring Load</span>
-            <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-scoring" style="width:${p.pct_scoring}%"></div></div>
-            <span class="grav-comp-val">${p.pct_scoring}th</span>
+            <span class="grav-comp-lbl">Usage Rate</span>
+            <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-usage" style="width:${p.pct_usage || 0}%"></div></div>
+            <span class="grav-comp-val">${p.pct_usage || 0}th</span>
+          </div>
+          <div class="grav-comp-row">
+            <span class="grav-comp-lbl">Efficiency</span>
+            <div class="grav-comp-track"><div class="grav-comp-fill grav-fill-scoring" style="width:${p.pct_ts || 0}%"></div></div>
+            <span class="grav-comp-val">${p.pct_ts || 0}th</span>
           </div>
         </div>
       </div>`;

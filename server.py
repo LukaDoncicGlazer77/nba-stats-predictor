@@ -1842,17 +1842,51 @@ def _compute_gravity_scores(rows, min_gp=20):
     qualified = [r for r in rows if (r.get("gp") or 0) >= min_gp]
     if len(qualified) < 3:
         return qualified
-    fg3m_vals = [r["fg3m_per_g"] or 0 for r in qualified]
-    fta_vals  = [r["fta_per_g"]  or 0 for r in qualified]
-    pts_vals  = [r["pts_per_g"]  or 0 for r in qualified]
+
+    # Derive composite sub-metrics for each player
     for r in qualified:
-        p3 = _pct_rank(fg3m_vals, r["fg3m_per_g"] or 0)
-        pc = _pct_rank(fta_vals,  r["fta_per_g"]  or 0)
-        ps = _pct_rank(pts_vals,  r["pts_per_g"]  or 0)
-        r["gravity"]     = round((0.40 * p3 + 0.35 * pc + 0.25 * ps) * 100, 1)
-        r["pct_3pt"]     = round(p3 * 100, 1)
-        r["pct_contact"] = round(pc * 100, 1)
-        r["pct_scoring"] = round(ps * 100, 1)
+        fga = r.get("fga_per_g") or 0
+        fta = r.get("fta_per_g") or 0
+        ft_pct = r.get("ft_pct") or 0
+        pts = r.get("pts_per_g") or 0
+        tov = r.get("tov_per_g") or 0
+        mpg = r.get("min_per_g") or 1
+
+        # FTA × FT%: expected free-throw points from contact (quality-adjusted contact)
+        r["_contact_quality"] = fta * ft_pct
+
+        # Possession usage per 48 min: captures ball-dominant stars who draw schemes/doubles
+        possessions_used = fga + 0.44 * fta + tov
+        r["_usage_rate"] = (possessions_used / max(mpg, 1)) * 48
+
+        # True Shooting %: efficient scorers create more gravity than chuckers
+        ts_denom = 2 * (fga + 0.44 * fta)
+        r["_ts_pct"] = pts / ts_denom if ts_denom > 0 else 0
+
+    # Build percentile distributions
+    perim_vals   = [r.get("fg3m_per_g") or 0 for r in qualified]
+    contact_vals = [r["_contact_quality"] for r in qualified]
+    usage_vals   = [r["_usage_rate"]      for r in qualified]
+    ts_vals      = [r["_ts_pct"]          for r in qualified]
+
+    for r in qualified:
+        p_perim   = _pct_rank(perim_vals,   r.get("fg3m_per_g") or 0)
+        p_contact = _pct_rank(contact_vals, r["_contact_quality"])
+        p_usage   = _pct_rank(usage_vals,   r["_usage_rate"])
+        p_ts      = _pct_rank(ts_vals,      r["_ts_pct"])
+
+        raw = 0.35 * p_perim + 0.28 * p_contact + 0.22 * p_usage + 0.15 * p_ts
+
+        # Versatility bonus: elite at both perimeter AND interior = extra defensive complexity
+        bonus = 0.05 if (p_perim >= 0.60 and p_contact >= 0.60) else 0
+
+        r["gravity"]     = min(round((raw + bonus) * 100, 1), 100.0)
+        r["pct_3pt"]     = round(p_perim   * 100, 1)
+        r["pct_contact"] = round(p_contact * 100, 1)
+        r["pct_usage"]   = round(p_usage   * 100, 1)
+        r["pct_ts"]      = round(p_ts      * 100, 1)
+        r["versatility_bonus"] = bonus > 0
+
     return sorted(qualified, key=lambda x: -x["gravity"])
 
 def _get_gravity_leaderboard(season=None):
