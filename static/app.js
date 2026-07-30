@@ -4230,7 +4230,7 @@ function renderGravityTable(players, filter) {
     const barW  = p.gravity;
     const team  = p.team_abbr || "—";
     const fg3pct = p.fg3_pct != null ? (p.fg3_pct * 100).toFixed(1) + "%" : "—";
-    return `<tr>
+    return `<tr class="grav-table-row" data-idx="${i}" style="cursor:pointer">
       <td class="grav-rank">${i + 1}</td>
       <td class="grav-player-cell">
         <div class="grav-player-name">${escapeHtml(p.player_name)}</div>
@@ -4251,6 +4251,10 @@ function renderGravityTable(players, filter) {
       <td>${(p.pts_per_g || 0).toFixed(1)}</td>
     </tr>`;
   }).join("");
+
+  tbody.querySelectorAll(".grav-table-row").forEach(tr => {
+    tr.addEventListener("click", () => showGravityDetail(rows[parseInt(tr.dataset.idx)]));
+  });
 }
 
 function _gravityTooltip(p) {
@@ -4409,6 +4413,11 @@ function renderGravityScatter(players) {
       dot.setAttribute("stroke-width", "1");
       if (tip) tip.style.display = "none";
     });
+
+    dot.addEventListener("click", () => {
+      if (tip) tip.style.display = "none";
+      showGravityDetail(p);
+    });
   });
 }
 
@@ -4446,12 +4455,161 @@ async function loadGravity(season) {
   }
 }
 
+function _gravSeasonLabel(season) {
+  return season ? `${season - 1}–${String(season).slice(-2)}` : "—";
+}
+
+async function showGravityDetail(player) {
+  const listView   = $("#gravListView");
+  const detailView = $("#gravDetailView");
+  if (listView)   listView.style.display   = "none";
+  if (detailView) detailView.style.display = "";
+
+  const col  = _gravityColor(player.gravity);
+  const tier = _gravityTier(player.gravity);
+  const ini  = player.player_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+  const avatarEl = $("#gravDetailAvatar");
+  const nameEl   = $("#gravDetailName");
+  const metaEl   = $("#gravDetailMeta");
+  const scoreEl  = $("#gravDetailScore");
+  const tierEl   = $("#gravDetailTier");
+
+  if (avatarEl) { avatarEl.textContent = ini; avatarEl.style.cssText = `background:${col}22;color:${col}`; }
+  if (nameEl)   nameEl.textContent  = player.player_name;
+  if (metaEl)   metaEl.textContent  = `${player.team_abbr || "—"} · ${player.gp} GP · ${_gravSeasonLabel(player.season)}`;
+  if (scoreEl)  { scoreEl.textContent = player.gravity; scoreEl.style.color = col; }
+  if (tierEl)   { tierEl.textContent = tier.label; tierEl.className = `grav-detail-tier ${tier.cls}`; }
+
+  // Component breakdown cards
+  const compEl = $("#gravDetailComponents");
+  if (compEl) {
+    const fg3pct = player.fg3_pct != null ? (player.fg3_pct * 100).toFixed(1) + "%" : "—";
+    const ftpct  = player.ft_pct  != null ? (player.ft_pct  * 100).toFixed(1) + "%" : "—";
+    compEl.innerHTML = `
+      <div class="grav-comp-card">
+        <div class="grav-comp-card-label" style="color:#7c5cff">3PT Threat</div>
+        <div class="grav-comp-card-pct" style="color:#7c5cff">${player.pct_3pt}th pct</div>
+        <div class="grav-comp-card-bar"><div style="width:${player.pct_3pt}%;background:#7c5cff"></div></div>
+        <div class="grav-comp-card-stat">${(player.fg3m_per_g||0).toFixed(1)} 3PM/G · ${(player.fg3a_per_g||0).toFixed(1)} 3PA/G · ${fg3pct}</div>
+      </div>
+      <div class="grav-comp-card">
+        <div class="grav-comp-card-label" style="color:#5b8cff">Contact Quality</div>
+        <div class="grav-comp-card-pct" style="color:#5b8cff">${player.pct_contact}th pct</div>
+        <div class="grav-comp-card-bar"><div style="width:${player.pct_contact}%;background:#5b8cff"></div></div>
+        <div class="grav-comp-card-stat">${(player.fta_per_g||0).toFixed(1)} FTA/G · ${ftpct} FT%</div>
+      </div>
+      <div class="grav-comp-card">
+        <div class="grav-comp-card-label" style="color:#1fe3a0">Usage Rate</div>
+        <div class="grav-comp-card-pct" style="color:#1fe3a0">${player.pct_usage||0}th pct</div>
+        <div class="grav-comp-card-bar"><div style="width:${player.pct_usage||0}%;background:#1fe3a0"></div></div>
+        <div class="grav-comp-card-stat">${(player.min_per_g||0).toFixed(1)} MPG · ${player.gp} games</div>
+      </div>
+      <div class="grav-comp-card">
+        <div class="grav-comp-card-label" style="color:#22d3ee">Efficiency (TS%)</div>
+        <div class="grav-comp-card-pct" style="color:#22d3ee">${player.pct_ts||0}th pct</div>
+        <div class="grav-comp-card-bar"><div style="width:${player.pct_ts||0}%;background:#22d3ee"></div></div>
+        <div class="grav-comp-card-stat">${(player.pts_per_g||0).toFixed(1)} PPG</div>
+      </div>
+      ${player.versatility_bonus ? `<div class="grav-comp-card grav-comp-card-bonus"><span>⚡</span> Two-Way Threat bonus applied — elite in both perimeter and contact</div>` : ""}
+    `;
+  }
+
+  // Stats summary grid
+  const statsEl = $("#gravDetailStatsGrid");
+  if (statsEl) {
+    const fg3pct = player.fg3_pct != null ? (player.fg3_pct * 100).toFixed(1) + "%" : "—";
+    const ftpct  = player.ft_pct  != null ? (player.ft_pct  * 100).toFixed(1) + "%" : "—";
+    const stats = [
+      { label: "PPG",    value: (player.pts_per_g||0).toFixed(1) },
+      { label: "3PM/G",  value: (player.fg3m_per_g||0).toFixed(1) },
+      { label: "3PA/G",  value: (player.fg3a_per_g||0).toFixed(1) },
+      { label: "3P%",    value: fg3pct },
+      { label: "FTA/G",  value: (player.fta_per_g||0).toFixed(1) },
+      { label: "FT%",    value: ftpct },
+      { label: "MPG",    value: (player.min_per_g||0).toFixed(1) },
+      { label: "GP",     value: player.gp },
+    ];
+    statsEl.innerHTML = stats.map(s => `
+      <div class="grav-stat-box">
+        <div class="grav-stat-val">${s.value}</div>
+        <div class="grav-stat-lbl">${s.label}</div>
+      </div>`).join("");
+  }
+
+  // Career trend — fetch from API
+  const careerEl = $("#gravDetailCareer");
+  if (careerEl) {
+    careerEl.innerHTML = `<div class="ref-loading-row"><div class="sf-spinner" style="width:22px;height:22px;border-width:3px"></div></div>`;
+    try {
+      const res  = await fetch(`/api/gravity-player?player_id=${encodeURIComponent(player.player_id)}`);
+      const data = await res.json();
+      const seasons = data.seasons || [];
+      if (seasons.length <= 1) {
+        careerEl.innerHTML = `<p class="grav-career-empty">Career trend requires data from multiple seasons.</p>`;
+      } else {
+        careerEl.innerHTML = `<div class="grav-career-title">Career Gravity Trend</div>` + _renderGravityCareerChart(seasons);
+      }
+    } catch {
+      careerEl.innerHTML = "";
+    }
+  }
+}
+
+function _renderGravityCareerChart(seasons) {
+  const W = 600, H = 130;
+  const PAD = { top: 16, right: 20, bottom: 28, left: 44 };
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+
+  const gravities = seasons.map(s => s.gravity || 0);
+  const maxG = Math.max(...gravities, 60);
+  const minG = Math.max(Math.min(...gravities) - 10, 0);
+
+  const xS = i => PAD.left + (i / (seasons.length - 1)) * innerW;
+  const yS = v => PAD.top  + (1 - (v - minG) / (maxG - minG)) * innerH;
+
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block">`;
+
+  // Grid
+  [25, 50, 75].forEach(v => {
+    if (v < minG || v > maxG) return;
+    const y = yS(v);
+    s += `<line x1="${PAD.left}" y1="${y}" x2="${PAD.left+innerW}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+    s += `<text x="${PAD.left-6}" y="${y+4}" text-anchor="end" fill="rgba(255,255,255,0.3)" font-size="9">${v}</text>`;
+  });
+
+  // Line path
+  const pts = seasons.map((s, i) => `${xS(i)},${yS(s.gravity||0)}`).join(" ");
+  s += `<polyline points="${pts}" fill="none" stroke="rgba(124,92,255,0.6)" stroke-width="2.5" stroke-linejoin="round"/>`;
+
+  // Dots + labels
+  seasons.forEach((season, i) => {
+    const x = xS(i), y = yS(season.gravity || 0);
+    const col = _gravityColor(season.gravity || 0);
+    s += `<circle cx="${x}" cy="${y}" r="5" fill="${col}" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>`;
+    s += `<text x="${x}" y="${H - 6}" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-size="9">${String(season.season).slice(-2)}-${String(season.season + 1).slice(-2)}</text>`;
+    s += `<text x="${x}" y="${y - 8}" text-anchor="middle" fill="${col}" font-size="9" font-weight="700">${season.gravity}</text>`;
+  });
+
+  s += `</svg>`;
+  return `<div class="grav-career-chart">${s}</div>`;
+}
+
 // Wire up gravity controls
 document.addEventListener("DOMContentLoaded", () => {
   const seasonSel = $("#gravitySeason");
   const searchEl  = $("#gravitySearch");
+  const backBtn   = $("#gravBackBtn");
+
   if (seasonSel) seasonSel.addEventListener("change", () => loadGravity(seasonSel.value));
   if (searchEl)  searchEl.addEventListener("input",  () => {
     if (_gravityData) renderGravityTable(_gravityData.players || [], searchEl.value);
+  });
+  if (backBtn) backBtn.addEventListener("click", () => {
+    const dv = $("#gravDetailView");
+    const lv = $("#gravListView");
+    if (dv) dv.style.display = "none";
+    if (lv) lv.style.display = "";
   });
 });

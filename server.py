@@ -1677,6 +1677,12 @@ class Handler(SimpleHTTPRequestHandler):
             season = int(season_raw) if season_raw.isdigit() else None
             return self.send_json(_get_gravity_leaderboard(season))
 
+        if parsed.path == "/api/gravity-player":
+            pid = (params.get("player_id") or [""])[0].strip()
+            if not pid:
+                return self.send_json({"error": "player_id required"}, status=400)
+            return self.send_json(_get_gravity_player_career(pid))
+
         if parsed.path.startswith("/api/"):
             return self.send_json({"error": "Not found"}, status=404)
 
@@ -1943,6 +1949,56 @@ def _get_gravity_leaderboard(season=None):
         return result
     except Exception as exc:
         return {"players": [], "error": str(exc), "season": season, "count": 0}
+
+def _get_gravity_player_career(player_id: str):
+    try:
+        with get_conn() as conn:
+            rows = q(conn, """
+                SELECT season,
+                       STRING_AGG(DISTINCT team_abbr, '/') AS team_abbr,
+                       SUM(gp)::int AS gp,
+                       ROUND((SUM(gp * COALESCE(pts_per_g,0)) / NULLIF(SUM(gp),0))::numeric,1) AS pts_per_g,
+                       ROUND((SUM(gp * COALESCE(fg3m_per_g,0)) / NULLIF(SUM(gp),0))::numeric,2) AS fg3m_per_g,
+                       ROUND((SUM(gp * COALESCE(fg3a_per_g,0)) / NULLIF(SUM(gp),0))::numeric,1) AS fg3a_per_g,
+                       ROUND((SUM(gp * COALESCE(fta_per_g,0)) / NULLIF(SUM(gp),0))::numeric,1) AS fta_per_g,
+                       ROUND((SUM(gp * COALESCE(fg3_pct,0)) / NULLIF(SUM(gp),0))::numeric,3) AS fg3_pct,
+                       ROUND((SUM(gp * COALESCE(ft_pct,0)) / NULLIF(SUM(gp),0))::numeric,3) AS ft_pct,
+                       ROUND((SUM(gp * COALESCE(fga_per_g,0)) / NULLIF(SUM(gp),0))::numeric,1) AS fga_per_g,
+                       ROUND((SUM(gp * COALESCE(tov_per_g,0)) / NULLIF(SUM(gp),0))::numeric,1) AS tov_per_g,
+                       ROUND((SUM(gp * COALESCE(min_per_g,0)) / NULLIF(SUM(gp),0))::numeric,1) AS min_per_g
+                FROM archive_player_season_stats
+                WHERE player_id = %s
+                GROUP BY season ORDER BY season
+            """, (player_id,))
+        seasons = [dict(r) for r in rows]
+        if not seasons:
+            return {"seasons": [], "player_id": player_id}
+        scored_seasons = []
+        for s in seasons:
+            season = s["season"]
+            league = _get_gravity_leaderboard(season)
+            player_row = next((p for p in league.get("players", []) if str(p.get("player_id","")) == str(player_id)), None)
+            if player_row:
+                scored_seasons.append({
+                    "season": season,
+                    "team_abbr": s.get("team_abbr", ""),
+                    "gp": s["gp"],
+                    "gravity": player_row.get("gravity"),
+                    "pct_3pt": player_row.get("pct_3pt"),
+                    "pct_contact": player_row.get("pct_contact"),
+                    "pct_usage": player_row.get("pct_usage"),
+                    "pct_ts": player_row.get("pct_ts"),
+                    "pts_per_g": float(s.get("pts_per_g") or 0),
+                    "fg3m_per_g": float(s.get("fg3m_per_g") or 0),
+                    "fg3a_per_g": float(s.get("fg3a_per_g") or 0),
+                    "fta_per_g": float(s.get("fta_per_g") or 0),
+                    "fg3_pct": float(s.get("fg3_pct") or 0),
+                    "ft_pct": float(s.get("ft_pct") or 0),
+                    "min_per_g": float(s.get("min_per_g") or 0),
+                })
+        return {"seasons": scored_seasons, "player_id": player_id}
+    except Exception as exc:
+        return {"seasons": [], "error": str(exc)}
 
 _ensure_gravity_table()
 

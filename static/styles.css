@@ -5770,11 +5770,90 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
   font-size: 0.65rem; margin-top: 4px;
 }
 
+/* detail view */
+.grav-detail-hero {
+  display: flex; align-items: center; gap: 18px;
+  background: var(--panel);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.grav-detail-avatar {
+  width: 58px; height: 58px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; font-weight: 800; flex-shrink: 0;
+}
+.grav-detail-info { flex: 1; }
+.grav-detail-name { margin: 0; font-size: 1.2rem; font-weight: 800; }
+.grav-detail-meta { font-size: 0.75rem; color: var(--muted); margin-top: 3px; }
+.grav-detail-score-block { text-align: right; }
+.grav-detail-score { font-size: 2.8rem; font-weight: 900; line-height: 1; }
+
+.grav-detail-components {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 12px; margin-bottom: 16px;
+}
+.grav-comp-card {
+  background: var(--panel);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 14px 12px;
+}
+.grav-comp-card-bonus {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.75rem; color: #a78bfa;
+  background: rgba(124,92,255,0.08);
+  border-color: rgba(124,92,255,0.2);
+}
+.grav-comp-card-label { font-size: 0.7rem; font-weight: 700; margin-bottom: 4px; }
+.grav-comp-card-pct   { font-size: 1.2rem; font-weight: 900; line-height: 1; }
+.grav-comp-card-bar {
+  height: 5px; background: rgba(255,255,255,0.07);
+  border-radius: 3px; overflow: hidden; margin: 8px 0 6px;
+}
+.grav-comp-card-bar div { height: 100%; border-radius: 3px; }
+.grav-comp-card-stat { font-size: 0.68rem; color: var(--muted); }
+
+.grav-detail-stats-grid {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  gap: 10px; margin-bottom: 16px;
+}
+.grav-stat-box {
+  background: var(--panel);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 12px 8px;
+  text-align: center;
+}
+.grav-stat-val { font-size: 1.1rem; font-weight: 800; }
+.grav-stat-lbl { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+
+.grav-detail-career {
+  background: var(--panel);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.grav-career-title { font-size: 0.8rem; font-weight: 700; color: rgba(220,232,255,0.7); margin-bottom: 10px; }
+.grav-career-chart { width: 100%; }
+.grav-career-empty { font-size: 0.75rem; color: var(--muted); margin: 0; }
+
+.grav-table-row:hover { background: rgba(255,255,255,0.03); }
+
+@media (max-width: 900px) {
+  .grav-detail-components { grid-template-columns: repeat(2, 1fr); }
+  .grav-detail-stats-grid  { grid-template-columns: repeat(4, 1fr); }
+}
 @media (max-width: 800px) {
   .grav-spotlight { grid-template-columns: 1fr; }
   .grav-score-bar-track { display: none; }
   .grav-scatter-sub { display: none; }
+  .grav-detail-hero { flex-wrap: wrap; }
 }
 @media (max-width: 600px) {
   .grav-method-note { font-size: 0.68rem; }
+  .grav-detail-components { grid-template-columns: 1fr 1fr; }
+  .grav-detail-stats-grid  { grid-template-columns: repeat(4, 1fr); }
 }

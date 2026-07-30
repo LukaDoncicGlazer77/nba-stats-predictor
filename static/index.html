@@ -72,7 +72,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" />
-    <link rel="stylesheet" href="styles.css?v=20260730-gravity4" />
+    <link rel="stylesheet" href="styles.css?v=20260730-gravity5" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WJMZDK5CEK"></script>
@@ -1132,6 +1132,9 @@
             </div>
           </div>
 
+          <!-- List view -->
+          <div id="gravListView">
+
           <!-- Spotlight top 3 -->
           <div class="grav-spotlight" id="gravSpotlight"></div>
 
@@ -1177,6 +1180,35 @@
               <tbody id="gravTableBody"></tbody>
             </table>
             <div id="gravEmpty" class="ref-no-data" style="display:none">No data yet — run <code>python3 pull_gravity_data.py</code> locally to populate.</div>
+          </div>
+
+          </div><!-- /gravListView -->
+
+          <!-- Player detail view -->
+          <div id="gravDetailView" style="display:none">
+            <div class="ref-detail-back-row">
+              <button class="ref-back-btn" id="gravBackBtn">&#8592; Back to Leaderboard</button>
+            </div>
+            <div class="grav-detail-hero">
+              <div class="grav-detail-avatar" id="gravDetailAvatar"></div>
+              <div class="grav-detail-info">
+                <h3 class="grav-detail-name" id="gravDetailName"></h3>
+                <div class="grav-detail-meta" id="gravDetailMeta"></div>
+              </div>
+              <div class="grav-detail-score-block">
+                <div class="grav-detail-score" id="gravDetailScore"></div>
+                <div class="grav-detail-tier"  id="gravDetailTier"></div>
+              </div>
+            </div>
+
+            <!-- Component breakdown -->
+            <div class="grav-detail-components" id="gravDetailComponents"></div>
+
+            <!-- Stats grid -->
+            <div class="grav-detail-stats-grid" id="gravDetailStatsGrid"></div>
+
+            <!-- Career gravity trend -->
+            <div class="grav-detail-career" id="gravDetailCareer"></div>
           </div>
         </section>
 
@@ -1350,7 +1382,7 @@
       </main>
     </div><!-- /appShell -->
 
-    <script src="app.js?v=20260730-gravity4"></script>
+    <script src="app.js?v=20260730-gravity5"></script>
 
     <!--Start of Tawk.to Script-->
     <script type="text/javascript">
