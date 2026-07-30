@@ -4682,11 +4682,62 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   const searchEl  = $("#gravitySearch");
+  const searchDrop = $("#gravitySearchDrop");
   const backBtn   = $("#gravBackBtn");
 
   if (seasonSel) seasonSel.addEventListener("change", () => loadGravity(seasonSel.value));
-  if (searchEl)  searchEl.addEventListener("input",  () => {
-    if (_gravityData) renderGravityTable(_gravityData.players || [], searchEl.value);
+
+  function _closeGravDrop() {
+    if (searchDrop) searchDrop.classList.remove("open");
+  }
+
+  if (searchEl) {
+    searchEl.addEventListener("input", () => {
+      const raw = searchEl.value;
+      const q = raw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      if (!q || !_gravityData) { _closeGravDrop(); return; }
+
+      const pool = _gravityData.players || [];
+      const matches = pool
+        .filter(p => {
+          const name = p.player_name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+          return name.split(/\s+/).some(part => part.startsWith(q)) || name.includes(q);
+        })
+        .sort((a, b) => {
+          const na = a.player_name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+          const nb = b.player_name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+          const aS = na.split(/\s+/).some(w => w.startsWith(q));
+          const bS = nb.split(/\s+/).some(w => w.startsWith(q));
+          if (aS !== bS) return aS ? -1 : 1;
+          return b.gravity - a.gravity;
+        })
+        .slice(0, 8);
+
+      if (!matches.length) { _closeGravDrop(); return; }
+
+      searchDrop.innerHTML = matches.map(p =>
+        `<div class="compare-option" data-pid="${escapeHtml(String(p.player_id))}">${escapeHtml(p.player_name)} <span style="color:var(--muted);font-size:0.75em">· ${p.gravity} gravity</span></div>`
+      ).join("");
+      searchDrop.classList.add("open");
+
+      searchDrop.querySelectorAll(".compare-option").forEach(opt => {
+        opt.addEventListener("mousedown", e => {
+          e.preventDefault();
+          const pid = opt.dataset.pid;
+          const player = pool.find(p => String(p.player_id) === pid);
+          _closeGravDrop();
+          searchEl.value = "";
+          if (player) showGravityDetail(player);
+        });
+      });
+    });
+
+    searchEl.addEventListener("blur", () => setTimeout(_closeGravDrop, 150));
+    searchEl.addEventListener("keydown", e => { if (e.key === "Escape") { _closeGravDrop(); searchEl.value = ""; } });
+  }
+
+  document.addEventListener("click", e => {
+    if (!e.target.closest("#gravitySearch") && !e.target.closest("#gravitySearchDrop")) _closeGravDrop();
   });
   if (backBtn) backBtn.addEventListener("click", () => {
     const dv = $("#gravDetailView");
