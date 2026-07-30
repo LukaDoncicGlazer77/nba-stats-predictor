@@ -3278,17 +3278,24 @@ function _refBiasRating(fd) {
   return { label: "Neutral", cls: "ref-rating-neutral" };
 }
 
+function _recentBias(r) {
+  if (r.recent_games > 0 && r.recent_adjusted_foul_disparity != null)
+    return parseFloat(r.recent_adjusted_foul_disparity);
+  return parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity);
+}
+
 function renderRefSpotlight(allRows) {
   const el = $("#refSpotlight");
   if (!el || !allRows.length) return;
-  const sorted = allRows.slice().sort((a, b) => parseFloat(b.adjusted_foul_disparity ?? b.foul_disparity) - parseFloat(a.adjusted_foul_disparity ?? a.foul_disparity));
-  const mostHome = sorted[0];
-  const mostAway = sorted[sorted.length - 1];
-  const mostWhistles = allRows.slice().sort((a, b) => parseFloat(b.avg_total_fouls) - parseFloat(a.avg_total_fouls))[0];
-  const fewestWhistles = allRows.slice().sort((a, b) => parseFloat(a.avg_total_fouls) - parseFloat(b.avg_total_fouls))[0];
-  const l2mRows = allRows.filter(r => r.l2m_total > 0);
-  const mostAccurate   = l2mRows.slice().sort((a, b) => parseFloat(a.error_rate_pct) - parseFloat(b.error_rate_pct))[0];
-  const leastAccurate  = l2mRows.slice().sort((a, b) => parseFloat(b.error_rate_pct) - parseFloat(a.error_rate_pct))[0];
+  const sorted = allRows.slice().sort((a, b) => _recentBias(b) - _recentBias(a));
+  const mostHome        = sorted[0];
+  const mostAway        = sorted[sorted.length - 1];
+  const mostWhistles    = allRows.slice().sort((a, b) => parseFloat(b.avg_total_fouls) - parseFloat(a.avg_total_fouls))[0];
+  const fewestWhistles  = allRows.slice().sort((a, b) => parseFloat(a.avg_total_fouls) - parseFloat(b.avg_total_fouls))[0];
+  const l2mRows    = allRows.filter(r => r.l2m_total > 0);
+  const clutchRows = allRows.filter(r => r.clutch_total > 0);
+  const mostAccurate = l2mRows.slice().sort((a, b) => parseFloat(a.error_rate_pct) - parseFloat(b.error_rate_pct))[0];
+  const worstClutch  = clutchRows.slice().sort((a, b) => parseFloat(b.clutch_error_rate_pct) - parseFloat(a.clutch_error_rate_pct))[0];
 
   const card = (icon, label, name, val, cls) => `
     <div class="ref-spotlight-card ${cls}" onclick="_refSpotlightClick('${escapeHtml(name)}')">
@@ -3298,19 +3305,21 @@ function renderRefSpotlight(allRows) {
       <div class="ref-spotlight-val">${val}</div>
     </div>`;
 
-  const homeFd = parseFloat(mostHome.adjusted_foul_disparity ?? mostHome.foul_disparity);
-  const awayFd = parseFloat(mostAway.adjusted_foul_disparity ?? mostAway.foul_disparity);
+  const homeFd = _recentBias(mostHome);
+  const awayFd = _recentBias(mostAway);
   el.innerHTML = [
-    card("🏠", "Most Home-Favoring", mostHome.ref_name,
-      `${homeFd > 0 ? "+" : ""}${homeFd.toFixed(2)} adj. bias`, "ref-spot-red"),
-    card("✈️", "Most Away-Friendly", mostAway.ref_name,
-      `${awayFd > 0 ? "+" : ""}${awayFd.toFixed(2)} adj. bias`, "ref-spot-green"),
+    card("🏠", "Most Home-Favoring (2yr)", mostHome.ref_name,
+      `${homeFd > 0 ? "+" : ""}${homeFd.toFixed(2)} recent bias`, "ref-spot-red"),
+    card("✈️", "Most Away-Friendly (2yr)", mostAway.ref_name,
+      `${awayFd > 0 ? "+" : ""}${awayFd.toFixed(2)} recent bias`, "ref-spot-green"),
     card("📢", "Most Whistles", mostWhistles.ref_name,
       `${mostWhistles.avg_total_fouls} fouls/game`, "ref-spot-yellow"),
     card("🤫", "Fewest Whistles", fewestWhistles.ref_name,
       `${fewestWhistles.avg_total_fouls} fouls/game`, "ref-spot-blue"),
-    ...(mostAccurate  ? [card("✅", "Most Accurate (L2M)",  mostAccurate.ref_name,  `${parseFloat(mostAccurate.error_rate_pct).toFixed(1)}% error rate`,  "ref-spot-green")] : []),
-    ...(leastAccurate ? [card("❌", "Least Accurate (L2M)", leastAccurate.ref_name, `${parseFloat(leastAccurate.error_rate_pct).toFixed(1)}% error rate`, "ref-spot-red")]  : []),
+    ...(mostAccurate ? [card("✅", "Most Accurate (L2M)", mostAccurate.ref_name,
+      `${parseFloat(mostAccurate.error_rate_pct).toFixed(1)}% overall error`, "ref-spot-green")] : []),
+    ...(worstClutch  ? [card("💀", "Worst Clutch Caller", worstClutch.ref_name,
+      `${parseFloat(worstClutch.clutch_error_rate_pct).toFixed(1)}% Q4/OT error`, "ref-spot-red")]  : []),
   ].join("");
 }
 window._refSpotlightClick = (name) => showRefDetail(name);
@@ -3334,17 +3343,24 @@ function renderRefList() {
     return;
   }
 
-  // Use adjusted disparity (normalized vs league avg) for meter scale
-  const maxFd = Math.max(..._refData.map(r => Math.abs(parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity))), 0.1);
+  // Use recent 2-season bias for meter scale and rating (more predictive)
+  const maxFd = Math.max(..._refData.map(r => Math.abs(_recentBias(r))), 0.1);
 
   tbody.innerHTML = rows.map((r, i) => {
-    const fd  = parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity);
-    const ftd = parseFloat(r.adjusted_fta_disparity  ?? r.fta_disparity);
+    const fd      = _recentBias(r);
+    const careerFd = parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity);
+    const ftd     = parseFloat(r.adjusted_fta_disparity ?? r.fta_disparity);
+    const hasRecent = r.recent_games > 0 && r.recent_adjusted_foul_disparity != null;
+    // Trend arrow: is ref getting more/less biased vs career?
+    const trendDiff = hasRecent ? (fd - careerFd) : 0;
+    const trendArrow = hasRecent && Math.abs(trendDiff) >= 0.15
+      ? (trendDiff > 0 ? ' <span style="color:#f87171;font-size:0.7em">↑</span>' : ' <span style="color:#4ade80;font-size:0.7em">↓</span>')
+      : "";
     const fdClass  = fd  > 0.5 ? "ref-bias-high" : fd  < -0.5 ? "ref-bias-low" : "ref-bias-neutral";
     const ftdClass = ftd > 1.0 ? "ref-bias-high" : ftd < -1.0 ? "ref-bias-low" : "ref-bias-neutral";
     const rating = _refBiasRating(fd);
     const meterPct = (Math.abs(fd) / maxFd * 45).toFixed(1);
-    const meterDir = fd >= 0 ? "left:50%" : `right:50%`;
+    const meterDir = fd >= 0 ? "left:50%" : "right:50%";
     const meterColor = fd > 0.5 ? "#f87171" : fd < -0.5 ? "#4ade80" : "#8899b4";
     const erPct = r.error_rate_pct != null ? parseFloat(r.error_rate_pct) : null;
     const erStr = erPct != null ? `${erPct.toFixed(1)}%` : "—";
@@ -3354,7 +3370,7 @@ function renderRefList() {
       <td><button class="ref-name-btn">${escapeHtml(r.ref_name)}</button></td>
       <td class="ref-num">${r.games}</td>
       <td class="ref-num">${r.avg_total_fouls}</td>
-      <td><span class="ref-bias-badge ${fdClass}">${fd > 0 ? "+" : ""}${fd.toFixed(2)}</span></td>
+      <td><span class="ref-bias-badge ${fdClass}">${fd > 0 ? "+" : ""}${fd.toFixed(2)}${trendArrow}</span></td>
       <td><span class="ref-bias-badge ${ftdClass}">${ftd > 0 ? "+" : ""}${ftd.toFixed(2)}</span></td>
       <td class="ref-num">${(parseFloat(r.home_win_pct) * 100).toFixed(1)}%</td>
       <td><span class="ref-bias-badge ${erCls}">${erStr}</span></td>
@@ -3383,7 +3399,7 @@ function renderRefScatter(data) {
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
 
-  const biases = data.map(r => parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity));
+  const biases = data.map(r => _recentBias(r));
   const fouls  = data.map(r => parseFloat(r.avg_total_fouls));
   const minB = Math.min(...biases), maxB = Math.max(...biases);
   const minF = Math.min(...fouls),  maxF = Math.max(...fouls);
@@ -3418,12 +3434,12 @@ function renderRefScatter(data) {
   s += `<line x1="${zeroX}" y1="${PAD.top}" x2="${zeroX}" y2="${PAD.top + innerH}" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-dasharray="4,3"/>`;
 
   // Axis labels
-  s += `<text x="${PAD.left + innerW / 2}" y="${H - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="12">← Away-favoring · Adj. Foul Bias (vs league avg) · Home-favoring →</text>`;
+  s += `<text x="${PAD.left + innerW / 2}" y="${H - 4}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="12">← Away-favoring · Recent 2yr Adj. Foul Bias · Home-favoring →</text>`;
   s += `<text x="13" y="${PAD.top + innerH / 2}" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="12" transform="rotate(-90,13,${PAD.top + innerH / 2})">Fouls / Game</text>`;
 
   // Dots
   data.forEach((r, i) => {
-    const bias = parseFloat(r.foul_disparity);
+    const bias = _recentBias(r);
     const fouls = parseFloat(r.avg_total_fouls);
     const cx = xS(bias), cy = yS(fouls);
     const color = bias > 0.5 ? "#f87171" : bias < -0.5 ? "#4ade80" : "#8899b4";
@@ -3450,12 +3466,16 @@ function renderRefScatter(data) {
       dot.setAttribute("r", "9");
       if (!tip) return;
       const erPct = r.error_rate_pct != null ? parseFloat(r.error_rate_pct) : null;
+      const clutchPct = r.clutch_error_rate_pct != null ? parseFloat(r.clutch_error_rate_pct) : null;
+      const careerFd = parseFloat(r.adjusted_foul_disparity ?? r.foul_disparity);
       tip.innerHTML = `
         <div class="sct-name">${escapeHtml(r.ref_name)}</div>
-        <div class="sct-row"><span>Adj. Foul Bias</span><span style="color:${bias > 0.5 ? "#f87171" : bias < -0.5 ? "#4ade80" : "#8899b4"}">${bias > 0 ? "+" : ""}${bias.toFixed(2)}</span></div>
+        <div class="sct-row"><span>Recent Bias (2yr)</span><span style="color:${bias > 0.5 ? "#f87171" : bias < -0.5 ? "#4ade80" : "#8899b4"}">${bias > 0 ? "+" : ""}${bias.toFixed(2)}</span></div>
+        <div class="sct-row"><span>Career Bias</span><span>${careerFd > 0 ? "+" : ""}${careerFd.toFixed(2)}</span></div>
         <div class="sct-row"><span>Fouls/Game</span><span>${r.avg_total_fouls}</span></div>
         <div class="sct-row"><span>Games</span><span>${r.games}</span></div>
         ${erPct != null ? `<div class="sct-row"><span>L2M Error Rate</span><span style="color:${erPct > 35 ? "#f87171" : erPct < 25 ? "#4ade80" : "#8899b4"}">${erPct.toFixed(1)}%</span></div>` : ""}
+        ${clutchPct != null ? `<div class="sct-row"><span>Clutch (Q4/OT)</span><span style="color:${clutchPct > 40 ? "#f87171" : clutchPct < 28 ? "#4ade80" : "#8899b4"}">${clutchPct.toFixed(1)}%</span></div>` : ""}
         <div class="sct-badge ${rating.cls}">${rating.label}</div>`;
       tip.style.display = "block";
     });
@@ -3491,7 +3511,7 @@ async function showRefDetail(name) {
     const res = await fetch(`/api/referee-detail?name=${encodeURIComponent(name)}`);
     const data = await res.json();
     const agg = _refData.find(r => r.ref_name === name) || {};
-    const fd = parseFloat(agg.foul_disparity) || 0;
+    const fd = _recentBias(agg) || 0;
     const rating = _refBiasRating(fd);
     $("#refDetailMeta").textContent = `${agg.games || 0} games officiated · 2015–2025`;
     const verdict = $("#refDetailVerdict");
@@ -3507,19 +3527,46 @@ async function showRefDetail(name) {
 }
 
 function renderRefStatCards(agg, l2m) {
-  const fd  = parseFloat(agg.adjusted_foul_disparity ?? agg.foul_disparity) || 0;
-  const ftd = parseFloat(agg.adjusted_fta_disparity  ?? agg.fta_disparity)  || 0;
-  const hwp = (parseFloat(agg.home_win_pct) || 0) * 100;
-  const erPct = l2m && l2m.error_rate_pct != null ? parseFloat(l2m.error_rate_pct) : null;
-  const l2mTotal = l2m ? (parseInt(l2m.total) || 0) : 0;
+  const fd      = parseFloat(agg.adjusted_foul_disparity ?? agg.foul_disparity) || 0;
+  const ftd     = parseFloat(agg.adjusted_fta_disparity  ?? agg.fta_disparity)  || 0;
+  const recentFd  = agg.recent_games > 0 && agg.recent_adjusted_foul_disparity != null
+    ? parseFloat(agg.recent_adjusted_foul_disparity) : null;
+  const hwp     = (parseFloat(agg.home_win_pct) || 0) * 100;
+  const erPct   = l2m && l2m.error_rate_pct != null ? parseFloat(l2m.error_rate_pct) : null;
+  const clutchPct = l2m && l2m.clutch_error_rate_pct != null ? parseFloat(l2m.clutch_error_rate_pct) : null;
+  const l2mTotal    = l2m ? (parseInt(l2m.total)        || 0) : 0;
+  const clutchTotal = l2m ? (parseInt(l2m.clutch_total) || 0) : 0;
+
   const cards = [
-    { icon: "📢", label: "Fouls / Game", value: agg.avg_total_fouls || "—", sub: "total (both teams)", cls: "" },
-    { icon: "🏠", label: "Adj. Foul Bias", value: (fd > 0 ? "+" : "") + fd.toFixed(2), sub: "vs league avg · positive = more home advantage than normal", cls: fd > 0.5 ? "ref-stat-high" : fd < -0.5 ? "ref-stat-low" : "" },
-    { icon: "🆓", label: "Adj. FTA Bias",  value: (ftd > 0 ? "+" : "") + ftd.toFixed(2), sub: "vs league avg free throw disparity", cls: ftd > 1.0 ? "ref-stat-high" : ftd < -1.0 ? "ref-stat-low" : "" },
-    { icon: "🏆", label: "Home Win %", value: hwp.toFixed(1) + "%", sub: "home team wins in officiated games", cls: hwp > 56 ? "ref-stat-high" : hwp < 46 ? "ref-stat-low" : "" },
+    { icon: "📢", label: "Fouls / Game",
+      value: agg.avg_total_fouls || "—",
+      sub: "total (both teams)", cls: "" },
+    { icon: "🏠", label: "Career Foul Bias",
+      value: (fd > 0 ? "+" : "") + fd.toFixed(2),
+      sub: "vs league avg · positive = more home advantage than normal",
+      cls: fd > 0.5 ? "ref-stat-high" : fd < -0.5 ? "ref-stat-low" : "" },
+    recentFd != null
+      ? { icon: "📅", label: "Recent Bias (2yr)",
+          value: (recentFd > 0 ? "+" : "") + recentFd.toFixed(2),
+          sub: `last 2 seasons · ${agg.recent_games} games · more predictive`,
+          cls: recentFd > 0.5 ? "ref-stat-high" : recentFd < -0.5 ? "ref-stat-low" : "" }
+      : { icon: "📅", label: "Recent Bias (2yr)", value: "—", sub: "not active in last 2 seasons", cls: "" },
+    { icon: "🏆", label: "Home Win %",
+      value: hwp.toFixed(1) + "%",
+      sub: "home team wins in officiated games",
+      cls: hwp > 56 ? "ref-stat-high" : hwp < 46 ? "ref-stat-low" : "" },
     erPct != null
-      ? { icon: "🎯", label: "L2M Error Rate", value: erPct.toFixed(1) + "%", sub: `${l2mTotal} late-game calls reviewed · lower = more accurate`, cls: erPct > 35 ? "ref-stat-high" : erPct < 25 ? "ref-stat-low" : "" }
-      : { icon: "🎯", label: "L2M Error Rate", value: "—", sub: "no L2M report data for this referee", cls: "" },
+      ? { icon: "🎯", label: "L2M Error Rate",
+          value: erPct.toFixed(1) + "%",
+          sub: `${l2mTotal} late-game calls reviewed · lower = more accurate`,
+          cls: erPct > 35 ? "ref-stat-high" : erPct < 25 ? "ref-stat-low" : "" }
+      : { icon: "🎯", label: "L2M Error Rate", value: "—", sub: "no L2M report data", cls: "" },
+    clutchPct != null
+      ? { icon: "⏱️", label: "Clutch Error Rate",
+          value: clutchPct.toFixed(1) + "%",
+          sub: `Q4 + OT only · ${clutchTotal} calls · errors when it counts most`,
+          cls: clutchPct > 40 ? "ref-stat-high" : clutchPct < 28 ? "ref-stat-low" : "" }
+      : { icon: "⏱️", label: "Clutch Error Rate", value: "—", sub: "Q4/OT · no data", cls: "" },
   ];
   $("#refStatCards").innerHTML = cards.map(c => `
     <div class="ref-stat-card ${c.cls}">

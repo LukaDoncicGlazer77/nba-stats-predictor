@@ -2005,7 +2005,10 @@ _REF_BASELINE_CACHE = {"data": None, "ts": 0}
 _REF_BASELINE_TTL = 3600
 
 _REF_AGGS_SQL = """
-WITH ref_games AS (
+WITH max_season AS (
+    SELECT MAX(season) - 1 AS cutoff FROM archive_referee_games
+),
+ref_games AS (
     SELECT ref1 AS ref_name, season, home_team, away_team,
            home_pf, away_pf, home_fta, away_fta, home_pts, away_pts
     FROM archive_referee_games WHERE ref1 IS NOT NULL AND ref1 != ''
@@ -2021,8 +2024,20 @@ WITH ref_games AS (
 league_avg AS (
     SELECT
         AVG(CAST(away_pf  AS float) - home_pf)  AS avg_foul_disp,
-        AVG(CAST(away_fta AS float) - home_fta) AS avg_fta_disp
-    FROM archive_referee_games
+        AVG(CAST(away_fta AS float) - home_fta) AS avg_fta_disp,
+        AVG(CASE WHEN g.season >= m.cutoff THEN CAST(away_pf  AS float) - home_pf  END) AS recent_avg_foul_disp,
+        AVG(CASE WHEN g.season >= m.cutoff THEN CAST(away_fta AS float) - home_fta END) AS recent_avg_fta_disp
+    FROM archive_referee_games g, max_season m
+),
+recent_aggs AS (
+    SELECT
+        rg.ref_name,
+        COUNT(*) AS recent_games,
+        ROUND(AVG(CAST(away_pf  AS float) - home_pf)::numeric, 2) AS recent_foul_disparity,
+        ROUND(AVG(CAST(away_fta AS float) - home_fta)::numeric, 2) AS recent_fta_disparity
+    FROM ref_games rg, max_season m
+    WHERE rg.season >= m.cutoff AND rg.ref_name IS NOT NULL AND rg.ref_name != ''
+    GROUP BY rg.ref_name
 ),
 l2m_stats AS (
     SELECT lower(ref_name) AS ref_lower,
@@ -2040,6 +2055,25 @@ l2m_stats AS (
         SELECT ref_3, decision FROM archive_l2m
         WHERE ref_3 IS NOT NULL AND ref_3 != '' AND decision IN ('CC','CNC','INC','IC')
     ) l
+    GROUP BY lower(ref_name)
+),
+l2m_clutch AS (
+    SELECT lower(ref_name) AS ref_lower,
+        COUNT(*) AS clutch_total,
+        SUM(CASE WHEN decision IN ('INC','IC') THEN 1 ELSE 0 END) AS clutch_errors
+    FROM (
+        SELECT ref_1 AS ref_name, decision FROM archive_l2m
+        WHERE ref_1 IS NOT NULL AND ref_1 != '' AND decision IN ('CC','CNC','INC','IC')
+          AND period IN ('4', 'OT')
+        UNION ALL
+        SELECT ref_2, decision FROM archive_l2m
+        WHERE ref_2 IS NOT NULL AND ref_2 != '' AND decision IN ('CC','CNC','INC','IC')
+          AND period IN ('4', 'OT')
+        UNION ALL
+        SELECT ref_3, decision FROM archive_l2m
+        WHERE ref_3 IS NOT NULL AND ref_3 != '' AND decision IN ('CC','CNC','INC','IC')
+          AND period IN ('4', 'OT')
+    ) lc
     GROUP BY lower(ref_name)
 ),
 ref_aggs AS (
@@ -2072,14 +2106,25 @@ SELECT
     r.home_win_pct,
     ROUND((r.foul_disparity - la.avg_foul_disp)::numeric,  2) AS adjusted_foul_disparity,
     ROUND((r.fta_disparity  - la.avg_fta_disp)::numeric,   2) AS adjusted_fta_disparity,
+    -- Recent form (last 2 seasons vs recent league baseline)
+    COALESCE(ra.recent_games, 0) AS recent_games,
+    ROUND((COALESCE(ra.recent_foul_disparity, r.foul_disparity) - la.recent_avg_foul_disp)::numeric, 2) AS recent_adjusted_foul_disparity,
+    ROUND((COALESCE(ra.recent_fta_disparity,  r.fta_disparity)  - la.recent_avg_fta_disp)::numeric,  2) AS recent_adjusted_fta_disparity,
+    -- L2M overall
     COALESCE(l.l2m_total,  0) AS l2m_total,
     COALESCE(l.l2m_errors, 0) AS l2m_errors,
     COALESCE(l.l2m_missed, 0) AS l2m_missed,
     COALESCE(l.l2m_wrong,  0) AS l2m_wrong,
-    ROUND((CAST(COALESCE(l.l2m_errors, 0) AS float) / NULLIF(COALESCE(l.l2m_total, 0), 0) * 100)::numeric, 1) AS error_rate_pct
+    ROUND((CAST(COALESCE(l.l2m_errors, 0) AS float) / NULLIF(COALESCE(l.l2m_total, 0), 0) * 100)::numeric, 1) AS error_rate_pct,
+    -- Clutch accuracy (Q4 + OT only)
+    COALESCE(lc.clutch_total,  0) AS clutch_total,
+    COALESCE(lc.clutch_errors, 0) AS clutch_errors,
+    ROUND((CAST(COALESCE(lc.clutch_errors, 0) AS float) / NULLIF(COALESCE(lc.clutch_total, 0), 0) * 100)::numeric, 1) AS clutch_error_rate_pct
 FROM ref_aggs r
 CROSS JOIN league_avg la
-LEFT JOIN l2m_stats l ON l.ref_lower = lower(r.ref_name)
+LEFT JOIN recent_aggs ra ON lower(ra.ref_name) = lower(r.ref_name)
+LEFT JOIN l2m_stats  l  ON l.ref_lower  = lower(r.ref_name)
+LEFT JOIN l2m_clutch lc ON lc.ref_lower = lower(r.ref_name)
 ORDER BY r.games DESC
 """
 
@@ -2174,7 +2219,7 @@ def _get_referee_detail(name: str):
                 ORDER BY pf_vs_avg DESC
             """, (name, name, name, name, name, name))
 
-            # L2M accuracy for this ref
+            # L2M accuracy — overall + clutch (Q4/OT) + playoff split
             l2m_rows = q(conn, """
                 SELECT
                     COUNT(*) AS total,
@@ -2182,15 +2227,22 @@ def _get_referee_detail(name: str):
                     SUM(CASE WHEN decision = 'INC' THEN 1 ELSE 0 END) AS missed,
                     SUM(CASE WHEN decision = 'IC'  THEN 1 ELSE 0 END) AS wrong,
                     SUM(CASE WHEN decision = 'CC'  THEN 1 ELSE 0 END) AS correct_calls,
-                    SUM(CASE WHEN decision = 'CNC' THEN 1 ELSE 0 END) AS correct_non_calls
+                    SUM(CASE WHEN decision = 'CNC' THEN 1 ELSE 0 END) AS correct_non_calls,
+                    SUM(CASE WHEN period IN ('4','OT') THEN 1 ELSE 0 END) AS clutch_total,
+                    SUM(CASE WHEN period IN ('4','OT') AND decision IN ('INC','IC') THEN 1 ELSE 0 END) AS clutch_errors,
+                    SUM(CASE WHEN playoff = TRUE THEN 1 ELSE 0 END) AS playoff_total,
+                    SUM(CASE WHEN playoff = TRUE AND decision IN ('INC','IC') THEN 1 ELSE 0 END) AS playoff_errors
                 FROM archive_l2m
                 WHERE (lower(ref_1) = lower(%s) OR lower(ref_2) = lower(%s) OR lower(ref_3) = lower(%s))
                   AND decision IN ('CC','CNC','INC','IC')
             """, (name, name, name))
             l2m = dict(l2m_rows[0]) if l2m_rows else {}
-            l2m_total = int(l2m.get("total") or 0)
-            l2m_errors = int(l2m.get("errors") or 0)
-            l2m["error_rate_pct"] = round(l2m_errors / l2m_total * 100, 1) if l2m_total else None
+            l2m_total    = int(l2m.get("total")        or 0)
+            clutch_total = int(l2m.get("clutch_total") or 0)
+            playoff_total = int(l2m.get("playoff_total") or 0)
+            l2m["error_rate_pct"]         = round(int(l2m.get("errors")         or 0) / l2m_total    * 100, 1) if l2m_total    else None
+            l2m["clutch_error_rate_pct"]  = round(int(l2m.get("clutch_errors")  or 0) / clutch_total * 100, 1) if clutch_total  else None
+            l2m["playoff_error_rate_pct"] = round(int(l2m.get("playoff_errors") or 0) / playoff_total * 100, 1) if playoff_total else None
 
         data = {
             "name": name,
