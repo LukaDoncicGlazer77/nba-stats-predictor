@@ -4129,7 +4129,7 @@ window.addEventListener("resize", () => {
   clearTimeout(_scatterResizeTimer);
   _scatterResizeTimer = setTimeout(() => {
     if (_refData && $("#refScatterSvg")) renderRefScatter(_refData);
-    if (_gravityData && $("#gravScatterSvg")) renderGravityScatter(_gravityData.players || []);
+    if (_gravityData && $("#gravScatterSvg") && $("#gravListView") && $("#gravListView").style.display !== "none") renderGravityScatter(_gravityData.players || []);
   }, 150);
 });
 
@@ -4326,7 +4326,12 @@ function renderGravityScatter(players) {
   const xS = v => PAD.left + (v / 100) * innerW;
   const yS = v => PAD.top  + (1 - v / 100) * innerH;
 
-  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="overflow:visible">`;
+  // Write into the existing element (outerHTML swap strips the id, breaking querySelector)
+  svgEl.setAttribute("width", W);
+  svgEl.setAttribute("height", H);
+  svgEl.style.overflow = "visible";
+
+  let s = ``;
 
   // Quadrant shading
   const midX = xS(50), midY = yS(50);
@@ -4372,16 +4377,12 @@ function renderGravityScatter(players) {
     s += `<circle class="grav-sc-dot" cx="${x}" cy="${y}" r="${r}" fill="${col}" fill-opacity="0.78" stroke="rgba(255,255,255,0.15)" stroke-width="1" data-idx="${origIdx}" style="cursor:pointer"/>`;
   });
 
-  s += `</svg>`;
-  svgEl.outerHTML = s;
+  svgEl.innerHTML = s;
 
-  const newSvg = $("#gravScatterSvg");
-  if (!newSvg) return;
+  const tip  = $("#gravScatterTooltip");
+  const wrap = svgEl.parentElement;
 
-  const tip = $("#gravScatterTooltip");
-  const wrap = newSvg.parentElement;
-
-  newSvg.querySelectorAll(".grav-sc-dot").forEach(dot => {
+  svgEl.querySelectorAll(".grav-sc-dot").forEach(dot => {
     const p = players[parseInt(dot.dataset.idx)];
 
     dot.addEventListener("mouseenter", e => {
