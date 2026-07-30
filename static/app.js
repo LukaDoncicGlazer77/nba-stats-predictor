@@ -4322,11 +4322,11 @@ function renderGravityScatter(players) {
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
 
-  // X = pct_3pt (0–100), Y = pct_contact (0–100)
+  // X = pct_usage (0–100), Y = pct_contact (0–100) — both meaningful across all eras
+  // Dot size encodes 3PT threat; dot color encodes gravity score
   const xS = v => PAD.left + (v / 100) * innerW;
   const yS = v => PAD.top  + (1 - v / 100) * innerH;
 
-  // Write into the existing element (outerHTML swap strips the id, breaking querySelector)
   svgEl.setAttribute("width", W);
   svgEl.setAttribute("height", H);
   svgEl.style.overflow = "visible";
@@ -4341,10 +4341,10 @@ function renderGravityScatter(players) {
   s += `<rect x="${midX}" y="${midY}" width="${PAD.left + innerW - midX}" height="${PAD.top + innerH - midY}" fill="rgba(234,179,8,0.04)"/>`;
 
   // Quadrant labels
-  s += `<text x="${PAD.left + 6}" y="${PAD.top + 14}" fill="rgba(91,140,255,0.45)" font-size="10">Interior Only</text>`;
+  s += `<text x="${PAD.left + 6}" y="${PAD.top + 14}" fill="rgba(91,140,255,0.45)" font-size="10">Role Player</text>`;
   s += `<text x="${midX + 6}" y="${PAD.top + 14}" fill="rgba(34,197,94,0.55)" font-size="10">Elite Gravity</text>`;
-  s += `<text x="${PAD.left + 6}" y="${PAD.top + innerH - 6}" fill="rgba(239,68,68,0.4)" font-size="10">Low Gravity</text>`;
-  s += `<text x="${midX + 6}" y="${PAD.top + innerH - 6}" fill="rgba(234,179,8,0.45)" font-size="10">Perimeter Only</text>`;
+  s += `<text x="${PAD.left + 6}" y="${PAD.top + innerH - 6}" fill="rgba(239,68,68,0.4)" font-size="10">Low Usage</text>`;
+  s += `<text x="${midX + 6}" y="${PAD.top + innerH - 6}" fill="rgba(234,179,8,0.45)" font-size="10">Volume Scorer</text>`;
 
   // Grid lines
   [25, 50, 75].forEach(v => {
@@ -4363,15 +4363,15 @@ function renderGravityScatter(players) {
   });
 
   // Axis labels
-  s += `<text x="${PAD.left + innerW / 2}" y="${H - 4}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="11">3PT Threat Percentile →</text>`;
+  s += `<text x="${PAD.left + innerW / 2}" y="${H - 4}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="11">Usage Rate Percentile →</text>`;
   s += `<text x="13" y="${PAD.top + innerH / 2}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="11" transform="rotate(-90,13,${PAD.top + innerH / 2})">Contact Quality Percentile →</text>`;
 
-  // Dots — sorted so high-gravity dots render on top
+  // Dots — sorted so high-gravity dots render on top; size = 3PT threat
   const sorted = [...players].sort((a, b) => a.gravity - b.gravity);
   sorted.forEach((p, i) => {
-    const x = xS(p.pct_3pt || 0);
+    const x = xS(p.pct_usage || 0);
     const y = yS(p.pct_contact || 0);
-    const r = 4 + ((p.pct_usage || 0) / 100) * 5;  // 4–9px radius based on usage
+    const r = 3.5 + ((p.pct_3pt || 0) / 100) * 5;  // 3.5–8.5px: bigger = more 3PT threat
     const col = _gravityColor(p.gravity);
     const origIdx = players.indexOf(p);
     s += `<circle class="grav-sc-dot" cx="${x}" cy="${y}" r="${r}" fill="${col}" fill-opacity="0.78" stroke="rgba(255,255,255,0.15)" stroke-width="1" data-idx="${origIdx}" style="cursor:pointer"/>`;
