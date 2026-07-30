@@ -5159,7 +5159,9 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .ref-stat-sub { font-size: 0.68rem; color: rgba(255,255,255,0.28); line-height: 1.4; }
 
 /* ── Detail panels ── */
-.ref-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.ref-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.ref-detail-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.ref-panel-span2 { grid-column: span 2; }
 .ref-panel {
   background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);
   border-radius: 16px; padding: 24px;
@@ -5214,6 +5216,33 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 .ref-season-col:hover .ref-season-bar { background: linear-gradient(180deg, #c4b5fd, rgba(196,181,253,0.4)); }
 .ref-season-fd  { font-variant-numeric: tabular-nums; }
 .ref-season-lbl { font-size: 0.58rem; color: rgba(255,255,255,0.35); margin-top: 3px; }
+
+/* ── Call type breakdown ── */
+.ref-call-row {
+  display: grid; grid-template-columns: 160px 1fr 80px;
+  align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.ref-call-label {
+  font-size: 0.75rem; color: rgba(220,232,255,0.65); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right;
+}
+.ref-call-bar-wrap {
+  height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;
+}
+.ref-call-bar {
+  height: 100%; border-radius: 4px;
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.ref-call-stats { display: flex; gap: 6px; align-items: baseline; }
+.ref-call-err   { font-size: 0.8rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ref-call-count { font-size: 0.65rem; color: rgba(255,255,255,0.28); font-variant-numeric: tabular-nums; }
+
+/* ── Close game bias ── */
+.ref-close-stat {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 14px;
+}
+.ref-close-val  { font-size: 2rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.ref-close-lbl  { font-size: 0.68rem; font-weight: 700; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.06em; }
 
 /* ── Player mode ── */
 .ref-player-search-row {
@@ -5371,6 +5400,8 @@ select:focus { border-color: var(--sidebar-active); outline: none; }
 @media (max-width: 900px) {
   .ref-stat-cards  { grid-template-columns: repeat(2, 1fr); grid-template-rows: auto; }
   .ref-detail-grid { grid-template-columns: 1fr; }
+  .ref-detail-grid-3 { grid-template-columns: 1fr; }
+  .ref-panel-span2 { grid-column: span 1; }
   .ref-detail-hero { flex-direction: column; align-items: flex-start; gap: 16px; }
 }
 @media (max-width: 700px) {

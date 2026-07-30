@@ -3506,6 +3506,8 @@ async function showRefDetail(name) {
   $("#refStatCards").innerHTML = "";
   $("#refTeamBars").innerHTML = `<div class="ref-loading-row"><div class="sf-spinner" style="width:24px;height:24px;border-width:3px"></div></div>`;
   $("#refSeasonChart").innerHTML = "";
+  $("#refCallBreakdown").innerHTML = "";
+  $("#refCloseGame").innerHTML = "";
 
   try {
     const res = await fetch(`/api/referee-detail?name=${encodeURIComponent(name)}`);
@@ -3518,6 +3520,8 @@ async function showRefDetail(name) {
     verdict.textContent = rating.label;
     verdict.className = `ref-verdict-badge ${rating.cls}`;
     renderRefStatCards(agg, data.l2m || null);
+    renderRefCallBreakdown(data.call_breakdown || []);
+    renderRefCloseGame(data.close_game || {}, agg);
     renderRefTeamBars(data.team_tendencies || []);
     renderRefSeasonChart(data.seasons || []);
   } catch {
@@ -3528,14 +3532,15 @@ async function showRefDetail(name) {
 
 function renderRefStatCards(agg, l2m) {
   const fd      = parseFloat(agg.adjusted_foul_disparity ?? agg.foul_disparity) || 0;
-  const ftd     = parseFloat(agg.adjusted_fta_disparity  ?? agg.fta_disparity)  || 0;
   const recentFd  = agg.recent_games > 0 && agg.recent_adjusted_foul_disparity != null
     ? parseFloat(agg.recent_adjusted_foul_disparity) : null;
-  const hwp     = (parseFloat(agg.home_win_pct) || 0) * 100;
-  const erPct   = l2m && l2m.error_rate_pct != null ? parseFloat(l2m.error_rate_pct) : null;
-  const clutchPct = l2m && l2m.clutch_error_rate_pct != null ? parseFloat(l2m.clutch_error_rate_pct) : null;
-  const l2mTotal    = l2m ? (parseInt(l2m.total)        || 0) : 0;
-  const clutchTotal = l2m ? (parseInt(l2m.clutch_total) || 0) : 0;
+  const hwp          = (parseFloat(agg.home_win_pct) || 0) * 100;
+  const erPct        = l2m && l2m.error_rate_pct        != null ? parseFloat(l2m.error_rate_pct)        : null;
+  const clutchPct    = l2m && l2m.clutch_error_rate_pct != null ? parseFloat(l2m.clutch_error_rate_pct) : null;
+  const playoffPct   = l2m && l2m.playoff_error_rate_pct != null ? parseFloat(l2m.playoff_error_rate_pct) : null;
+  const l2mTotal     = l2m ? (parseInt(l2m.total)         || 0) : 0;
+  const clutchTotal  = l2m ? (parseInt(l2m.clutch_total)  || 0) : 0;
+  const playoffTotal = l2m ? (parseInt(l2m.playoff_total) || 0) : 0;
 
   const cards = [
     { icon: "📢", label: "Fouls / Game",
@@ -3567,6 +3572,12 @@ function renderRefStatCards(agg, l2m) {
           sub: `Q4 + OT only · ${clutchTotal} calls · errors when it counts most`,
           cls: clutchPct > 40 ? "ref-stat-high" : clutchPct < 28 ? "ref-stat-low" : "" }
       : { icon: "⏱️", label: "Clutch Error Rate", value: "—", sub: "Q4/OT · no data", cls: "" },
+    playoffPct != null
+      ? { icon: "🏅", label: "Playoff Error Rate",
+          value: playoffPct.toFixed(1) + "%",
+          sub: `${playoffTotal} playoff calls reviewed · vs overall ${erPct != null ? erPct.toFixed(1) + "%" : "—"}`,
+          cls: playoffPct > 38 ? "ref-stat-high" : playoffPct < 26 ? "ref-stat-low" : "" }
+      : { icon: "🏅", label: "Playoff Error Rate", value: "—", sub: "no playoff L2M data", cls: "" },
   ];
   $("#refStatCards").innerHTML = cards.map(c => `
     <div class="ref-stat-card ${c.cls}">
@@ -3575,6 +3586,61 @@ function renderRefStatCards(agg, l2m) {
       <div class="ref-stat-label">${c.label}</div>
       <div class="ref-stat-sub">${c.sub}</div>
     </div>`).join("");
+}
+
+function renderRefCallBreakdown(calls) {
+  const el = $("#refCallBreakdown");
+  if (!el) return;
+  if (!calls || !calls.length) {
+    el.innerHTML = `<p style="color:var(--muted);font-size:0.84rem;padding:12px 0">No call type data available</p>`;
+    return;
+  }
+  const maxErr = Math.max(...calls.map(c => parseInt(c.errors)), 1);
+  el.innerHTML = calls.map(c => {
+    const errPct = parseFloat(c.error_pct);
+    const barW = (parseInt(c.errors) / maxErr * 100).toFixed(1);
+    const barColor = errPct > 40 ? "#f87171" : errPct > 30 ? "#fb923c" : errPct < 20 ? "#4ade80" : "#8899b4";
+    return `<div class="ref-call-row">
+      <div class="ref-call-label" title="${escapeHtml(c.call_type)}">${escapeHtml(c.call_type)}</div>
+      <div class="ref-call-bar-wrap">
+        <div class="ref-call-bar" style="width:${barW}%;background:${barColor}"></div>
+      </div>
+      <div class="ref-call-stats">
+        <span class="ref-call-err" style="color:${barColor}">${errPct.toFixed(0)}%</span>
+        <span class="ref-call-count">${c.errors}/${c.total}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderRefCloseGame(closeGame, agg) {
+  const el = $("#refCloseGame");
+  if (!el) return;
+  const n = parseInt(closeGame.close_games || 0);
+  if (!n) {
+    el.innerHTML = `<p style="color:var(--muted);font-size:0.84rem;padding:12px 0">Not enough close game data</p>`;
+    return;
+  }
+  const adjFd  = parseFloat(closeGame.adj_close_foul_disparity);
+  const adjFta = parseFloat(closeGame.adj_close_fta_disparity);
+  const careerFd = parseFloat(agg.adjusted_foul_disparity ?? agg.foul_disparity) || 0;
+  const diff = adjFd - careerFd;
+  const diffColor = diff > 0.2 ? "#f87171" : diff < -0.2 ? "#4ade80" : "rgba(255,255,255,0.5)";
+  const fdColor = adjFd > 0.5 ? "#f87171" : adjFd < -0.5 ? "#4ade80" : "rgba(255,255,255,0.7)";
+  el.innerHTML = `
+    <div class="ref-close-stat">
+      <div class="ref-close-val" style="color:${fdColor}">${adjFd > 0 ? "+" : ""}${adjFd.toFixed(2)}</div>
+      <div class="ref-close-lbl">Adj. Foul Bias</div>
+    </div>
+    <div class="ref-close-stat">
+      <div class="ref-close-val" style="color:${adjFta > 0.8 ? "#f87171" : adjFta < -0.8 ? "#4ade80" : "rgba(255,255,255,0.7)"}">${adjFta > 0 ? "+" : ""}${adjFta.toFixed(2)}</div>
+      <div class="ref-close-lbl">Adj. FTA Bias</div>
+    </div>
+    <div class="ref-close-stat">
+      <div class="ref-close-val" style="color:${diffColor}">${diff > 0 ? "+" : ""}${diff.toFixed(2)}</div>
+      <div class="ref-close-lbl">vs Career Avg</div>
+    </div>
+    <div style="font-size:0.72rem;color:var(--muted);margin-top:10px">${n} close games · positive = home team benefits more than usual</div>`;
 }
 
 function renderRefTeamBars(teams) {

@@ -2244,11 +2244,56 @@ def _get_referee_detail(name: str):
             l2m["clutch_error_rate_pct"]  = round(int(l2m.get("clutch_errors")  or 0) / clutch_total * 100, 1) if clutch_total  else None
             l2m["playoff_error_rate_pct"] = round(int(l2m.get("playoff_errors") or 0) / playoff_total * 100, 1) if playoff_total else None
 
+            # Call-type error breakdown — which call types does this ref most often get wrong
+            call_rows = q(conn, """
+                SELECT
+                    call_type,
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN decision IN ('INC','IC') THEN 1 ELSE 0 END) AS errors,
+                    ROUND(100.0 * SUM(CASE WHEN decision IN ('INC','IC') THEN 1 ELSE 0 END)
+                          / COUNT(*)::numeric, 1) AS error_pct
+                FROM archive_l2m
+                WHERE (lower(ref_1) = lower(%s) OR lower(ref_2) = lower(%s) OR lower(ref_3) = lower(%s))
+                  AND decision IN ('CC','CNC','INC','IC')
+                  AND call_type IS NOT NULL AND call_type != ''
+                GROUP BY call_type
+                HAVING COUNT(*) >= 10
+                ORDER BY errors DESC
+                LIMIT 8
+            """, (name, name, name))
+
+            # Close game bias — foul disparity specifically when final margin <= 5 pts
+            close_rows = q(conn, """
+                WITH ref_games AS (
+                    SELECT home_pf, away_pf, home_fta, away_fta, home_pts, away_pts
+                    FROM archive_referee_games
+                    WHERE (ref1 = %s OR ref2 = %s OR ref3 = %s)
+                      AND ABS(home_pts - away_pts) <= 5
+                ),
+                league_close AS (
+                    SELECT
+                        AVG(CAST(away_pf AS float) - home_pf)  AS avg_foul_disp,
+                        AVG(CAST(away_fta AS float) - home_fta) AS avg_fta_disp
+                    FROM archive_referee_games
+                    WHERE ABS(home_pts - away_pts) <= 5
+                )
+                SELECT
+                    COUNT(*) AS close_games,
+                    ROUND(AVG(CAST(rg.away_pf AS float) - rg.home_pf)::numeric, 2)  AS close_foul_disparity,
+                    ROUND(AVG(CAST(rg.away_fta AS float) - rg.home_fta)::numeric, 2) AS close_fta_disparity,
+                    ROUND((AVG(CAST(rg.away_pf AS float) - rg.home_pf) - lc.avg_foul_disp)::numeric, 2) AS adj_close_foul_disparity,
+                    ROUND((AVG(CAST(rg.away_fta AS float) - rg.home_fta) - lc.avg_fta_disp)::numeric, 2) AS adj_close_fta_disparity
+                FROM ref_games rg, league_close lc
+            """, (name, name, name))
+            close_game = dict(close_rows[0]) if close_rows and int(close_rows[0].get("close_games") or 0) > 0 else {}
+
         data = {
             "name": name,
             "seasons": [dict(r) for r in season_rows],
             "team_tendencies": [dict(r) for r in team_rows],
             "l2m": l2m,
+            "call_breakdown": [dict(r) for r in call_rows],
+            "close_game": close_game,
         }
         _REF_DETAIL_CACHE[cache_key] = {"data": data, "ts": now}
         return data
