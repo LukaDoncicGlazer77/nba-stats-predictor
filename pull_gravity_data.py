@@ -62,8 +62,8 @@ def pull_season(season_str, conn):
     try:
         df = LeagueDashPlayerStats(
             season=season_str,
-            per_mode_simple="PerGame",
-            measure_type_simple="Base",
+            per_mode_detailed="PerGame",
+            measure_type_detailed_defense="Base",
             season_type_all_star="Regular Season",
         ).get_data_frames()[0]
     except Exception as exc:
